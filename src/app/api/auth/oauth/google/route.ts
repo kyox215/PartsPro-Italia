@@ -13,8 +13,6 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const body = await parseRequestBody(request);
-  const email = String(body.email ?? "");
-  const password = String(body.password ?? "");
   const locale = normalizeAuthLocale(body.locale);
   const next = getSafeAuthRedirect(body.next, locale);
 
@@ -25,15 +23,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = await getSupabaseServerClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const callbackUrl = new URL("/api/auth/callback", request.url);
+  callbackUrl.searchParams.set("locale", locale);
+  callbackUrl.searchParams.set("next", next);
 
-  if (error) {
-    return NextResponse.redirect(
-      new URL(`/${locale}/login?error=${encodeURIComponent(error.message)}`, request.url),
-      303,
-    );
+  const supabase = await getSupabaseServerClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: callbackUrl.toString(),
+    },
+  });
+
+  if (error || !data.url) {
+    const loginUrl = new URL(`/${locale}/login`, request.url);
+    loginUrl.searchParams.set("error", error?.message ?? "google-oauth-start-failed");
+    return NextResponse.redirect(loginUrl, 303);
   }
 
-  return NextResponse.redirect(new URL(next, request.url), 303);
+  return NextResponse.redirect(data.url, 303);
 }

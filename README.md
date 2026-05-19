@@ -8,6 +8,7 @@ The app is built for:
 - B2C-compatible checkout
 - Italian and Chinese UI routes (`/it`, `/zh`)
 - Supabase Auth/Postgres/Storage architecture
+- Email/password and Google OAuth login entry
 - Supabase CLI config in `supabase/config.toml`
 - Stripe checkout and bank transfer orders
 - Vercel Git deployments from GitHub
@@ -75,6 +76,8 @@ npm run build
 - `/api/admin/b2b/status`
 - `/api/admin/rma/status`
 - `/api/admin/health`
+- `/api/auth/callback`
+- `/api/auth/oauth/google`
 - `/api/auth/sign-in`
 - `/api/auth/sign-up`
 - `/api/auth/sign-out`

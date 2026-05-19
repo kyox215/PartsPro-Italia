@@ -55,6 +55,28 @@ export default async function LoginPage({
             {locale === "it" ? "Entra" : "登录"}
           </button>
         </form>
+
+        <div className="my-5 flex items-center gap-3">
+          <div className="h-px flex-1 bg-slate-200" />
+          <span className="text-xs font-semibold uppercase text-slate-400">
+            {locale === "it" ? "oppure" : "或者"}
+          </span>
+          <div className="h-px flex-1 bg-slate-200" />
+        </div>
+
+        <form action="/api/auth/oauth/google" method="post">
+          <input type="hidden" name="locale" value={locale} />
+          <input type="hidden" name="next" value={`/${locale}/account`} />
+          <button
+            className="inline-flex h-11 w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-950 transition hover:border-blue-300 hover:text-blue-700"
+            type="submit"
+          >
+            <span className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-xs font-black text-blue-600">
+              G
+            </span>
+            {locale === "it" ? "Continua con Google" : "使用 Google 登录"}
+          </button>
+        </form>
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">

@@ -55,6 +55,23 @@ Never commit `.env.local` or secret values. Use `.env.example` only as the publi
 
 The migration enables RLS and keeps authorization roles in `profiles`, not user-editable metadata.
 
+### Google Login
+
+Enable Google under Supabase Dashboard > Authentication > Providers. In Google Cloud Console, add this authorized redirect URI:
+
+```text
+https://<project-ref>.supabase.co/auth/v1/callback
+```
+
+In Supabase Auth URL Configuration, allow these app redirect URLs:
+
+```text
+http://localhost:3001/api/auth/callback
+https://phone-parts-b2b-italy.vercel.app/api/auth/callback
+```
+
+The login page posts to `/api/auth/oauth/google`, then Supabase redirects back to `/api/auth/callback` where the app exchanges the OAuth code for SSR cookies.
+
 Useful SQL after your first admin signs up:
 
 ```sql
@@ -64,6 +81,8 @@ where email = 'you@example.com';
 ```
 
 The app uses Supabase SSR cookie sessions through `src/proxy.ts`. Admin APIs check the signed-in user and only allow real writes for users with `profiles.role = 'admin'`. If Supabase is not configured, admin pages stay in demo mode so Vercel builds and previews still work.
+
+Admin passwords are managed by Supabase Auth and cannot be read back from the app or database. Create the admin user with email/password or Google login, set `ADMIN_EMAIL` to that email in Vercel, and set `profiles.role = 'admin'`.
 
 ## 5. Stripe Setup
 
@@ -105,6 +124,8 @@ After deployment, check:
 - `/it/admin/rma`
 - `/it/admin/system`
 - `/it/login`
+- `/api/auth/oauth/google`
+- `/api/auth/callback`
 - `/api/admin/orders/status`
 - `/api/admin/b2b/status`
 - `/api/admin/rma/status`
