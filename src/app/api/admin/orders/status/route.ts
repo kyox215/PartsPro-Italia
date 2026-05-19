@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const rawBody = await parseRequestBody(request);
   const locale = String(rawBody.locale ?? "it");
-  const backUrl = new URL(`/${locale}/admin/orders`, request.url);
+  const backUrl = getBackUrl(request, locale, rawBody.returnTo, "/admin/orders");
   const parsed = adminOrderStatusSchema.safeParse(rawBody);
 
   if (!parsed.success) {
@@ -51,4 +51,20 @@ export async function POST(request: Request) {
 
   backUrl.searchParams.set("saved", "1");
   return NextResponse.redirect(backUrl, 303);
+}
+
+function getBackUrl(
+  request: Request,
+  locale: string,
+  returnTo: unknown,
+  fallbackPath: string,
+) {
+  if (
+    typeof returnTo === "string" &&
+    returnTo.startsWith(`/${locale}/admin/orders`)
+  ) {
+    return new URL(returnTo, request.url);
+  }
+
+  return new URL(`/${locale}${fallbackPath}`, request.url);
 }

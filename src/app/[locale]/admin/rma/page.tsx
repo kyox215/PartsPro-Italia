@@ -76,6 +76,13 @@ export default async function AdminRmaPage({
                 locale={locale}
                 statuses={rmaStatuses}
               />
+              <ButtonLink
+                href={localizePath(locale, `/admin/rma/${rma.id}`)}
+                variant="secondary"
+                className="h-9 px-3 text-xs"
+              >
+                {locale === "it" ? "Apri" : "查看"}
+              </ButtonLink>
             </div>
           </article>
         ))}

@@ -92,6 +92,7 @@ export function AccountOrdersTable({
             <th className="px-4 py-3">Payment</th>
             <th className="px-4 py-3">Total</th>
             <th className="px-4 py-3">Status</th>
+            <th className="px-4 py-3">Detail</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200">
@@ -131,6 +132,15 @@ export function AccountOrdersTable({
                 <Badge className="border-slate-300 bg-slate-100 text-slate-800">
                   {order.status}
                 </Badge>
+              </td>
+              <td className="px-4 py-3">
+                <ButtonLink
+                  href={localizePath(locale, `/account/orders/${order.id}`)}
+                  variant="secondary"
+                  className="h-9 px-3 text-xs"
+                >
+                  {locale === "it" ? "Apri" : "查看"}
+                </ButtonLink>
               </td>
             </tr>
           ))}
@@ -181,6 +191,13 @@ export function AccountRmaGrid({
           <p className="mt-3 text-xs text-slate-500">
             {new Date(rma.createdAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN")}
           </p>
+          <ButtonLink
+            href={localizePath(locale, `/account/rma/${rma.id}`)}
+            variant="secondary"
+            className="mt-4 h-9 px-3 text-xs"
+          >
+            {locale === "it" ? "Apri dettaglio" : "查看详情"}
+          </ButtonLink>
         </article>
       ))}
     </div>

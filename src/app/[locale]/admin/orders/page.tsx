@@ -67,6 +67,7 @@ export default async function AdminOrdersPage({
                 <th className="px-4 py-3">Payment</th>
                 <th className="px-4 py-3">Total</th>
                 <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Detail</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
@@ -113,6 +114,15 @@ export default async function AdminOrdersPage({
                       locale={locale}
                       statuses={orderStatuses}
                     />
+                  </td>
+                  <td className="px-4 py-3">
+                    <ButtonLink
+                      href={localizePath(locale, `/admin/orders/${order.id}`)}
+                      variant="secondary"
+                      className="h-9 px-3 text-xs"
+                    >
+                      {locale === "it" ? "Apri" : "查看"}
+                    </ButtonLink>
                   </td>
                 </tr>
               ))}

@@ -17,8 +17,9 @@ The app is built for:
 - Role-aware navigation and post-login redirects
 - Admin product/SKU creation shell at `/{locale}/admin/products`
 - Admin order, B2B approval, and RMA status workflows
+- Admin order/RMA detail pages with fulfillment and return-to-detail status updates
 - Admin system health dashboard for environment and Supabase table checks
-- Customer account workspace with own orders, totals, and RMA activity
+- Customer account workspace with own orders, totals, RMA activity, and detail pages
 - Customer company profile editor for invoice and B2B data
 
 ## Getting Started
@@ -63,14 +64,18 @@ npm run build
 - `/it/rma`
 - `/it/account`
 - `/it/account/orders`
+- `/it/account/orders/[orderId]`
 - `/it/account/rma`
+- `/it/account/rma/[rmaId]`
 - `/it/account/company`
 - `/it/admin`
 - `/it/admin/inventory`
 - `/it/admin/products`
 - `/it/admin/orders`
+- `/it/admin/orders/[orderId]`
 - `/it/admin/b2b`
 - `/it/admin/rma`
+- `/it/admin/rma/[rmaId]`
 - `/it/admin/system`
 - `/it/login`
 - `/api/orders`

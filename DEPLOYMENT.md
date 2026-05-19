@@ -115,7 +115,9 @@ After deployment, check:
 - `/it/checkout`
 - `/it/account`
 - `/it/account/orders`
+- `/it/account/orders/[orderId]`
 - `/it/account/rma`
+- `/it/account/rma/[rmaId]`
 - `/it/account/company`
 - `/it/b2b`
 - `/it/rma`
@@ -123,8 +125,10 @@ After deployment, check:
 - `/it/admin/products`
 - `/it/admin/inventory`
 - `/it/admin/orders`
+- `/it/admin/orders/[orderId]`
 - `/it/admin/b2b`
 - `/it/admin/rma`
+- `/it/admin/rma/[rmaId]`
 - `/it/admin/system`
 - `/it/login`
 - `/api/auth/oauth/google`
@@ -142,12 +146,14 @@ After deployment, check:
 - Admin routes use a left-sidebar workspace and redirect non-admin signed-in users back to account with a permission message.
 - Account routes use a left-sidebar workspace with overview, historical orders, RMA records, and company profile.
 - The account pages read the signed-in customer's own orders and RMA records through Supabase SSR sessions and RLS.
+- Account order detail pages show item-level stock/preorder fulfillment and link each line to a prefilled RMA request.
+- Account RMA detail pages show the customer's own case state, issue, SKU, and submitted description.
 - Customers can maintain company, invoice, contact, and category data at `/account/company`; status and price group remain admin-controlled.
 - Login redirects are role-aware: admins land on `/{locale}/admin`, ordinary users land on `/{locale}/account`, unless a safe role-allowed `next` URL was requested.
 - `/admin/system` shows Vercel environment readiness plus Supabase public/admin table reachability without exposing secret values.
 - Stripe checkout redirects to Stripe only when `STRIPE_SECRET_KEY` is configured.
 - Product/SKU admin form writes to `products`, `skus`, and `inventory` when Supabase is configured and the user is admin.
-- Admin order, B2B approval, and RMA pages can update statuses through Node.js route handlers when Supabase is configured and the user is admin.
+- Admin order and RMA detail pages show operational context and can update statuses through Node.js route handlers when Supabase is configured and the user is admin.
 - Without Supabase env vars, catalog/admin pages use local seed products and API writes return demo-mode redirects.
 
 ## 8. Rollback

@@ -4,10 +4,20 @@ import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 
 export default async function RmaPage({
   params,
-}: Readonly<{ params: Promise<{ locale: string }> }>) {
+  searchParams,
+}: Readonly<{
+  params: Promise<{ locale: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}>) {
   const { locale: rawLocale } = await params;
+  const query = (await searchParams) ?? {};
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "it";
   const dictionary = getDictionary(locale);
+  const defaults = {
+    orderNumber: valueOf(query.orderNumber),
+    sku: valueOf(query.sku),
+    quantity: valueOf(query.quantity),
+  };
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
@@ -32,6 +42,7 @@ export default async function RmaPage({
                 className="h-11 rounded-lg border border-slate-300 px-3 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                 name={name}
                 type={name === "quantity" ? "number" : "text"}
+                defaultValue={defaults[name as keyof typeof defaults] ?? ""}
               />
             </label>
           ))}
@@ -58,4 +69,8 @@ export default async function RmaPage({
       </section>
     </div>
   );
+}
+
+function valueOf(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }
