@@ -110,6 +110,9 @@ export async function POST(request: Request) {
     .insert({
       product_id: product.id,
       sku: payload.sku,
+      barcode_ean13: payload.barcodeEan13 || null,
+      cost_price:
+        typeof payload.costPrice === "number" ? payload.costPrice : null,
       color: payload.color || null,
       compatibility: payload.compatibility
         ? payload.compatibility.split(",").map((item) => item.trim()).filter(Boolean)

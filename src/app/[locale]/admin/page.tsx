@@ -8,6 +8,7 @@ import {
   TicketCheck,
   type LucideIcon,
   UsersRound,
+  Warehouse,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
@@ -72,6 +73,15 @@ export default async function AdminPage({
       href: localizePath(locale, "/admin/products"),
     },
     {
+      Icon: Warehouse,
+      title: locale === "it" ? "Inventario e preordini" : "库存与预购",
+      description:
+        locale === "it"
+          ? "Importa ordini fornitore e conferma arrivi."
+          : "导入上游订货单并确认到货/缺货。",
+      href: localizePath(locale, "/admin/inventory"),
+    },
+    {
       Icon: ClipboardList,
       title: locale === "it" ? "Ordini e pagamenti" : "订单与付款",
       description:
@@ -130,6 +140,9 @@ export default async function AdminPage({
         <div className="mt-5 flex flex-wrap gap-3">
           <ButtonLink href={localizePath(locale, "/admin/products")}>
             {locale === "it" ? "Gestisci prodotti" : "管理商品"}
+          </ButtonLink>
+          <ButtonLink href={localizePath(locale, "/admin/inventory")} variant="secondary">
+            {locale === "it" ? "Inventario" : "库存"}
           </ButtonLink>
           <ButtonLink href={localizePath(locale, "/admin/orders")} variant="secondary">
             {locale === "it" ? "Ordini" : "订单"}

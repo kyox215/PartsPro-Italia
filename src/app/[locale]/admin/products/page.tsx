@@ -234,6 +234,7 @@ export default async function AdminProductsPage({
           <input type="hidden" name="locale" value={locale} />
           <Input name="slug" label="Slug" defaultValue="iphone-15-pro-soft-oled-display" />
           <Input name="sku" label="SKU" defaultValue="APL-IP15P-SCR-SO-BLK" />
+          <Input name="barcodeEan13" label="EAN-13" defaultValue="" required={false} />
           <Input name="brand" label="Brand" defaultValue="Apple" />
           <Input name="model" label="Model" defaultValue="iPhone 15 Pro" />
           <label className="grid gap-2 text-sm font-medium text-slate-700">
@@ -266,6 +267,7 @@ export default async function AdminProductsPage({
           <Input name="nameZh" label="中文名" defaultValue="iPhone 15 Pro Soft OLED 黑色屏幕" />
           <Input name="color" label="Color" defaultValue="Black" />
           <Input name="moq" label="MOQ" defaultValue="1" type="number" />
+          <Input name="costPrice" label="Cost EUR" defaultValue="" type="number" step="0.01" required={false} />
           <Input name="retailPrice" label="Retail EUR" defaultValue="119.90" type="number" step="0.01" />
           <Input name="b2bPrice" label="B2B EUR" defaultValue="92.50" type="number" step="0.01" />
           <Input name="stockOnHand" label="Stock" defaultValue="20" type="number" />
@@ -323,16 +325,20 @@ export default async function AdminProductsPage({
           </h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] text-left text-sm">
+          <table className="w-full min-w-[1240px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-4 py-3">SKU</th>
+                <th className="px-4 py-3">EAN</th>
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3">Brand / Model</th>
                 <th className="px-4 py-3">Quality</th>
+                <th className="px-4 py-3">Cost</th>
                 <th className="px-4 py-3">Retail</th>
                 <th className="px-4 py-3">B2B</th>
                 <th className="px-4 py-3">Stock</th>
+                <th className="px-4 py-3">Reserved</th>
+                <th className="px-4 py-3">Incoming</th>
                 <th className="px-4 py-3">Status</th>
               </tr>
             </thead>
@@ -341,6 +347,9 @@ export default async function AdminProductsPage({
                 <tr key={row.id}>
                   <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-800">
                     {row.sku}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-slate-600">
+                    {row.barcodeEan13 || "-"}
                   </td>
                   <td className="px-4 py-3">
                     <p className="font-semibold text-slate-950">
@@ -356,17 +365,31 @@ export default async function AdminProductsPage({
                       {row.qualityGrade}
                     </Badge>
                   </td>
+                  <td className="px-4 py-3">
+                    {row.costPrice === null ? "-" : formatMoney(row.costPrice, locale)}
+                  </td>
                   <td className="px-4 py-3">{formatMoney(row.retailPrice, locale)}</td>
                   <td className="px-4 py-3 font-semibold text-blue-700">
                     {formatMoney(row.b2bPrice, locale)}
                   </td>
                   <td className="px-4 py-3">
                     {row.stockOnHand}
-                    {row.incomingQty ? (
-                      <span className="ml-2 text-xs text-violet-700">
-                        +{row.incomingQty}
+                  </td>
+                  <td className="px-4 py-3 text-slate-700">
+                    {row.stockReserved}
+                    {row.incomingReserved ? (
+                      <span className="ml-1 text-xs text-violet-700">
+                        / {row.incomingReserved}
                       </span>
                     ) : null}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="font-semibold text-violet-700">
+                      {Math.max(row.incomingQty - row.incomingReserved, 0)}
+                    </span>
+                    <span className="ml-1 text-xs text-slate-500">
+                      / {row.incomingQty}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     {row.isActive ? (

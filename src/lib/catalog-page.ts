@@ -35,6 +35,7 @@ export type CatalogItem = {
   productId: string;
   slug: string;
   sku: string;
+  barcodeEan13: string | null;
   brand: string;
   model: string;
   category: string;
@@ -51,6 +52,11 @@ export type CatalogItem = {
   stockOnHand: number | null;
   availableStock: number | null;
   incomingQty: number | null;
+  incomingReserved: number | null;
+  incomingAvailable: number | null;
+  preorderLeadTimeMinDays: number | null;
+  preorderLeadTimeMaxDays: number | null;
+  isPreorderable: boolean;
 };
 
 export type CatalogFacetOption = {
@@ -93,6 +99,7 @@ type CatalogRow = {
   product_id: string;
   slug: string;
   sku: string;
+  barcode_ean13?: string | null;
   brand: string;
   model: string;
   category: string;
@@ -112,6 +119,11 @@ type CatalogRow = {
   stock_on_hand?: number | null;
   available_stock?: number | null;
   incoming_qty?: number | null;
+  incoming_reserved?: number | null;
+  incoming_available?: number | null;
+  preorder_lead_time_min_days?: number | null;
+  preorder_lead_time_max_days?: number | null;
+  is_preorderable?: boolean | null;
 };
 
 type AttributeValueRow = {
@@ -404,6 +416,7 @@ function applyCatalogFilters(
     nextQuery = nextQuery.or(
       [
         `sku.ilike.${pattern}`,
+        `barcode_ean13.ilike.${pattern}`,
         `brand.ilike.${pattern}`,
         `model.ilike.${pattern}`,
         `name_it.ilike.${pattern}`,
@@ -429,9 +442,9 @@ function applyCatalogFilters(
     if (state.availability === "in_stock") {
       nextQuery = nextQuery.gt("available_stock", 0);
     } else if (state.availability === "incoming") {
-      nextQuery = nextQuery.eq("available_stock", 0).gt("incoming_qty", 0);
+      nextQuery = nextQuery.eq("available_stock", 0).gt("incoming_available", 0);
     } else if (state.availability === "out_of_stock") {
-      nextQuery = nextQuery.eq("available_stock", 0).eq("incoming_qty", 0);
+      nextQuery = nextQuery.eq("available_stock", 0).eq("incoming_available", 0);
     } else if (state.availability === "low_stock") {
       nextQuery = nextQuery.gt("available_stock", 0).lte("available_stock", 10);
     }
@@ -560,6 +573,7 @@ function buildLocalFacets(
     product_id: product.slug,
     slug: product.slug,
     sku: product.sku,
+    barcode_ean13: null,
     brand: product.brand,
     model: product.model,
     category: product.category,
@@ -571,6 +585,11 @@ function buildLocalFacets(
     moq: product.moq,
     available_stock: product.stock,
     incoming_qty: product.incoming ?? 0,
+    incoming_reserved: 0,
+    incoming_available: product.incoming ?? 0,
+    preorder_lead_time_min_days: 7,
+    preorder_lead_time_max_days: 14,
+    is_preorderable: (product.incoming ?? 0) > 0,
   }));
 
   return buildFacets(rows, [], locale, state, isPriceVisible);
@@ -638,7 +657,7 @@ function buildAvailabilityOptions(
   const counts = rows.reduce<Record<string, number>>(
     (result, row) => {
       const available = Number(row.available_stock ?? 0);
-      const incoming = Number(row.incoming_qty ?? 0);
+      const incoming = Number(row.incoming_available ?? row.incoming_qty ?? 0);
       if (available > 0) result.in_stock += 1;
       if (available > 0 && available <= 10) result.low_stock += 1;
       if (available <= 0 && incoming > 0) result.incoming += 1;
@@ -699,6 +718,7 @@ function mapCatalogRow(
     productId: row.product_id,
     slug: row.slug,
     sku: row.sku,
+    barcodeEan13: row.barcode_ean13 ?? null,
     brand: row.brand,
     model: row.model,
     category: row.category,
@@ -717,6 +737,19 @@ function mapCatalogRow(
     stockOnHand: isPriceVisible ? Number(row.stock_on_hand ?? 0) : null,
     availableStock: isPriceVisible ? Number(row.available_stock ?? 0) : null,
     incomingQty: isPriceVisible ? Number(row.incoming_qty ?? 0) : null,
+    incomingReserved: isPriceVisible ? Number(row.incoming_reserved ?? 0) : null,
+    incomingAvailable: isPriceVisible
+      ? Number(row.incoming_available ?? row.incoming_qty ?? 0)
+      : null,
+    preorderLeadTimeMinDays: isPriceVisible
+      ? Number(row.preorder_lead_time_min_days ?? 7)
+      : null,
+    preorderLeadTimeMaxDays: isPriceVisible
+      ? Number(row.preorder_lead_time_max_days ?? 14)
+      : null,
+    isPreorderable: isPriceVisible
+      ? Boolean(row.is_preorderable ?? Number(row.incoming_available ?? row.incoming_qty ?? 0) > 0)
+      : false,
   };
 }
 
@@ -730,6 +763,7 @@ function mapLocalProduct(
     productId: product.slug,
     slug: product.slug,
     sku: product.sku,
+    barcodeEan13: null,
     brand: product.brand,
     model: product.model,
     category: product.category,
@@ -746,6 +780,11 @@ function mapLocalProduct(
     stockOnHand: isPriceVisible ? product.stock : null,
     availableStock: isPriceVisible ? product.stock : null,
     incomingQty: isPriceVisible ? (product.incoming ?? 0) : null,
+    incomingReserved: isPriceVisible ? 0 : null,
+    incomingAvailable: isPriceVisible ? (product.incoming ?? 0) : null,
+    preorderLeadTimeMinDays: isPriceVisible ? 7 : null,
+    preorderLeadTimeMaxDays: isPriceVisible ? 14 : null,
+    isPreorderable: isPriceVisible ? (product.incoming ?? 0) > 0 : false,
   };
 }
 

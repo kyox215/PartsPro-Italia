@@ -38,7 +38,13 @@ export default async function ProductDetailPage({
             {item.quality}
           </Badge>
           {detail.isPriceVisible ? (
-            <StockBadge available={item.availableStock ?? 0} incoming={item.incomingQty ?? 0} locale={locale} />
+            <StockBadge
+              available={item.availableStock ?? 0}
+              incoming={item.incomingAvailable ?? item.incomingQty ?? 0}
+              leadMax={item.preorderLeadTimeMaxDays ?? 14}
+              leadMin={item.preorderLeadTimeMinDays ?? 7}
+              locale={locale}
+            />
           ) : (
             <Badge className="border-amber-200 bg-amber-50 text-amber-700">
               {locale === "it" ? "Login per prezzo" : "登录查看价格"}
@@ -136,9 +142,16 @@ export default async function ProductDetailPage({
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           {detail.isPriceVisible ? (
-            <ButtonLink href={localizePath(locale, "/cart")} className="flex-1">
+            <ButtonLink
+              href={`${localizePath(locale, "/checkout")}?sku=${encodeURIComponent(item.sku)}&qty=${item.moq}`}
+              className="flex-1"
+            >
               <ShoppingCart className="h-4 w-4" />
-              {dictionary.common.addToCart}
+              {(item.availableStock ?? 0) > 0
+                ? dictionary.common.addToCart
+                : locale === "it"
+                  ? "Preordina"
+                  : "预购"}
             </ButtonLink>
           ) : (
             <ButtonLink href={localizePath(locale, "/login")} className="flex-1">
@@ -188,8 +201,16 @@ function ProductMedia({
 function StockBadge({
   available,
   incoming,
+  leadMin,
+  leadMax,
   locale,
-}: Readonly<{ available: number; incoming: number; locale: Locale }>) {
+}: Readonly<{
+  available: number;
+  incoming: number;
+  leadMin: number;
+  leadMax: number;
+  locale: Locale;
+}>) {
   if (available > 0) {
     return (
       <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
@@ -201,7 +222,8 @@ function StockBadge({
   if (incoming > 0) {
     return (
       <Badge className="border-violet-200 bg-violet-50 text-violet-700">
-        {locale === "it" ? "In arrivo" : "在途"} {incoming}
+        {locale === "it" ? "Preordine" : "预购"} {incoming} / {leadMin}-{leadMax}{" "}
+        {locale === "it" ? "gg" : "天"}
       </Badge>
     );
   }

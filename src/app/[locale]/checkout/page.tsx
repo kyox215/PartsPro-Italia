@@ -1,30 +1,31 @@
 import { CreditCard, Landmark } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { products } from "@/lib/catalog";
+import { ButtonLink } from "@/components/ui/button";
+import { loadCheckoutLines } from "@/lib/checkout-lines";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
-import { calculateLineTotal, formatMoney } from "@/lib/pricing";
+import { localizePath } from "@/lib/i18n";
+import { formatMoney } from "@/lib/pricing";
 
 export default async function CheckoutPage({
   params,
-}: Readonly<{ params: Promise<{ locale: string }> }>) {
+  searchParams,
+}: Readonly<{
+  params: Promise<{ locale: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}>) {
   const { locale: rawLocale } = await params;
+  const query = (await searchParams) ?? {};
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "it";
   const dictionary = getDictionary(locale);
-  const cartLines = [
-    { product: products[0], quantity: 5 },
-    { product: products[1], quantity: 10 },
-  ];
+  const selectedItems = itemsFromSearchParams(query);
+  const checkout = await loadCheckoutLines({ locale, items: selectedItems });
+  const error = valueOf(query.error);
+  const cartLines = checkout.lines;
   const itemsJson = JSON.stringify(
-    cartLines.map((line) => ({ sku: line.product.sku, quantity: line.quantity })),
+    cartLines.map((line) => ({ sku: line.sku, quantity: line.quantity })),
   );
-  const subtotal = cartLines.reduce(
-    (sum, line) => sum + calculateLineTotal(line.product, line.quantity, true).subtotal,
-    0,
-  );
-  const vat = cartLines.reduce(
-    (sum, line) => sum + calculateLineTotal(line.product, line.quantity, true).vat,
-    0,
-  );
+  const subtotal = cartLines.reduce((sum, line) => sum + line.subtotal, 0);
+  const vat = cartLines.reduce((sum, line) => sum + line.vat, 0);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
@@ -37,6 +38,24 @@ export default async function CheckoutPage({
           {dictionary.checkout.subtitle}
         </p>
 
+        {error ? (
+          <div className="mt-5 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+            {decodeURIComponent(error)}
+          </div>
+        ) : null}
+
+        {checkout.requiresLogin ? (
+          <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            {locale === "it"
+              ? "Accedi per vedere prezzi B2B e creare preordini."
+              : "请先登录，才能查看 B2B 价格并创建预购订单。"}
+            <ButtonLink href={localizePath(locale, "/login")} className="mt-4 w-fit">
+              {locale === "it" ? "Login" : "登录"}
+            </ButtonLink>
+          </div>
+        ) : null}
+
+        {!checkout.requiresLogin && cartLines.length > 0 ? (
         <form className="mt-8 grid gap-6" action="/api/orders" method="post">
           <input type="hidden" name="locale" value={locale} />
           <input type="hidden" name="itemsJson" value={itemsJson} />
@@ -75,16 +94,26 @@ export default async function CheckoutPage({
             </h2>
             <div className="mt-3 space-y-2 text-sm text-slate-700">
               {cartLines.map((line) => (
-                <div key={line.product.sku} className="flex justify-between gap-4">
-                  <span>
-                    {line.product.names[locale]} x {line.quantity}
-                  </span>
-                  <strong>
-                    {formatMoney(
-                      calculateLineTotal(line.product, line.quantity, true).subtotal,
-                      locale,
-                    )}
-                  </strong>
+                <div key={line.sku} className="grid gap-1 border-b border-slate-200 pb-2 last:border-b-0">
+                  <div className="flex justify-between gap-4">
+                    <span>
+                      {line.name} x {line.quantity}
+                    </span>
+                    <strong>{formatMoney(line.subtotal, locale)}</strong>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {line.fulfillmentType === "stock"
+                      ? locale === "it"
+                        ? "Da stock disponibile"
+                        : "现货发货"
+                      : line.fulfillmentType === "preorder"
+                        ? locale === "it"
+                          ? `Preordine ${line.preorderLeadTimeMinDays}-${line.preorderLeadTimeMaxDays} giorni`
+                          : `预购 ${line.preorderLeadTimeMinDays}-${line.preorderLeadTimeMaxDays} 天到货`
+                        : locale === "it"
+                          ? "Stock + preordine"
+                          : "现货 + 预购"}
+                  </p>
                 </div>
               ))}
               <div className="flex justify-between border-t border-slate-200 pt-2">
@@ -105,6 +134,7 @@ export default async function CheckoutPage({
             {dictionary.common.submit}
           </button>
         </form>
+        ) : null}
       </section>
     </div>
   );
@@ -120,6 +150,18 @@ function Fieldset({
       {children}
     </fieldset>
   );
+}
+
+function itemsFromSearchParams(searchParams: Record<string, string | string[] | undefined>) {
+  const sku = valueOf(searchParams.sku);
+  const qty = Math.max(1, Number.parseInt(valueOf(searchParams.qty), 10) || 1);
+
+  if (!sku) return [];
+  return [{ sku, quantity: qty }];
+}
+
+function valueOf(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : (value ?? "");
 }
 
 function Input({

@@ -37,6 +37,7 @@ export const categories = [
   { id: "screens", label: { it: "Display", zh: "屏幕" } },
   { id: "batteries", label: { it: "Batterie", zh: "电池" } },
   { id: "charging-ports", label: { it: "Connettori ricarica", zh: "尾插" } },
+  { id: "dock-connectors", label: { it: "Dock connector", zh: "尾插 / 充电接口" } },
   { id: "back-covers", label: { it: "Back cover", zh: "后盖" } },
   { id: "cameras", label: { it: "Fotocamere", zh: "摄像头" } },
   { id: "tools", label: { it: "Strumenti", zh: "工具耗材" } },

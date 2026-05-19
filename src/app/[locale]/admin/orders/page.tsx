@@ -91,6 +91,12 @@ export default async function AdminOrdersPage({
                       {order.items.map((item) => (
                         <li key={`${order.id}-${item.sku}`}>
                           {item.sku} x {item.quantity}
+                          {item.fulfillmentType ? (
+                            <span className="ml-2 text-xs text-slate-500">
+                              {item.fulfillmentType}
+                              {item.preorderQty ? ` / preorder ${item.preorderQty}` : ""}
+                            </span>
+                          ) : null}
                         </li>
                       ))}
                     </ul>

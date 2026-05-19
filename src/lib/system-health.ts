@@ -105,6 +105,10 @@ const adminTables = [
   "orders",
   "order_items",
   "rmas",
+  "inventory_settings",
+  "supplier_purchase_orders",
+  "supplier_purchase_order_items",
+  "inventory_movements",
 ] as const;
 
 export async function getSystemHealth(): Promise<SystemHealth> {

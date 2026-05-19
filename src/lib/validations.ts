@@ -78,6 +78,8 @@ export const adminProductSchema = z.object({
   descriptionZh: z.string().optional().or(z.literal("")),
   imageUrl: z.string().url().optional().or(z.literal("")),
   sku: z.string().min(1),
+  barcodeEan13: z.string().optional().or(z.literal("")),
+  costPrice: z.coerce.number().nonnegative().optional().or(z.literal("")),
   color: z.string().optional().or(z.literal("")),
   compatibility: z.string().optional().or(z.literal("")),
   moq: z.coerce.number().int().positive(),
@@ -105,6 +107,25 @@ export const adminCatalogAttributeSchema = z.object({
   unit: z.string().optional().or(z.literal("")),
   isFilterable: z.coerce.boolean().default(true),
   options: z.string().optional().or(z.literal("")),
+});
+
+export const adminInventorySettingsSchema = z.object({
+  locale: z.enum(["it", "zh"]).default("it"),
+  b2bMarkup: z.coerce.number().positive(),
+  retailMarkup: z.coerce.number().positive(),
+  preorderLeadTimeMinDays: z.coerce.number().int().nonnegative(),
+  preorderLeadTimeMaxDays: z.coerce.number().int().nonnegative(),
+}).refine(
+  (value) => value.preorderLeadTimeMaxDays >= value.preorderLeadTimeMinDays,
+  {
+    message: "max lead time must be greater than or equal to min lead time",
+    path: ["preorderLeadTimeMaxDays"],
+  },
+);
+
+export const adminInventoryReceiveSchema = z.object({
+  locale: z.enum(["it", "zh"]).default("it"),
+  itemIds: z.string().min(1),
 });
 
 export const adminOrderStatusSchema = z.object({

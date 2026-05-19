@@ -19,6 +19,9 @@ export type AdminOrderRow = {
     name: string;
     quantity: number;
     unitPrice: number;
+    fulfillmentType?: string;
+    stockQty?: number;
+    preorderQty?: number;
   }>;
 };
 
@@ -61,12 +64,18 @@ export async function getAdminOrderRows(): Promise<AdminOrderRow[]> {
             name: products[0].names.it,
             quantity: 5,
             unitPrice: products[0].b2bPrice,
+            fulfillmentType: "stock",
+            stockQty: 5,
+            preorderQty: 0,
           },
           {
             sku: products[1].sku,
             name: products[1].names.it,
             quantity: 10,
             unitPrice: products[1].b2bPrice,
+            fulfillmentType: "mixed",
+            stockQty: 5,
+            preorderQty: 5,
           },
         ],
       },
@@ -101,11 +110,17 @@ export async function getAdminOrderRows(): Promise<AdminOrderRow[]> {
         name: string;
         quantity: number;
         unit_price: number | string;
+        fulfillment_type?: string;
+        stock_qty?: number;
+        preorder_qty?: number;
       }) => ({
         sku: item.sku,
         name: item.name,
         quantity: item.quantity,
         unitPrice: Number(item.unit_price ?? 0),
+        fulfillmentType: item.fulfillment_type,
+        stockQty: item.stock_qty,
+        preorderQty: item.preorder_qty,
       }),
     ),
   }));

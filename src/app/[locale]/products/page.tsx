@@ -418,7 +418,7 @@ function DesktopCatalogTable({
                   </td>
                   <td className="px-4 py-4 align-top">
                     <Link
-                      href={localizePath(locale, "/cart")}
+                      href={checkoutHref(locale, item)}
                       className="inline-flex h-9 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-3 text-sm font-bold text-white hover:bg-blue-700"
                     >
                       <ShoppingCart className="h-4 w-4" />
@@ -476,6 +476,19 @@ function MobileCatalogCards({
                 <div className="col-span-2">
                   <StockLabel item={item} locale={locale} />
                 </div>
+                <Link
+                  href={checkoutHref(locale, item)}
+                  className="col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-blue-600 bg-blue-600 px-3 text-sm font-bold text-white hover:bg-blue-700"
+                >
+                  <ShoppingCart className="h-4 w-4" />
+                  {item.availableStock && item.availableStock > 0
+                    ? locale === "it"
+                      ? "Ordina"
+                      : "下单"
+                    : locale === "it"
+                      ? "Preordina"
+                      : "预购"}
+                </Link>
               </>
             ) : (
               <div>
@@ -492,7 +505,9 @@ function MobileCatalogCards({
 
 function StockLabel({ item, locale }: Readonly<{ item: CatalogItem; locale: Locale }>) {
   const available = item.availableStock ?? 0;
-  const incoming = item.incomingQty ?? 0;
+  const incoming = item.incomingAvailable ?? item.incomingQty ?? 0;
+  const leadMin = item.preorderLeadTimeMinDays ?? 7;
+  const leadMax = item.preorderLeadTimeMaxDays ?? 14;
 
   return (
     <div className="text-sm">
@@ -509,8 +524,8 @@ function StockLabel({ item, locale }: Readonly<{ item: CatalogItem; locale: Loca
           ? `${available} ${locale === "it" ? "pz" : "件"}`
           : incoming > 0
             ? locale === "it"
-              ? "In arrivo"
-              : "在途"
+              ? `Preordine ${leadMin}-${leadMax} gg`
+              : `预购 ${leadMin}-${leadMax} 天到货`
             : locale === "it"
               ? "Esaurito"
               : "缺货"}
@@ -603,4 +618,12 @@ function buildActiveChips(catalog: CatalogPageData) {
 function productsHref(locale: Locale, params: URLSearchParams) {
   const query = params.toString();
   return `${localizePath(locale, "/products")}${query ? `?${query}` : ""}`;
+}
+
+function checkoutHref(locale: Locale, item: CatalogItem) {
+  const params = new URLSearchParams({
+    sku: item.sku,
+    qty: String(item.moq),
+  });
+  return `${localizePath(locale, "/checkout")}?${params.toString()}`;
 }
