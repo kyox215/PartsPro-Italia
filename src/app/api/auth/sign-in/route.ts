@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { getRoleForUser } from "@/lib/auth";
 import {
-  getSafeAuthRedirect,
+  getRoleAwareAuthRedirect,
   normalizeAuthLocale,
 } from "@/lib/auth-redirect";
 import { parseRequestBody } from "@/lib/request";
@@ -16,7 +17,6 @@ export async function POST(request: Request) {
   const email = String(body.email ?? "");
   const password = String(body.password ?? "");
   const locale = normalizeAuthLocale(body.locale);
-  const next = getSafeAuthRedirect(body.next, locale);
 
   if (!hasSupabasePublicConfig()) {
     return NextResponse.redirect(
@@ -34,6 +34,18 @@ export async function POST(request: Request) {
       303,
     );
   }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const role = user
+    ? await getRoleForUser({ id: user.id, email: user.email })
+    : { isAdmin: false };
+  const next = getRoleAwareAuthRedirect({
+    value: body.next,
+    locale,
+    isAdmin: role.isAdmin,
+  });
 
   return NextResponse.redirect(new URL(next, request.url), 303);
 }

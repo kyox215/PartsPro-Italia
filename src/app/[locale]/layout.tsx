@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
+import { getAuthContext } from "@/lib/auth";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 
 export function generateStaticParams() {
@@ -20,10 +21,11 @@ export default async function LocaleLayout({
   }
 
   const dictionary = getDictionary(locale);
+  const auth = await getAuthContext();
 
   return (
     <div className="flex min-h-screen flex-col">
-      <SiteHeader locale={locale} dictionary={dictionary} />
+      <SiteHeader locale={locale} dictionary={dictionary} auth={auth} />
       <main className="flex-1">{children}</main>
       <Footer locale={locale} />
     </div>

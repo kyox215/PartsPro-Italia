@@ -114,11 +114,14 @@ After deployment, check:
 - `/it/cart`
 - `/it/checkout`
 - `/it/account`
+- `/it/account/orders`
+- `/it/account/rma`
 - `/it/account/company`
 - `/it/b2b`
 - `/it/rma`
 - `/it/admin`
 - `/it/admin/products`
+- `/it/admin/inventory`
 - `/it/admin/orders`
 - `/it/admin/b2b`
 - `/it/admin/rma`
@@ -135,8 +138,12 @@ After deployment, check:
 ## 7. Current MVP Behavior
 
 - Checkout posts real line items via `itemsJson`; bank transfer orders redirect to the account page with the generated order ID.
-- The account page reads the signed-in customer's own orders and RMA records through Supabase SSR sessions and RLS.
+- The header is role-aware: customers see account links, admins see the admin entry, and anonymous users see login.
+- Admin routes use a left-sidebar workspace and redirect non-admin signed-in users back to account with a permission message.
+- Account routes use a left-sidebar workspace with overview, historical orders, RMA records, and company profile.
+- The account pages read the signed-in customer's own orders and RMA records through Supabase SSR sessions and RLS.
 - Customers can maintain company, invoice, contact, and category data at `/account/company`; status and price group remain admin-controlled.
+- Login redirects are role-aware: admins land on `/{locale}/admin`, ordinary users land on `/{locale}/account`, unless a safe role-allowed `next` URL was requested.
 - `/admin/system` shows Vercel environment readiness plus Supabase public/admin table reachability without exposing secret values.
 - Stripe checkout redirects to Stripe only when `STRIPE_SECRET_KEY` is configured.
 - Product/SKU admin form writes to `products`, `skus`, and `inventory` when Supabase is configured and the user is admin.

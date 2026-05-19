@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  getSafeAuthRedirect,
-  normalizeAuthLocale,
-} from "@/lib/auth-redirect";
+import { normalizeAuthLocale } from "@/lib/auth-redirect";
 import { parseRequestBody } from "@/lib/request";
 import {
   getSupabaseServerClient,
@@ -14,7 +11,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const body = await parseRequestBody(request);
   const locale = normalizeAuthLocale(body.locale);
-  const next = getSafeAuthRedirect(body.next, locale);
+  const next = String(body.next ?? "");
 
   if (!hasSupabasePublicConfig()) {
     return NextResponse.redirect(

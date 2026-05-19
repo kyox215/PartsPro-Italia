@@ -211,10 +211,11 @@ export async function getAdminRmaRows(): Promise<AdminRmaRow[]> {
 }
 
 export async function getAdminDashboardMetrics() {
-  const [orders, b2bApplications, rmas] = await Promise.all([
+  const [orders, b2bApplications, rmas, preorderIncomingTotal] = await Promise.all([
     getAdminOrderRows(),
     getAdminB2BApplicationRows(),
     getAdminRmaRows(),
+    getPreorderIncomingTotal(),
   ]);
 
   return {
@@ -222,9 +223,38 @@ export async function getAdminDashboardMetrics() {
     b2bApplications,
     rmas,
     orderCount: orders.length,
+    pendingPaymentCount: orders.filter((order) => order.status === "pending_payment")
+      .length,
     pendingB2BCount: b2bApplications.filter((item) => item.status === "pending")
       .length,
     openRmaCount: rmas.filter((item) => item.status !== "completed").length,
+    preorderIncomingTotal,
     revenueTotal: orders.reduce((sum, order) => sum + order.total, 0),
   };
+}
+
+async function getPreorderIncomingTotal() {
+  if (!hasSupabaseAdminConfig()) {
+    return products.reduce((sum, product) => sum + (product.incoming ?? 0), 0);
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("inventory")
+    .select("incoming_qty, incoming_reserved");
+
+  if (error) {
+    console.error("Failed to load incoming inventory total", error);
+    return 0;
+  }
+
+  return (data ?? []).reduce(
+    (sum, row) =>
+      sum +
+      Math.max(
+        Number(row.incoming_qty ?? 0) - Number(row.incoming_reserved ?? 0),
+        0,
+      ),
+    0,
+  );
 }

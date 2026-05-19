@@ -17,6 +17,9 @@ export type AccountOrderRow = {
     name: string;
     quantity: number;
     unitPrice: number;
+    fulfillmentType?: string;
+    stockQty?: number;
+    preorderQty?: number;
   }>;
 };
 
@@ -94,13 +97,13 @@ export async function getAccountActivity(
       .select("id, status, payment_method, total, currency, created_at, order_items (*)")
       .eq("profile_id", auth.user.id)
       .order("created_at", { ascending: false })
-      .limit(20),
+      .limit(100),
     supabase
       .from("rmas")
       .select("id, status, order_number, sku, quantity, issue_type, description, created_at")
       .eq("profile_id", auth.user.id)
       .order("created_at", { ascending: false })
-      .limit(20),
+      .limit(100),
   ]);
 
   if (ordersResult.error) {
@@ -125,11 +128,17 @@ export async function getAccountActivity(
           name: string;
           quantity: number;
           unit_price: number | string;
+          fulfillment_type?: string | null;
+          stock_qty?: number | null;
+          preorder_qty?: number | null;
         }) => ({
           sku: item.sku,
           name: item.name,
           quantity: item.quantity,
           unitPrice: Number(item.unit_price ?? 0),
+          fulfillmentType: item.fulfillment_type ?? undefined,
+          stockQty: item.stock_qty ?? undefined,
+          preorderQty: item.preorder_qty ?? undefined,
         }),
       ),
     })),

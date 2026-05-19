@@ -30,7 +30,7 @@ export default async function AdminProductsPage({
   const attributeSaved = valueOf(query.attribute);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="space-y-6">
       <section className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
         <Badge className="border-blue-200 bg-blue-50 text-blue-700">
           {locale === "it" ? "Prodotti / SKU" : "商品 / SKU"}

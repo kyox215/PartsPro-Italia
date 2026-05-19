@@ -14,18 +14,19 @@ export default async function LoginPage({
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "it";
   const auth = await getAuthContext();
   const error = valueOf(query.error);
+  const next = valueOf(query.next) ?? "";
 
   return (
     <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-2 lg:px-8">
       <section className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
         <Badge className="border-blue-200 bg-blue-50 text-blue-700">Auth</Badge>
         <h1 className="mt-4 text-3xl font-bold text-slate-950">
-          {locale === "it" ? "Accesso cliente" : "客户登录"}
+          {locale === "it" ? "Accesso" : "登录"}
         </h1>
         <p className="mt-3 text-sm leading-6 text-slate-600">
           {locale === "it"
-            ? "Supabase Auth gestisce sessioni, cookie SSR e accesso a account/admin."
-            : "Supabase Auth 负责会话、SSR Cookie、账户中心和后台访问。"}
+            ? "Dopo l'accesso, gli admin entrano nel pannello operativo e i clienti nell'area account."
+            : "登录后，管理员进入运营后台，普通用户进入账户中心。"}
         </p>
 
         {!auth.configured ? (
@@ -44,7 +45,7 @@ export default async function LoginPage({
 
         <form className="mt-6 grid gap-4" action="/api/auth/sign-in" method="post">
           <input type="hidden" name="locale" value={locale} />
-          <input type="hidden" name="next" value={`/${locale}/account`} />
+          <input type="hidden" name="next" value={next} />
           <Input label="Email" name="email" type="email" />
           <Input
             label={locale === "it" ? "Password" : "密码"}
@@ -66,7 +67,7 @@ export default async function LoginPage({
 
         <form action="/api/auth/oauth/google" method="post">
           <input type="hidden" name="locale" value={locale} />
-          <input type="hidden" name="next" value={`/${locale}/account`} />
+          <input type="hidden" name="next" value={next} />
           <button
             className="inline-flex h-11 w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-950 transition hover:border-blue-300 hover:text-blue-700"
             type="submit"

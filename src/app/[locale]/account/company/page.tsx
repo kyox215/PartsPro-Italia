@@ -42,7 +42,7 @@ export default async function AccountCompanyPage({
   const formError = valueOf(query.error) ?? error;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="space-y-6">
       <section className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
         <Badge className="border-blue-200 bg-blue-50 text-blue-700">
           {locale === "it" ? "Profilo B2B" : "B2B 公司资料"}
@@ -94,7 +94,7 @@ export default async function AccountCompanyPage({
         )}
       </section>
 
-      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
+      <section className="rounded-lg border border-slate-200 bg-white p-5">
         <div className="grid gap-4 md:grid-cols-[auto_1fr_auto] md:items-center">
           <ShieldCheck className="h-6 w-6 text-blue-600" />
           <div>

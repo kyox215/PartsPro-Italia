@@ -34,7 +34,7 @@ export default async function AdminRmaPage({
   const error = valueOf(query.error);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="space-y-6">
       <section className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
         <Badge className="border-orange-200 bg-orange-50 text-orange-700">RMA</Badge>
         <h1 className="mt-4 text-3xl font-bold text-slate-950">

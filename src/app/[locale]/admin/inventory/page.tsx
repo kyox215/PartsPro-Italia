@@ -47,7 +47,7 @@ export default async function AdminInventoryPage({
   const openItemIds = openItems.map((item) => item.id).join(",");
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="space-y-6">
       <section className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
         <Badge className="border-violet-200 bg-violet-50 text-violet-700">
           {locale === "it" ? "Inventario" : "库存"}

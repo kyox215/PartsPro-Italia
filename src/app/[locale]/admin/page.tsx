@@ -29,8 +29,10 @@ export default async function AdminPage({
       ? await getAdminDashboardMetrics()
       : {
           orderCount: 0,
+          pendingPaymentCount: 0,
           pendingB2BCount: 0,
           openRmaCount: 0,
+          preorderIncomingTotal: 0,
           revenueTotal: 0,
         };
 
@@ -44,6 +46,16 @@ export default async function AdminPage({
       Icon: Boxes,
       label: locale === "it" ? "Ordini" : "订单",
       value: String(dashboard.orderCount),
+    },
+    {
+      Icon: ClipboardList,
+      label: locale === "it" ? "Bonifici pending" : "待付款订单",
+      value: String(dashboard.pendingPaymentCount),
+    },
+    {
+      Icon: Warehouse,
+      label: locale === "it" ? "In arrivo" : "在途可预购",
+      value: String(dashboard.preorderIncomingTotal),
     },
     {
       Icon: UsersRound,
@@ -120,7 +132,7 @@ export default async function AdminPage({
   ];
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="space-y-6">
       <section className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
         <Badge className="border-slate-300 bg-slate-100 text-slate-800">Admin</Badge>
         <h1 className="mt-4 text-3xl font-bold text-slate-950">
@@ -167,7 +179,7 @@ export default async function AdminPage({
         </div>
       </section>
 
-      <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-6">
         {metrics.map(({ Icon, label, value }) => (
           <article key={label} className="rounded-lg border border-slate-200 bg-white p-5">
             <Icon className="h-6 w-6 text-blue-600" />
@@ -177,7 +189,7 @@ export default async function AdminPage({
         ))}
       </div>
 
-      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
+      <section className="rounded-lg border border-slate-200 bg-white p-5">
         <h2 className="text-lg font-bold text-slate-950">
           {locale === "it" ? "Moduli operativi" : "运营模块"}
         </h2>

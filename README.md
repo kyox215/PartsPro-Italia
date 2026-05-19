@@ -14,10 +14,11 @@ The app is built for:
 - Vercel Git deployments from GitHub
 - Internal admin shell at `/admin` or `/{locale}/admin`
 - Supabase SSR auth with cookie sessions
+- Role-aware navigation and post-login redirects
 - Admin product/SKU creation shell at `/{locale}/admin/products`
 - Admin order, B2B approval, and RMA status workflows
 - Admin system health dashboard for environment and Supabase table checks
-- Customer account dashboard with own orders and RMA activity
+- Customer account workspace with own orders, totals, and RMA activity
 - Customer company profile editor for invoice and B2B data
 
 ## Getting Started
@@ -61,8 +62,11 @@ npm run build
 - `/it/b2b`
 - `/it/rma`
 - `/it/account`
+- `/it/account/orders`
+- `/it/account/rma`
 - `/it/account/company`
 - `/it/admin`
+- `/it/admin/inventory`
 - `/it/admin/products`
 - `/it/admin/orders`
 - `/it/admin/b2b`
@@ -72,6 +76,9 @@ npm run build
 - `/api/orders`
 - `/api/account/company`
 - `/api/admin/products`
+- `/api/admin/inventory/import-cart`
+- `/api/admin/inventory/receive`
+- `/api/admin/inventory/settings`
 - `/api/admin/orders/status`
 - `/api/admin/b2b/status`
 - `/api/admin/rma/status`

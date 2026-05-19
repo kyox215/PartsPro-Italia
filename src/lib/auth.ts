@@ -42,6 +42,23 @@ export async function getAuthContext(): Promise<AuthContext> {
     };
   }
 
+  const { role, isAdmin } = await getRoleForUser({
+    id: user.id,
+    email: user.email,
+  });
+
+  return {
+    configured: true,
+    user: {
+      id: user.id,
+      email: user.email,
+    },
+    role,
+    isAdmin,
+  };
+}
+
+export async function getRoleForUser(user: { id: string; email?: string | null }) {
   let role: string | null = null;
 
   if (hasSupabaseAdminConfig()) {
@@ -57,15 +74,7 @@ export async function getAuthContext(): Promise<AuthContext> {
   const adminEmail = getAdminEmail();
   const isAdmin = role === "admin" || user.email?.toLowerCase() === adminEmail;
 
-  return {
-    configured: true,
-    user: {
-      id: user.id,
-      email: user.email,
-    },
-    role,
-    isAdmin,
-  };
+  return { role, isAdmin };
 }
 
 export async function assertAdmin() {

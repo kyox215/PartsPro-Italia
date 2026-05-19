@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { getRoleForUser } from "@/lib/auth";
 import {
-  getSafeAuthRedirect,
+  getRoleAwareAuthRedirect,
   normalizeAuthLocale,
 } from "@/lib/auth-redirect";
 import {
@@ -18,10 +19,8 @@ export async function GET(request: Request) {
     requestUrl.searchParams.get("locale") ??
       cookieStore.get("partspro-oauth-locale")?.value,
   );
-  const next = getSafeAuthRedirect(
-    requestUrl.searchParams.get("next") ?? cookieStore.get("partspro-oauth-next")?.value,
-    locale,
-  );
+  const requestedNext =
+    requestUrl.searchParams.get("next") ?? cookieStore.get("partspro-oauth-next")?.value;
   const code = requestUrl.searchParams.get("code");
 
   if (!hasSupabasePublicConfig()) {
@@ -50,6 +49,17 @@ export async function GET(request: Request) {
     return response;
   }
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const role = user
+    ? await getRoleForUser({ id: user.id, email: user.email })
+    : { isAdmin: false };
+  const next = getRoleAwareAuthRedirect({
+    value: requestedNext,
+    locale,
+    isAdmin: role.isAdmin,
+  });
   const response = NextResponse.redirect(new URL(next, request.url), 303);
   response.cookies.delete("partspro-oauth-locale");
   response.cookies.delete("partspro-oauth-next");
