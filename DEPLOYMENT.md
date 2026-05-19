@@ -33,6 +33,7 @@ Set these in Vercel Project Settings > Environment Variables for Production, Pre
 ```text
 NEXT_PUBLIC_SITE_URL
 NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -45,11 +46,12 @@ Never commit `.env.local` or secret values. Use `.env.example` only as the publi
 
 ## 4. Supabase Setup
 
-1. Create a Supabase project.
-2. Apply `supabase/migrations/0001_initial_schema.sql`.
-3. Optionally apply `supabase/seed.sql`.
-4. Copy the project URL and keys into Vercel env vars.
-5. Create an admin user, then set their `profiles.role` to `admin`.
+1. Create or open the Supabase project.
+2. Link the local CLI project with `npx supabase link --project-ref <project-ref>`.
+3. Apply `supabase/migrations/0001_initial_schema.sql`.
+4. Optionally apply `supabase/seed.sql`.
+5. Copy the project URL and keys into Vercel env vars.
+6. Create an admin user, then set their `profiles.role` to `admin`.
 
 The migration enables RLS and keeps authorization roles in `profiles`, not user-editable metadata.
 

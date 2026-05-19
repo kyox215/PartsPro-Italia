@@ -8,6 +8,7 @@ The app is built for:
 - B2C-compatible checkout
 - Italian and Chinese UI routes (`/it`, `/zh`)
 - Supabase Auth/Postgres/Storage architecture
+- Supabase CLI config in `supabase/config.toml`
 - Stripe checkout and bank transfer orders
 - Vercel Git deployments from GitHub
 - Internal admin shell at `/admin` or `/{locale}/admin`

@@ -1,25 +1,28 @@
 import { cookies } from "next/headers";
 import { createServerClient, type CookieOptionsWithName } from "@supabase/ssr";
+import {
+  getSupabasePublicKey,
+  getSupabaseUrl,
+  hasSupabasePublicConfig,
+} from "@/lib/supabase/config";
 
-export function hasSupabasePublicConfig() {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  );
-}
+export { hasSupabasePublicConfig };
 
 export async function getSupabaseServerClient() {
+  const url = getSupabaseUrl();
+  const publicKey = getSupabasePublicKey();
+
   if (!hasSupabasePublicConfig()) {
     throw new Error(
-      "Supabase public config is missing. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      "Supabase public config is missing. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
     );
   }
 
   const cookieStore = await cookies();
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url!,
+    publicKey!,
     {
       cookies: {
         getAll() {
