@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAuthContext } from "@/lib/auth";
 import { products } from "@/lib/catalog";
 import { getSiteUrl } from "@/lib/env";
 import { parseRequestBody } from "@/lib/request";
@@ -21,7 +22,10 @@ export async function POST(request: Request) {
   }
 
   const orderId = crypto.randomUUID();
-  const items = parsed.data.items?.length
+  const parsedItems = parseItems(parsed.data.items, parsed.data.itemsJson);
+  const items = parsedItems.length
+    ? parsedItems
+    : parsed.data.items?.length
     ? parsed.data.items
     : [
         { sku: products[0].sku, quantity: 1 },
@@ -43,11 +47,13 @@ export async function POST(request: Request) {
   const subtotal = lines.reduce((sum, line) => sum + line.totals.subtotal, 0);
   const vat = lines.reduce((sum, line) => sum + line.totals.vat, 0);
   const total = subtotal + vat;
+  const auth = await getAuthContext();
 
   if (hasSupabaseAdminConfig()) {
     const supabase = getSupabaseAdminClient();
-    await supabase.from("orders").insert({
+    const { error: orderError } = await supabase.from("orders").insert({
       id: orderId,
+      profile_id: auth.user?.id ?? null,
       status:
         parsed.data.paymentMethod === "bank_transfer"
           ? "pending_payment"
@@ -68,7 +74,11 @@ export async function POST(request: Request) {
       metadata: parsed.data,
     });
 
-    await supabase.from("order_items").insert(
+    if (orderError) {
+      return NextResponse.json({ error: orderError.message }, { status: 500 });
+    }
+
+    const { error: itemsError } = await supabase.from("order_items").insert(
       lines.map((line) => ({
         order_id: orderId,
         sku: line.product.sku,
@@ -78,6 +88,10 @@ export async function POST(request: Request) {
         vat_rate: line.product.vatRate,
       })),
     );
+
+    if (itemsError) {
+      return NextResponse.json({ error: itemsError.message }, { status: 500 });
+    }
   }
 
   if (parsed.data.paymentMethod === "stripe" && hasStripeConfig()) {
@@ -102,14 +116,20 @@ export async function POST(request: Request) {
       metadata: { orderId },
     });
 
-    return NextResponse.json({
+    const result = {
       orderId,
       status: "checkout_created",
       checkoutUrl: session.url,
-    });
+    };
+
+    if (wantsRedirect(request) && session.url) {
+      return NextResponse.redirect(session.url, 303);
+    }
+
+    return NextResponse.json(result);
   }
 
-  return NextResponse.json({
+  const result = {
     orderId,
     status:
       parsed.data.paymentMethod === "bank_transfer"
@@ -120,5 +140,48 @@ export async function POST(request: Request) {
       parsed.data.paymentMethod === "bank_transfer"
         ? "Bank transfer order created."
         : "Stripe config missing; order saved as checkout_created when Supabase is configured.",
-  });
+  };
+
+  if (wantsRedirect(request)) {
+    const accountUrl = new URL(`/${parsed.data.locale}/account`, request.url);
+    accountUrl.searchParams.set("order", orderId);
+    accountUrl.searchParams.set("status", result.status);
+    return NextResponse.redirect(accountUrl, 303);
+  }
+
+  return NextResponse.json(result);
+}
+
+function parseItems(
+  items: Array<{ sku: string; quantity: number }> | undefined,
+  itemsJson?: string,
+) {
+  if (items?.length) {
+    return items;
+  }
+
+  if (!itemsJson) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(itemsJson);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .map((item) => ({
+        sku: String(item.sku ?? ""),
+        quantity: Number(item.quantity ?? 0),
+      }))
+      .filter((item) => item.sku && item.quantity > 0);
+  } catch {
+    return [];
+  }
+}
+
+function wantsRedirect(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
+  const accept = request.headers.get("accept") ?? "";
+  return contentType.includes("application/x-www-form-urlencoded") || accept.includes("text/html");
 }

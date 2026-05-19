@@ -228,6 +228,46 @@ as $$
   select role from public.profiles where id = auth.uid()
 $$;
 
+create or replace function app_private.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (
+    id,
+    email,
+    full_name,
+    preferred_locale,
+    role
+  )
+  values (
+    new.id,
+    coalesce(new.email, ''),
+    new.raw_user_meta_data ->> 'full_name',
+    coalesce(new.raw_user_meta_data ->> 'preferred_locale', 'it'),
+    case
+      when lower(coalesce(new.email, '')) = lower(coalesce(current_setting('app.admin_email', true), ''))
+      then 'admin'::public.user_role
+      else 'retail'::public.user_role
+    end
+  )
+  on conflict (id) do update
+  set
+    email = excluded.email,
+    full_name = coalesce(public.profiles.full_name, excluded.full_name),
+    updated_at = now();
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+after insert on auth.users
+for each row execute function app_private.handle_new_user();
+
 alter table public.profiles enable row level security;
 alter table public.companies enable row level security;
 alter table public.b2b_applications enable row level security;

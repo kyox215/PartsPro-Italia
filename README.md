@@ -11,6 +11,8 @@ The app is built for:
 - Stripe checkout and bank transfer orders
 - Vercel Git deployments from GitHub
 - Internal admin shell at `/admin` or `/{locale}/admin`
+- Supabase SSR auth with cookie sessions
+- Admin product/SKU creation shell at `/{locale}/admin/products`
 
 ## Getting Started
 
@@ -54,7 +56,13 @@ npm run build
 - `/it/rma`
 - `/it/account`
 - `/it/admin`
+- `/it/admin/products`
+- `/it/login`
 - `/api/orders`
+- `/api/admin/products`
+- `/api/auth/sign-in`
+- `/api/auth/sign-up`
+- `/api/auth/sign-out`
 - `/api/b2b-applications`
 - `/api/rma`
 - `/api/stripe/webhook`

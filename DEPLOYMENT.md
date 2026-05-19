@@ -53,6 +53,16 @@ Never commit `.env.local` or secret values. Use `.env.example` only as the publi
 
 The migration enables RLS and keeps authorization roles in `profiles`, not user-editable metadata.
 
+Useful SQL after your first admin signs up:
+
+```sql
+update public.profiles
+set role = 'admin'
+where email = 'you@example.com';
+```
+
+The app uses Supabase SSR cookie sessions through `src/proxy.ts`. Admin APIs check the signed-in user and only allow real writes for users with `profiles.role = 'admin'`. If Supabase is not configured, admin pages stay in demo mode so Vercel builds and previews still work.
+
 ## 5. Stripe Setup
 
 1. Create Stripe account.
@@ -85,7 +95,16 @@ After deployment, check:
 - `/it/b2b`
 - `/it/rma`
 - `/it/admin`
+- `/it/admin/products`
+- `/it/login`
 - `/api/admin/health`
+
+## 8. Current MVP Behavior
+
+- Checkout posts real line items via `itemsJson`; bank transfer orders redirect to the account page with the generated order ID.
+- Stripe checkout redirects to Stripe only when `STRIPE_SECRET_KEY` is configured.
+- Product/SKU admin form writes to `products`, `skus`, and `inventory` when Supabase is configured and the user is admin.
+- Without Supabase env vars, catalog/admin pages use local seed products and API writes return demo-mode redirects.
 
 ## 7. Rollback
 

@@ -1,6 +1,8 @@
 import { CreditCard, Landmark } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { products } from "@/lib/catalog";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
+import { calculateLineTotal, formatMoney } from "@/lib/pricing";
 
 export default async function CheckoutPage({
   params,
@@ -8,6 +10,21 @@ export default async function CheckoutPage({
   const { locale: rawLocale } = await params;
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "it";
   const dictionary = getDictionary(locale);
+  const cartLines = [
+    { product: products[0], quantity: 5 },
+    { product: products[1], quantity: 10 },
+  ];
+  const itemsJson = JSON.stringify(
+    cartLines.map((line) => ({ sku: line.product.sku, quantity: line.quantity })),
+  );
+  const subtotal = cartLines.reduce(
+    (sum, line) => sum + calculateLineTotal(line.product, line.quantity, true).subtotal,
+    0,
+  );
+  const vat = cartLines.reduce(
+    (sum, line) => sum + calculateLineTotal(line.product, line.quantity, true).vat,
+    0,
+  );
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
@@ -21,6 +38,8 @@ export default async function CheckoutPage({
         </p>
 
         <form className="mt-8 grid gap-6" action="/api/orders" method="post">
+          <input type="hidden" name="locale" value={locale} />
+          <input type="hidden" name="itemsJson" value={itemsJson} />
           <Fieldset title={dictionary.checkout.customer as string}>
             <Input name="email" label="Email" type="email" />
             <Input name="name" label={locale === "it" ? "Nome" : "姓名"} />
@@ -49,6 +68,35 @@ export default async function CheckoutPage({
               <span className="font-semibold">{dictionary.checkout.bank}</span>
             </label>
           </Fieldset>
+
+          <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <h2 className="text-sm font-bold text-slate-950">
+              {locale === "it" ? "Riepilogo ordine" : "订单摘要"}
+            </h2>
+            <div className="mt-3 space-y-2 text-sm text-slate-700">
+              {cartLines.map((line) => (
+                <div key={line.product.sku} className="flex justify-between gap-4">
+                  <span>
+                    {line.product.names[locale]} x {line.quantity}
+                  </span>
+                  <strong>
+                    {formatMoney(
+                      calculateLineTotal(line.product, line.quantity, true).subtotal,
+                      locale,
+                    )}
+                  </strong>
+                </div>
+              ))}
+              <div className="flex justify-between border-t border-slate-200 pt-2">
+                <span>VAT</span>
+                <strong>{formatMoney(vat, locale)}</strong>
+              </div>
+              <div className="flex justify-between text-base font-bold text-slate-950">
+                <span>Total</span>
+                <strong>{formatMoney(subtotal + vat, locale)}</strong>
+              </div>
+            </div>
+          </section>
 
           <button
             className="h-12 rounded-lg border border-blue-600 bg-blue-600 px-5 text-sm font-bold text-white hover:bg-blue-700"

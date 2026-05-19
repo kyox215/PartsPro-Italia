@@ -1,6 +1,8 @@
 import { Boxes, CircleDollarSign, ShieldAlert, TicketCheck, UsersRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
+import { ButtonLink } from "@/components/ui/button";
+import { getAuthContext } from "@/lib/auth";
+import { getDictionary, isLocale, type Locale, localizePath } from "@/lib/i18n";
 
 export default async function AdminPage({
   params,
@@ -8,6 +10,7 @@ export default async function AdminPage({
   const { locale: rawLocale } = await params;
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "it";
   const dictionary = getDictionary(locale);
+  const auth = await getAuthContext();
 
   const metrics = [
     [Boxes, "SKU", "6"],
@@ -28,7 +31,24 @@ export default async function AdminPage({
         </p>
         <div className="mt-5 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-900">
           <ShieldAlert className="mr-2 inline h-4 w-4" />
-          {dictionary.admin.warning}
+          {auth.configured && !auth.isAdmin
+            ? locale === "it"
+              ? "Accesso reale limitato agli admin. In locale puoi vedere la shell, ma le API admin richiedono ruolo admin."
+              : "真实后台仅管理员可访问。本地可查看界面，但后台 API 需要 admin 角色。"
+            : dictionary.admin.warning}
+        </div>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <ButtonLink href={localizePath(locale, "/admin/products")}>
+            {locale === "it" ? "Gestisci prodotti" : "管理商品"}
+          </ButtonLink>
+          <ButtonLink href="/api/admin/health" variant="secondary">
+            API health
+          </ButtonLink>
+          {!auth.user && auth.configured ? (
+            <ButtonLink href={localizePath(locale, "/login")} variant="secondary">
+              {locale === "it" ? "Login admin" : "管理员登录"}
+            </ButtonLink>
+          ) : null}
         </div>
       </section>
 

@@ -1,6 +1,8 @@
 import { FileText, PackageCheck, RotateCcw, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
+import { ButtonLink } from "@/components/ui/button";
+import { getAuthContext } from "@/lib/auth";
+import { getDictionary, isLocale, type Locale, localizePath } from "@/lib/i18n";
 
 export default async function AccountPage({
   params,
@@ -8,6 +10,7 @@ export default async function AccountPage({
   const { locale: rawLocale } = await params;
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "it";
   const dictionary = getDictionary(locale);
+  const auth = await getAuthContext();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -19,6 +22,39 @@ export default async function AccountPage({
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
           {dictionary.account.subtitle}
         </p>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          {auth.user ? (
+            <>
+              <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
+                {auth.user.email}
+              </Badge>
+              <form action="/api/auth/sign-out" method="post">
+                <input type="hidden" name="locale" value={locale} />
+                <button
+                  className="h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-950 hover:border-blue-300 hover:text-blue-700"
+                  type="submit"
+                >
+                  {locale === "it" ? "Esci" : "退出登录"}
+                </button>
+              </form>
+            </>
+          ) : (
+            <>
+              <Badge className="border-orange-200 bg-orange-50 text-orange-700">
+                {auth.configured
+                  ? locale === "it"
+                    ? "Login richiesto"
+                    : "需要登录"
+                  : locale === "it"
+                    ? "Demo senza Supabase"
+                    : "未配置 Supabase 的演示模式"}
+              </Badge>
+              <ButtonLink href={localizePath(locale, "/login")} variant="secondary">
+                {locale === "it" ? "Vai al login" : "前往登录"}
+              </ButtonLink>
+            </>
+          )}
+        </div>
       </section>
 
       <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
