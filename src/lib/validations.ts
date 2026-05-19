@@ -68,3 +68,43 @@ export const adminProductSchema = z.object({
   stockOnHand: z.coerce.number().int().nonnegative(),
   incomingQty: z.coerce.number().int().nonnegative().default(0),
 });
+
+export const adminOrderStatusSchema = z.object({
+  id: z.string().min(1),
+  status: z.enum([
+    "draft",
+    "checkout_created",
+    "pending_payment",
+    "paid",
+    "processing",
+    "shipped",
+    "completed",
+    "cancelled",
+    "refunded",
+  ]),
+  locale: z.enum(["it", "zh"]).default("it"),
+});
+
+export const adminB2BStatusSchema = z.object({
+  id: z.string().min(1),
+  status: z.enum(["pending", "approved", "rejected"]),
+  priceGroup: z.string().optional().or(z.literal("")),
+  locale: z.enum(["it", "zh"]).default("it"),
+});
+
+export const adminRmaStatusSchema = z.object({
+  id: z.string().min(1),
+  status: z.enum([
+    "submitted",
+    "waiting_information",
+    "approved_return",
+    "waiting_receive",
+    "testing",
+    "approved",
+    "rejected",
+    "replacement_sent",
+    "refund_processing",
+    "completed",
+  ]),
+  locale: z.enum(["it", "zh"]).default("it"),
+});

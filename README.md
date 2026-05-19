@@ -13,6 +13,7 @@ The app is built for:
 - Internal admin shell at `/admin` or `/{locale}/admin`
 - Supabase SSR auth with cookie sessions
 - Admin product/SKU creation shell at `/{locale}/admin/products`
+- Admin order, B2B approval, and RMA status workflows
 
 ## Getting Started
 
@@ -57,9 +58,15 @@ npm run build
 - `/it/account`
 - `/it/admin`
 - `/it/admin/products`
+- `/it/admin/orders`
+- `/it/admin/b2b`
+- `/it/admin/rma`
 - `/it/login`
 - `/api/orders`
 - `/api/admin/products`
+- `/api/admin/orders/status`
+- `/api/admin/b2b/status`
+- `/api/admin/rma/status`
 - `/api/auth/sign-in`
 - `/api/auth/sign-up`
 - `/api/auth/sign-out`

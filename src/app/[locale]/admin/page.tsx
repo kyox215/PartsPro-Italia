@@ -1,8 +1,19 @@
-import { Boxes, CircleDollarSign, ShieldAlert, TicketCheck, UsersRound } from "lucide-react";
+import {
+  Boxes,
+  CircleDollarSign,
+  ClipboardList,
+  PackagePlus,
+  ShieldAlert,
+  TicketCheck,
+  type LucideIcon,
+  UsersRound,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { getAuthContext } from "@/lib/auth";
+import { getAdminDashboardMetrics } from "@/lib/admin-operations";
 import { getDictionary, isLocale, type Locale, localizePath } from "@/lib/i18n";
+import { formatMoney } from "@/lib/pricing";
 
 export default async function AdminPage({
   params,
@@ -11,12 +22,81 @@ export default async function AdminPage({
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "it";
   const dictionary = getDictionary(locale);
   const auth = await getAuthContext();
+  const dashboard =
+    !auth.configured || auth.isAdmin
+      ? await getAdminDashboardMetrics()
+      : {
+          orderCount: 0,
+          pendingB2BCount: 0,
+          openRmaCount: 0,
+          revenueTotal: 0,
+        };
 
-  const metrics = [
-    [Boxes, "SKU", "6"],
-    [UsersRound, locale === "it" ? "B2B pending" : "待审核 B2B", "3"],
-    [CircleDollarSign, locale === "it" ? "Ordini oggi" : "今日订单", "12"],
-    [TicketCheck, "RMA", "2"],
+  const metrics: Array<{ Icon: LucideIcon; label: string; value: string }> = [
+    {
+      Icon: CircleDollarSign,
+      label: locale === "it" ? "Fatturato ordini" : "订单总额",
+      value: formatMoney(dashboard.revenueTotal, locale),
+    },
+    {
+      Icon: Boxes,
+      label: locale === "it" ? "Ordini" : "订单",
+      value: String(dashboard.orderCount),
+    },
+    {
+      Icon: UsersRound,
+      label: locale === "it" ? "B2B pending" : "待审核 B2B",
+      value: String(dashboard.pendingB2BCount),
+    },
+    {
+      Icon: TicketCheck,
+      label: locale === "it" ? "RMA aperti" : "待处理 RMA",
+      value: String(dashboard.openRmaCount),
+    },
+  ];
+
+  const modules: Array<{
+    Icon: LucideIcon;
+    title: string;
+    description: string;
+    href: string;
+  }> = [
+    {
+      Icon: PackagePlus,
+      title: locale === "it" ? "Prodotti e SKU" : "商品与 SKU",
+      description:
+        locale === "it"
+          ? "Crea SKU, prezzi B2B e stock iniziale."
+          : "创建 SKU、B2B 价格和初始库存。",
+      href: localizePath(locale, "/admin/products"),
+    },
+    {
+      Icon: ClipboardList,
+      title: locale === "it" ? "Ordini e pagamenti" : "订单与付款",
+      description:
+        locale === "it"
+          ? "Controlla righe, bonifico, Stripe e fulfilment."
+          : "查看明细、转账、Stripe 和发货状态。",
+      href: localizePath(locale, "/admin/orders"),
+    },
+    {
+      Icon: UsersRound,
+      title: locale === "it" ? "Clienti B2B" : "B2B 客户",
+      description:
+        locale === "it"
+          ? "Approva account wholesale e price group."
+          : "审核批发账户并分配价格组。",
+      href: localizePath(locale, "/admin/b2b"),
+    },
+    {
+      Icon: TicketCheck,
+      title: locale === "it" ? "RMA e resi" : "RMA 与退货",
+      description:
+        locale === "it"
+          ? "Gestisci resi, sostituzioni e rimborsi."
+          : "管理退货、换货和退款。",
+      href: localizePath(locale, "/admin/rma"),
+    },
   ];
 
   return (
@@ -41,6 +121,15 @@ export default async function AdminPage({
           <ButtonLink href={localizePath(locale, "/admin/products")}>
             {locale === "it" ? "Gestisci prodotti" : "管理商品"}
           </ButtonLink>
+          <ButtonLink href={localizePath(locale, "/admin/orders")} variant="secondary">
+            {locale === "it" ? "Ordini" : "订单"}
+          </ButtonLink>
+          <ButtonLink href={localizePath(locale, "/admin/b2b")} variant="secondary">
+            {locale === "it" ? "Revisioni B2B" : "B2B 审核"}
+          </ButtonLink>
+          <ButtonLink href={localizePath(locale, "/admin/rma")} variant="secondary">
+            RMA
+          </ButtonLink>
           <ButtonLink href="/api/admin/health" variant="secondary">
             API health
           </ButtonLink>
@@ -53,11 +142,11 @@ export default async function AdminPage({
       </section>
 
       <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-        {metrics.map(([Icon, label, value]) => (
-          <article key={label as string} className="rounded-lg border border-slate-200 bg-white p-5">
+        {metrics.map(({ Icon, label, value }) => (
+          <article key={label} className="rounded-lg border border-slate-200 bg-white p-5">
             <Icon className="h-6 w-6 text-blue-600" />
-            <p className="mt-4 text-sm font-medium text-slate-500">{label as string}</p>
-            <p className="mt-1 text-3xl font-bold text-slate-950">{value as string}</p>
+            <p className="mt-4 text-sm font-medium text-slate-500">{label}</p>
+            <p className="mt-1 text-3xl font-bold text-slate-950">{value}</p>
           </article>
         ))}
       </div>
@@ -66,18 +155,17 @@ export default async function AdminPage({
         <h2 className="text-lg font-bold text-slate-950">
           {locale === "it" ? "Moduli operativi" : "运营模块"}
         </h2>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {[
-            locale === "it" ? "Prodotti e SKU" : "商品与 SKU",
-            locale === "it" ? "Stock e lotti" : "库存与批次",
-            locale === "it" ? "Ordini e pagamenti" : "订单与付款",
-            locale === "it" ? "Clienti B2B" : "B2B 客户",
-            locale === "it" ? "RMA e resi" : "RMA 与退货",
-            locale === "it" ? "Contenuti legali" : "法律内容",
-          ].map((item) => (
-            <div key={item} className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-800">
-              {item}
-            </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          {modules.map(({ Icon, title, description, href }) => (
+            <a
+              key={title}
+              className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 transition hover:border-blue-200 hover:bg-blue-50"
+              href={href}
+            >
+              <Icon className="h-5 w-5 text-blue-600" />
+              <p className="mt-3 font-bold text-slate-950">{title}</p>
+              <p className="mt-1 leading-5">{description}</p>
+            </a>
           ))}
         </div>
       </section>

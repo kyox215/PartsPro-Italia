@@ -96,17 +96,24 @@ After deployment, check:
 - `/it/rma`
 - `/it/admin`
 - `/it/admin/products`
+- `/it/admin/orders`
+- `/it/admin/b2b`
+- `/it/admin/rma`
 - `/it/login`
+- `/api/admin/orders/status`
+- `/api/admin/b2b/status`
+- `/api/admin/rma/status`
 - `/api/admin/health`
 
-## 8. Current MVP Behavior
+## 7. Current MVP Behavior
 
 - Checkout posts real line items via `itemsJson`; bank transfer orders redirect to the account page with the generated order ID.
 - Stripe checkout redirects to Stripe only when `STRIPE_SECRET_KEY` is configured.
 - Product/SKU admin form writes to `products`, `skus`, and `inventory` when Supabase is configured and the user is admin.
+- Admin order, B2B approval, and RMA pages can update statuses through Node.js route handlers when Supabase is configured and the user is admin.
 - Without Supabase env vars, catalog/admin pages use local seed products and API writes return demo-mode redirects.
 
-## 7. Rollback
+## 8. Rollback
 
 For code bugs, revert the Git commit and push `main`.
 
