@@ -70,7 +70,7 @@ http://localhost:3001/api/auth/callback
 https://phone-parts-b2b-italy.vercel.app/api/auth/callback
 ```
 
-The login page posts to `/api/auth/oauth/google`, then Supabase redirects back to `/api/auth/callback` where the app exchanges the OAuth code for SSR cookies.
+The login page posts to `/api/auth/oauth/google`, then Supabase redirects back to `/api/auth/callback` where the app exchanges the OAuth code for SSR cookies. The app stores the post-login target in a short-lived HTTP-only cookie, so the production callback URL can stay exact.
 
 Useful SQL after your first admin signs up:
 

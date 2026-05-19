@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import {
   getSafeAuthRedirect,
@@ -12,8 +13,15 @@ export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
-  const locale = normalizeAuthLocale(requestUrl.searchParams.get("locale"));
-  const next = getSafeAuthRedirect(requestUrl.searchParams.get("next"), locale);
+  const cookieStore = await cookies();
+  const locale = normalizeAuthLocale(
+    requestUrl.searchParams.get("locale") ??
+      cookieStore.get("partspro-oauth-locale")?.value,
+  );
+  const next = getSafeAuthRedirect(
+    requestUrl.searchParams.get("next") ?? cookieStore.get("partspro-oauth-next")?.value,
+    locale,
+  );
   const code = requestUrl.searchParams.get("code");
 
   if (!hasSupabasePublicConfig()) {
@@ -36,8 +44,14 @@ export async function GET(request: Request) {
   if (error) {
     const loginUrl = new URL(`/${locale}/login`, request.url);
     loginUrl.searchParams.set("error", error.message);
-    return NextResponse.redirect(loginUrl, 303);
+    const response = NextResponse.redirect(loginUrl, 303);
+    response.cookies.delete("partspro-oauth-locale");
+    response.cookies.delete("partspro-oauth-next");
+    return response;
   }
 
-  return NextResponse.redirect(new URL(next, request.url), 303);
+  const response = NextResponse.redirect(new URL(next, request.url), 303);
+  response.cookies.delete("partspro-oauth-locale");
+  response.cookies.delete("partspro-oauth-next");
+  return response;
 }

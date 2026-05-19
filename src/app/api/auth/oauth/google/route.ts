@@ -24,8 +24,6 @@ export async function POST(request: Request) {
   }
 
   const callbackUrl = new URL("/api/auth/callback", request.url);
-  callbackUrl.searchParams.set("locale", locale);
-  callbackUrl.searchParams.set("next", next);
 
   const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
@@ -41,5 +39,23 @@ export async function POST(request: Request) {
     return NextResponse.redirect(loginUrl, 303);
   }
 
-  return NextResponse.redirect(data.url, 303);
+  const response = NextResponse.redirect(data.url, 303);
+  const secure = new URL(request.url).protocol === "https:";
+
+  response.cookies.set("partspro-oauth-locale", locale, {
+    httpOnly: true,
+    maxAge: 60 * 10,
+    path: "/",
+    sameSite: "lax",
+    secure,
+  });
+  response.cookies.set("partspro-oauth-next", next, {
+    httpOnly: true,
+    maxAge: 60 * 10,
+    path: "/",
+    sameSite: "lax",
+    secure,
+  });
+
+  return response;
 }
