@@ -15,6 +15,7 @@ The app is built for:
 - Supabase SSR auth with cookie sessions
 - Admin product/SKU creation shell at `/{locale}/admin/products`
 - Admin order, B2B approval, and RMA status workflows
+- Admin system health dashboard for environment and Supabase table checks
 - Customer account dashboard with own orders and RMA activity
 - Customer company profile editor for invoice and B2B data
 
@@ -65,6 +66,7 @@ npm run build
 - `/it/admin/orders`
 - `/it/admin/b2b`
 - `/it/admin/rma`
+- `/it/admin/system`
 - `/it/login`
 - `/api/orders`
 - `/api/account/company`
@@ -72,13 +74,13 @@ npm run build
 - `/api/admin/orders/status`
 - `/api/admin/b2b/status`
 - `/api/admin/rma/status`
+- `/api/admin/health`
 - `/api/auth/sign-in`
 - `/api/auth/sign-up`
 - `/api/auth/sign-out`
 - `/api/b2b-applications`
 - `/api/rma`
 - `/api/stripe/webhook`
-- `/api/admin/health`
 
 ## Database
 

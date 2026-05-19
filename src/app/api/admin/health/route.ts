@@ -1,17 +1,9 @@
 import { NextResponse } from "next/server";
-import { getMissingProductionEnv } from "@/lib/env";
-import { hasStripeConfig } from "@/lib/stripe";
-import { hasSupabaseAdminConfig } from "@/lib/supabase/admin";
+import { getSystemHealth } from "@/lib/system-health";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  return NextResponse.json({
-    ok: true,
-    integrations: {
-      supabaseAdmin: hasSupabaseAdminConfig(),
-      stripe: hasStripeConfig(),
-    },
-    missingProductionEnv: getMissingProductionEnv(),
-  });
+  const health = await getSystemHealth();
+  return NextResponse.json(health, { status: health.ok ? 200 : 503 });
 }

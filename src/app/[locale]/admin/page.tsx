@@ -1,4 +1,5 @@
 import {
+  Activity,
   Boxes,
   CircleDollarSign,
   ClipboardList,
@@ -97,6 +98,15 @@ export default async function AdminPage({
           : "管理退货、换货和退款。",
       href: localizePath(locale, "/admin/rma"),
     },
+    {
+      Icon: Activity,
+      title: locale === "it" ? "Sistema" : "系统状态",
+      description:
+        locale === "it"
+          ? "Controlla env, Supabase, Stripe e database."
+          : "检查环境变量、Supabase、Stripe 和数据库。",
+      href: localizePath(locale, "/admin/system"),
+    },
   ];
 
   return (
@@ -133,6 +143,9 @@ export default async function AdminPage({
           <ButtonLink href="/api/admin/health" variant="secondary">
             API health
           </ButtonLink>
+          <ButtonLink href={localizePath(locale, "/admin/system")} variant="secondary">
+            {locale === "it" ? "Sistema" : "系统状态"}
+          </ButtonLink>
           {!auth.user && auth.configured ? (
             <ButtonLink href={localizePath(locale, "/login")} variant="secondary">
               {locale === "it" ? "Login admin" : "管理员登录"}
@@ -155,7 +168,7 @@ export default async function AdminPage({
         <h2 className="text-lg font-bold text-slate-950">
           {locale === "it" ? "Moduli operativi" : "运营模块"}
         </h2>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-5">
           {modules.map(({ Icon, title, description, href }) => (
             <a
               key={title}
