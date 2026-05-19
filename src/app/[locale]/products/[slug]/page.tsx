@@ -1,9 +1,10 @@
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { AlertTriangle, CheckCircle2, ShoppingCart } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Lock, ShoppingCart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
-import { getProductBySlug, products, qualityStyles } from "@/lib/catalog";
+import { products } from "@/lib/catalog";
+import { loadCatalogItemBySlug } from "@/lib/catalog-page";
 import { getDictionary, isLocale, locales, type Locale, localizePath } from "@/lib/i18n";
 import { formatMoney } from "@/lib/pricing";
 
@@ -19,87 +20,111 @@ export default async function ProductDetailPage({
   const { locale: rawLocale, slug } = await params;
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "it";
   const dictionary = getDictionary(locale);
-  const product = getProductBySlug(slug);
+  const detail = await loadCatalogItemBySlug(locale, slug);
 
-  if (!product) {
+  if (!detail) {
     notFound();
   }
 
+  const { item } = detail;
+
   return (
     <div className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <Image
-          src={product.image}
-          alt={product.names[locale]}
-          width={900}
-          height={675}
-          className="aspect-[4/3] w-full object-cover"
-        />
-      </div>
+      <ProductMedia name={item.name} image={item.image} />
 
       <section className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
         <div className="flex flex-wrap gap-2">
-          <Badge className={qualityStyles[product.quality]}>{product.quality}</Badge>
-          <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
-            {product.stock > 0 ? dictionary.common.inStock : dictionary.common.preorder}
+          <Badge className="border-slate-200 bg-slate-50 text-slate-700">
+            {item.quality}
           </Badge>
+          {detail.isPriceVisible ? (
+            <StockBadge available={item.availableStock ?? 0} incoming={item.incomingQty ?? 0} locale={locale} />
+          ) : (
+            <Badge className="border-amber-200 bg-amber-50 text-amber-700">
+              {locale === "it" ? "Login per prezzo" : "登录查看价格"}
+            </Badge>
+          )}
         </div>
-        <h1 className="mt-4 text-3xl font-bold text-slate-950">
-          {product.names[locale]}
-        </h1>
-        <p className="mt-3 text-sm leading-7 text-slate-600">
-          {product.descriptions[locale]}
-        </p>
+        <h1 className="mt-4 text-3xl font-bold text-slate-950">{item.name}</h1>
+        <p className="mt-3 text-sm leading-7 text-slate-600">{item.description}</p>
 
         <dl className="mt-6 grid gap-4 rounded-lg bg-slate-50 p-4 sm:grid-cols-2">
           <div>
             <dt className="text-xs uppercase text-slate-500">SKU</dt>
             <dd className="mt-1 font-mono text-sm font-bold text-slate-950">
-              {product.sku}
+              {item.sku}
             </dd>
           </div>
           <div>
             <dt className="text-xs uppercase text-slate-500">{dictionary.common.moq}</dt>
-            <dd className="mt-1 font-bold text-slate-950">{product.moq}</dd>
+            <dd className="mt-1 font-bold text-slate-950">{item.moq}</dd>
           </div>
-          <div>
-            <dt className="text-xs uppercase text-slate-500">
-              {dictionary.common.retail}
-            </dt>
-            <dd className="mt-1 text-2xl font-bold text-slate-950">
-              {formatMoney(product.retailPrice, locale)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs uppercase text-slate-500">{dictionary.common.b2b}</dt>
-            <dd className="mt-1 text-2xl font-bold text-blue-700">
-              {formatMoney(product.b2bPrice, locale)}
-            </dd>
-          </div>
+          {detail.isPriceVisible ? (
+            <>
+              <div>
+                <dt className="text-xs uppercase text-slate-500">
+                  {dictionary.common.retail}
+                </dt>
+                <dd className="mt-1 text-2xl font-bold text-slate-950">
+                  {formatMoney(item.retailPrice ?? 0, locale)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase text-slate-500">
+                  {dictionary.common.b2b}
+                </dt>
+                <dd className="mt-1 text-2xl font-bold text-blue-700">
+                  {formatMoney(item.b2bPrice ?? 0, locale)}
+                </dd>
+              </div>
+            </>
+          ) : (
+            <div className="sm:col-span-2">
+              <dt className="text-xs uppercase text-slate-500">
+                {locale === "it" ? "Prezzo e stock" : "价格与库存"}
+              </dt>
+              <dd className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+                <Lock className="mr-2 inline h-4 w-4" />
+                {locale === "it"
+                  ? "Accedi per vedere prezzi B2B e disponibilita."
+                  : "登录后查看 B2B 价格和库存。"}
+              </dd>
+            </div>
+          )}
         </dl>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           <div className="rounded-lg border border-slate-200 p-4">
             <h2 className="font-bold text-slate-950">{dictionary.product.compatibility}</h2>
             <ul className="mt-3 space-y-2 text-sm text-slate-600">
-              {product.compatibility.map((item) => (
-                <li key={item} className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  {item}
-                </li>
-              ))}
+              {(item.compatibility.length > 0 ? item.compatibility : [item.model]).map(
+                (value) => (
+                  <li key={value} className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    {value}
+                  </li>
+                ),
+              )}
             </ul>
           </div>
           <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-            <h2 className="font-bold text-blue-950">{dictionary.product.tiers}</h2>
-            <ul className="mt-3 space-y-2 text-sm text-blue-900">
-              {product.tiers.map((tier) => (
-                <li key={tier.minQty} className="flex justify-between">
-                  <span>{tier.minQty}+ pcs</span>
-                  <strong>{formatMoney(tier.unitPrice, locale)}</strong>
-                </li>
-              ))}
-            </ul>
+            <h2 className="font-bold text-blue-950">
+              {locale === "it" ? "Parametri" : "商品参数"}
+            </h2>
+            {detail.attributes.length > 0 ? (
+              <dl className="mt-3 space-y-2 text-sm text-blue-950">
+                {detail.attributes.map((attribute) => (
+                  <div key={`${attribute.key}-${attribute.value}`} className="flex justify-between gap-3">
+                    <dt className="text-blue-800">{attribute.label}</dt>
+                    <dd className="font-bold">{attribute.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <p className="mt-3 text-sm text-blue-900">
+                {locale === "it" ? "Parametri non ancora assegnati." : "暂未设置参数。"}
+              </p>
+            )}
           </div>
         </div>
 
@@ -110,15 +135,80 @@ export default async function ProductDetailPage({
         </div>
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <ButtonLink href={localizePath(locale, "/cart")} className="flex-1">
-            <ShoppingCart className="h-4 w-4" />
-            {dictionary.common.addToCart}
-          </ButtonLink>
+          {detail.isPriceVisible ? (
+            <ButtonLink href={localizePath(locale, "/cart")} className="flex-1">
+              <ShoppingCart className="h-4 w-4" />
+              {dictionary.common.addToCart}
+            </ButtonLink>
+          ) : (
+            <ButtonLink href={localizePath(locale, "/login")} className="flex-1">
+              <Lock className="h-4 w-4" />
+              {locale === "it" ? "Login per ordinare" : "登录后下单"}
+            </ButtonLink>
+          )}
           <ButtonLink href={localizePath(locale, "/b2b")} variant="secondary">
             {dictionary.common.requestB2b}
           </ButtonLink>
         </div>
       </section>
     </div>
+  );
+}
+
+function ProductMedia({
+  name,
+  image,
+}: Readonly<{ name: string; image: string | null }>) {
+  if (image?.startsWith("https://images.unsplash.com/")) {
+    return (
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <Image
+          src={image}
+          alt={name}
+          width={900}
+          height={675}
+          className="aspect-[4/3] w-full object-cover"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex aspect-[4/3] items-center justify-center rounded-lg border border-slate-200 bg-slate-100 p-6">
+      <div className="text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-lg bg-white text-2xl font-bold text-slate-400">
+          SKU
+        </div>
+        <p className="mt-4 text-sm font-semibold text-slate-600">{name}</p>
+      </div>
+    </div>
+  );
+}
+
+function StockBadge({
+  available,
+  incoming,
+  locale,
+}: Readonly<{ available: number; incoming: number; locale: Locale }>) {
+  if (available > 0) {
+    return (
+      <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
+        {locale === "it" ? "Disponibile" : "有现货"} {available}
+      </Badge>
+    );
+  }
+
+  if (incoming > 0) {
+    return (
+      <Badge className="border-violet-200 bg-violet-50 text-violet-700">
+        {locale === "it" ? "In arrivo" : "在途"} {incoming}
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge className="border-rose-200 bg-rose-50 text-rose-700">
+      {locale === "it" ? "Esaurito" : "缺货"}
+    </Badge>
   );
 }

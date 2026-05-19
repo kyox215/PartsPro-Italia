@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import {
+  ensureCatalogReferenceRows,
+  parseSkuAttributes,
+  upsertSkuAttributeValues,
+} from "@/lib/admin-catalog";
 import { assertAdmin } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
 import {
@@ -66,6 +71,17 @@ export async function POST(request: Request) {
 
   const payload = parsed.data;
   const supabase = getSupabaseAdminClient();
+
+  try {
+    await ensureCatalogReferenceRows(supabase, payload);
+  } catch (error) {
+    backUrl.searchParams.set(
+      "error",
+      error instanceof Error ? error.message : "Reference upsert failed",
+    );
+    return NextResponse.redirect(backUrl, 303);
+  }
+
   const { data: product, error: productError } = await supabase
     .from("products")
     .insert({
@@ -121,6 +137,20 @@ export async function POST(request: Request) {
 
   if (inventoryError) {
     backUrl.searchParams.set("error", inventoryError.message);
+    return NextResponse.redirect(backUrl, 303);
+  }
+
+  try {
+    await upsertSkuAttributeValues(
+      supabase,
+      sku.id,
+      parseSkuAttributes(payload.attributes),
+    );
+  } catch (error) {
+    backUrl.searchParams.set(
+      "error",
+      error instanceof Error ? error.message : "Attribute save failed",
+    );
     return NextResponse.redirect(backUrl, 303);
   }
 

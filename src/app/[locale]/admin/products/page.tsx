@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
+import { getAdminCatalogAttributeRows } from "@/lib/admin-catalog";
 import { getAuthContext } from "@/lib/auth";
 import { categories, qualityStyles } from "@/lib/catalog";
 import { getDictionary, isLocale, type Locale, localizePath } from "@/lib/i18n";
@@ -19,8 +20,14 @@ export default async function AdminProductsPage({
   const dictionary = getDictionary(locale);
   const auth = await getAuthContext();
   const rows = !auth.configured || auth.isAdmin ? await getAdminProductRows() : [];
+  const attributes =
+    auth.configured && auth.isAdmin ? await getAdminCatalogAttributeRows() : [];
   const saved = valueOf(query.saved);
   const error = valueOf(query.error);
+  const imported = valueOf(query.imported);
+  const processed = valueOf(query.processed);
+  const importMessage = valueOf(query.message);
+  const attributeSaved = valueOf(query.attribute);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -75,6 +82,20 @@ export default async function AdminProductsPage({
           </div>
         ) : null}
 
+        {imported ? (
+          <div className="mt-5 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+            {locale === "it"
+              ? `Import catalogo: ${processed || "0"} righe lette, ${imported} SKU importati. Stato: ${importMessage || "ok"}.`
+              : `目录导入：读取 ${processed || "0"} 行，导入 ${imported} 个 SKU。状态：${importMessage || "ok"}。`}
+          </div>
+        ) : null}
+
+        {attributeSaved ? (
+          <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+            {locale === "it" ? "Parametro salvato." : "参数已保存。"}
+          </div>
+        ) : null}
+
         <div className="mt-5 flex gap-3">
           <ButtonLink href={localizePath(locale, "/admin")} variant="secondary">
             {dictionary.nav.admin}
@@ -86,6 +107,120 @@ export default async function AdminProductsPage({
           ) : null}
         </div>
       </section>
+
+      <section className="mt-6 grid gap-5 lg:grid-cols-[1fr_1.2fr]">
+        <div className="rounded-lg border border-slate-200 bg-white p-5">
+          <h2 className="text-lg font-bold text-slate-950">
+            {locale === "it" ? "Import da price_*" : "从 price_* 导入"}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {locale === "it"
+              ? "Importa a batch i dati esistenti in products/skus. Richiede SUPABASE_SERVICE_ROLE_KEY."
+              : "分批把现有 price_* 数据导入 products/skus。需要 SUPABASE_SERVICE_ROLE_KEY。"}
+          </p>
+          <form action="/api/admin/catalog/import" method="post" className="mt-4 flex gap-3">
+            <input type="hidden" name="locale" value={locale} />
+            <input
+              name="batchSize"
+              defaultValue="500"
+              type="number"
+              min="1"
+              max="5000"
+              className="h-11 w-28 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+            />
+            <button
+              type="submit"
+              className="h-11 rounded-lg border border-slate-900 bg-slate-950 px-4 text-sm font-bold text-white hover:bg-slate-800"
+            >
+              {locale === "it" ? "Importa batch" : "导入一批"}
+            </button>
+          </form>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-5">
+          <h2 className="text-lg font-bold text-slate-950">
+            {locale === "it" ? "Nuovo parametro filtro" : "新建筛选参数"}
+          </h2>
+          <form
+            action="/api/admin/catalog/attributes"
+            method="post"
+            className="mt-4 grid gap-3 md:grid-cols-2"
+          >
+            <input type="hidden" name="locale" value={locale} />
+            <Input name="key" label="Key" defaultValue="screen_technology" />
+            <Input name="labelIt" label="Label IT" defaultValue="Tecnologia display" />
+            <Input name="labelZh" label="中文标签" defaultValue="屏幕技术" />
+            <label className="grid gap-2 text-sm font-medium text-slate-700">
+              Type
+              <select
+                name="inputType"
+                defaultValue="select"
+                className="h-11 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+              >
+                <option value="select">select</option>
+                <option value="boolean">boolean</option>
+                <option value="number">number</option>
+                <option value="text">text</option>
+              </select>
+            </label>
+            <Input name="unit" label="Unit" defaultValue="" required={false} />
+            <label className="flex items-center gap-2 pt-7 text-sm font-medium text-slate-700">
+              <input name="isFilterable" type="checkbox" defaultChecked />
+              Filterable
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-slate-700 md:col-span-2">
+              Options
+              <textarea
+                name="options"
+                className="min-h-24 rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                defaultValue={"soft-oled|Soft OLED|Soft OLED\nhard-oled|Hard OLED|Hard OLED"}
+              />
+            </label>
+            <button
+              className="h-11 rounded-lg border border-blue-600 bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 md:col-span-2"
+              type="submit"
+            >
+              {locale === "it" ? "Salva parametro" : "保存参数"}
+            </button>
+          </form>
+        </div>
+      </section>
+
+      {attributes.length > 0 ? (
+        <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
+          <h2 className="text-lg font-bold text-slate-950">
+            {locale === "it" ? "Parametri attivi" : "当前筛选参数"}
+          </h2>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {attributes.map((attribute) => (
+              <div key={attribute.id} className="rounded-lg border border-slate-200 p-4">
+                <p className="font-mono text-xs font-bold text-slate-500">
+                  {attribute.key}
+                </p>
+                <p className="mt-1 font-bold text-slate-950">
+                  {locale === "it" ? attribute.labelIt : attribute.labelZh}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {attribute.inputType}
+                  {attribute.unit ? ` / ${attribute.unit}` : ""}
+                </p>
+                {attribute.options.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {attribute.options.slice(0, 6).map((option) => (
+                      <Badge
+                        key={option.value}
+                        className="border-slate-200 bg-slate-50 text-slate-700"
+                      >
+                        {locale === "it" ? option.labelIt : option.labelZh}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
         <h2 className="text-lg font-bold text-slate-950">
@@ -162,6 +297,14 @@ export default async function AdminProductsPage({
               className="min-h-24 rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
               name="descriptionZh"
               defaultValue="适合专业维修场景的 Soft OLED 兼容屏。"
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-medium text-slate-700 md:col-span-3">
+            Attributes
+            <textarea
+              className="min-h-24 rounded-lg border border-slate-300 p-3 font-mono text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+              name="attributes"
+              defaultValue={"screen_technology=soft-oled\nwith_frame=yes\nwarranty=6-months"}
             />
           </label>
           <button
@@ -252,12 +395,14 @@ function Input({
   defaultValue,
   type = "text",
   step,
+  required = true,
 }: Readonly<{
   name: string;
   label: string;
   defaultValue?: string;
   type?: string;
   step?: string;
+  required?: boolean;
 }>) {
   return (
     <label className="grid gap-2 text-sm font-medium text-slate-700">
@@ -266,7 +411,7 @@ function Input({
         className="h-11 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
         defaultValue={defaultValue}
         name={name}
-        required
+        required={required}
         step={step}
         type={type}
       />

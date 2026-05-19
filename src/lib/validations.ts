@@ -85,6 +85,26 @@ export const adminProductSchema = z.object({
   b2bPrice: z.coerce.number().nonnegative(),
   stockOnHand: z.coerce.number().int().nonnegative(),
   incomingQty: z.coerce.number().int().nonnegative().default(0),
+  attributes: z.string().optional().or(z.literal("")),
+});
+
+export const adminCatalogImportSchema = z.object({
+  locale: z.enum(["it", "zh"]).default("it"),
+  batchSize: z.coerce.number().int().positive().max(5000).default(500),
+});
+
+export const adminCatalogAttributeSchema = z.object({
+  locale: z.enum(["it", "zh"]).default("it"),
+  key: z
+    .string()
+    .min(1)
+    .regex(/^[a-z0-9_]+$/, "key must use lowercase letters, numbers, and underscores"),
+  labelIt: z.string().min(1),
+  labelZh: z.string().min(1),
+  inputType: z.enum(["select", "boolean", "number", "text"]).default("select"),
+  unit: z.string().optional().or(z.literal("")),
+  isFilterable: z.coerce.boolean().default(true),
+  options: z.string().optional().or(z.literal("")),
 });
 
 export const adminOrderStatusSchema = z.object({
