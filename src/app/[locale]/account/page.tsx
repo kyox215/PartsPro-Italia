@@ -219,12 +219,12 @@ export default async function AccountPage({
             </h2>
             <p className="mt-1 text-sm leading-6 text-slate-600">
               {locale === "it"
-                ? "Dati fattura, indirizzi e price group saranno collegati alla tabella companies."
-                : "发票资料、地址和价格组后续会连接到 companies 表。"}
+                ? "Aggiorna dati fattura, indirizzi e contatti. Stato e price group restano gestiti dagli admin."
+                : "维护发票资料、地址和联系人。审核状态和价格组由后台管理员管理。"}
             </p>
           </div>
-          <ButtonLink href={localizePath(locale, "/b2b")} variant="secondary">
-            {locale === "it" ? "Richiedi B2B" : "申请批发"}
+          <ButtonLink href={localizePath(locale, "/account/company")} variant="secondary">
+            {locale === "it" ? "Modifica profilo" : "编辑资料"}
           </ButtonLink>
         </div>
       </section>

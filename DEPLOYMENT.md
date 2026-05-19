@@ -95,6 +95,7 @@ After deployment, check:
 - `/it/cart`
 - `/it/checkout`
 - `/it/account`
+- `/it/account/company`
 - `/it/b2b`
 - `/it/rma`
 - `/it/admin`
@@ -107,11 +108,13 @@ After deployment, check:
 - `/api/admin/b2b/status`
 - `/api/admin/rma/status`
 - `/api/admin/health`
+- `/api/account/company`
 
 ## 7. Current MVP Behavior
 
 - Checkout posts real line items via `itemsJson`; bank transfer orders redirect to the account page with the generated order ID.
 - The account page reads the signed-in customer's own orders and RMA records through Supabase SSR sessions and RLS.
+- Customers can maintain company, invoice, contact, and category data at `/account/company`; status and price group remain admin-controlled.
 - Stripe checkout redirects to Stripe only when `STRIPE_SECRET_KEY` is configured.
 - Product/SKU admin form writes to `products`, `skus`, and `inventory` when Supabase is configured and the user is admin.
 - Admin order, B2B approval, and RMA pages can update statuses through Node.js route handlers when Supabase is configured and the user is admin.

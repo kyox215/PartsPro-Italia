@@ -40,6 +40,23 @@ export const b2bApplicationSchema = z.object({
   interestedCategories: z.string().optional().or(z.literal("")),
 });
 
+export const accountCompanySchema = z.object({
+  locale: z.enum(["it", "zh"]).default("it"),
+  companyName: z.string().min(1, "companyName is required"),
+  vatNumber: z.string().optional().or(z.literal("")),
+  fiscalCode: z.string().optional().or(z.literal("")),
+  sdi: z.string().optional().or(z.literal("")),
+  pec: z.string().email().optional().or(z.literal("")),
+  billingAddress: z.string().optional().or(z.literal("")),
+  shippingAddress: z.string().optional().or(z.literal("")),
+  contactName: z.string().optional().or(z.literal("")),
+  phone: z.string().optional().or(z.literal("")),
+  whatsapp: z.string().optional().or(z.literal("")),
+  companyType: z.string().optional().or(z.literal("")),
+  monthlyVolume: z.string().optional().or(z.literal("")),
+  interestedCategories: z.string().optional().or(z.literal("")),
+});
+
 export const rmaSchema = z.object({
   locale: z.enum(["it", "zh"]).default("it"),
   orderNumber: z.string().min(1, "orderNumber is required"),

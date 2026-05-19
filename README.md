@@ -16,6 +16,7 @@ The app is built for:
 - Admin product/SKU creation shell at `/{locale}/admin/products`
 - Admin order, B2B approval, and RMA status workflows
 - Customer account dashboard with own orders and RMA activity
+- Customer company profile editor for invoice and B2B data
 
 ## Getting Started
 
@@ -58,6 +59,7 @@ npm run build
 - `/it/b2b`
 - `/it/rma`
 - `/it/account`
+- `/it/account/company`
 - `/it/admin`
 - `/it/admin/products`
 - `/it/admin/orders`
@@ -65,6 +67,7 @@ npm run build
 - `/it/admin/rma`
 - `/it/login`
 - `/api/orders`
+- `/api/account/company`
 - `/api/admin/products`
 - `/api/admin/orders/status`
 - `/api/admin/b2b/status`
