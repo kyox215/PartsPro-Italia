@@ -4,17 +4,17 @@ This project is designed for a private GitHub repository connected to Vercel Git
 
 ## 1. First GitHub Push
 
-Create a private GitHub repository named `phone-parts-b2b-italy`, then run:
+Create or use the GitHub repository `kyox215/PartsPro-Italia`, then run:
 
 ```bash
-git remote add origin git@github.com:<your-user-or-org>/phone-parts-b2b-italy.git
+git remote add origin git@github.com:kyox215/PartsPro-Italia.git
 git push -u origin main
 ```
 
 If you use HTTPS instead of SSH:
 
 ```bash
-git remote add origin https://github.com/<your-user-or-org>/phone-parts-b2b-italy.git
+git remote add origin https://github.com/kyox215/PartsPro-Italia.git
 git push -u origin main
 ```
 
