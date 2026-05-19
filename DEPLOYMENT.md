@@ -1,6 +1,6 @@
 # GitHub + Vercel Deployment
 
-This project is designed for a private GitHub repository connected to Vercel Git deployments.
+This project is designed for a GitHub repository connected to Vercel Git deployments.
 
 ## 1. First GitHub Push
 
@@ -92,6 +92,7 @@ After deployment, check:
 - `/it/products`
 - `/it/cart`
 - `/it/checkout`
+- `/it/account`
 - `/it/b2b`
 - `/it/rma`
 - `/it/admin`
@@ -108,6 +109,7 @@ After deployment, check:
 ## 7. Current MVP Behavior
 
 - Checkout posts real line items via `itemsJson`; bank transfer orders redirect to the account page with the generated order ID.
+- The account page reads the signed-in customer's own orders and RMA records through Supabase SSR sessions and RLS.
 - Stripe checkout redirects to Stripe only when `STRIPE_SECRET_KEY` is configured.
 - Product/SKU admin form writes to `products`, `skus`, and `inventory` when Supabase is configured and the user is admin.
 - Admin order, B2B approval, and RMA pages can update statuses through Node.js route handlers when Supabase is configured and the user is admin.

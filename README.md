@@ -14,6 +14,7 @@ The app is built for:
 - Supabase SSR auth with cookie sessions
 - Admin product/SKU creation shell at `/{locale}/admin/products`
 - Admin order, B2B approval, and RMA status workflows
+- Customer account dashboard with own orders and RMA activity
 
 ## Getting Started
 

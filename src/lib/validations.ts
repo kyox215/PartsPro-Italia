@@ -41,6 +41,7 @@ export const b2bApplicationSchema = z.object({
 });
 
 export const rmaSchema = z.object({
+  locale: z.enum(["it", "zh"]).default("it"),
   orderNumber: z.string().min(1, "orderNumber is required"),
   sku: z.string().min(1, "sku is required"),
   quantity: z.coerce.number().int().positive(),

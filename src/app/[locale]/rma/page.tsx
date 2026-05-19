@@ -19,6 +19,7 @@ export default async function RmaPage({
         </p>
 
         <form className="mt-8 grid gap-4 md:grid-cols-2" action="/api/rma" method="post">
+          <input type="hidden" name="locale" value={locale} />
           {[
             ["orderNumber", locale === "it" ? "Numero ordine" : "订单号"],
             ["sku", "SKU"],
