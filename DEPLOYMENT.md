@@ -133,6 +133,7 @@ After deployment, check:
 - `/it/login`
 - `/api/auth/oauth/google`
 - `/api/auth/callback`
+- `/api/admin/catalog/translations`
 - `/api/admin/orders/status`
 - `/api/admin/b2b/status`
 - `/api/admin/rma/status`
@@ -153,6 +154,7 @@ After deployment, check:
 - `/admin/system` shows Vercel environment readiness plus Supabase public/admin table reachability without exposing secret values.
 - Stripe checkout redirects to Stripe only when `STRIPE_SECRET_KEY` is configured.
 - Product/SKU admin form writes to `products`, `skus`, and `inventory` when Supabase is configured and the user is admin.
+- Admin catalog translation tools generate Chinese product names for imported supplier items and allow manual `name_zh` / `description_zh` correction.
 - Admin order and RMA detail pages show operational context and can update statuses through Node.js route handlers when Supabase is configured and the user is admin.
 - Without Supabase env vars, catalog/admin pages use local seed products and API writes return demo-mode redirects.
 

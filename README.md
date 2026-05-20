@@ -16,6 +16,7 @@ The app is built for:
 - Supabase SSR auth with cookie sessions
 - Role-aware navigation and post-login redirects
 - Admin product/SKU creation shell at `/{locale}/admin/products`
+- Admin catalog Chinese translation generation and manual correction
 - Admin order, B2B approval, and RMA status workflows
 - Admin order/RMA detail pages with fulfillment and return-to-detail status updates
 - Admin system health dashboard for environment and Supabase table checks
@@ -81,6 +82,7 @@ npm run build
 - `/api/orders`
 - `/api/account/company`
 - `/api/admin/products`
+- `/api/admin/catalog/translations`
 - `/api/admin/inventory/import-cart`
 - `/api/admin/inventory/receive`
 - `/api/admin/inventory/settings`

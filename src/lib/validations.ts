@@ -109,6 +109,22 @@ export const adminCatalogAttributeSchema = z.object({
   options: z.string().optional().or(z.literal("")),
 });
 
+export const adminCatalogTranslationsSchema = z.discriminatedUnion("mode", [
+  z.object({
+    mode: z.literal("batch"),
+    locale: z.enum(["it", "zh"]).default("zh"),
+    limit: z.coerce.number().int().positive().max(1000).default(300),
+    overwrite: z.coerce.boolean().default(false),
+  }),
+  z.object({
+    mode: z.literal("manual"),
+    locale: z.enum(["it", "zh"]).default("zh"),
+    productId: z.string().min(1),
+    nameZh: z.string().min(1, "nameZh is required"),
+    descriptionZh: z.string().optional().or(z.literal("")),
+  }),
+]);
+
 export const adminInventorySettingsSchema = z.object({
   locale: z.enum(["it", "zh"]).default("it"),
   b2bMarkup: z.coerce.number().positive(),

@@ -17,6 +17,7 @@ export type AdminProductRow = {
   qualityGrade: string;
   nameIt: string;
   nameZh: string;
+  descriptionZh: string | null;
   costPrice: number | null;
   retailPrice: number;
   b2bPrice: number;
@@ -42,6 +43,7 @@ export async function getAdminProductRows(): Promise<AdminProductRow[]> {
       qualityGrade: product.quality,
       nameIt: product.names.it,
       nameZh: product.names.zh,
+      descriptionZh: product.descriptions.zh,
       costPrice: null,
       retailPrice: product.retailPrice,
       b2bPrice: product.b2bPrice,
@@ -74,6 +76,7 @@ export async function getAdminProductRows(): Promise<AdminProductRow[]> {
         quality_grade,
         name_it,
         name_zh,
+        description_zh,
         is_active
       ),
       inventory (
@@ -85,7 +88,7 @@ export async function getAdminProductRows(): Promise<AdminProductRow[]> {
     `,
     )
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(300);
 
   if (error) {
     console.error("Failed to load admin products", error);
@@ -109,6 +112,7 @@ export async function getAdminProductRows(): Promise<AdminProductRow[]> {
       qualityGrade: product?.quality_grade ?? "",
       nameIt: product?.name_it ?? "",
       nameZh: product?.name_zh ?? "",
+      descriptionZh: product?.description_zh ?? null,
       costPrice: row.cost_price === null ? null : Number(row.cost_price ?? 0),
       retailPrice: Number(row.retail_price ?? 0),
       b2bPrice: Number(row.b2b_price ?? 0),

@@ -9,6 +9,8 @@ import {
   getSupabaseAdminClient,
   hasSupabaseAdminConfig,
 } from "@/lib/supabase/admin";
+import { isCatalogChineseTranslationStale } from "@/lib/catalog-translation";
+import type { SupplierCartImportPayloadRow } from "@/lib/inventory-import";
 
 export const runtime = "nodejs";
 
@@ -41,6 +43,7 @@ export async function POST(request: Request) {
     });
 
     if (error) throw new Error(error.message);
+    await syncSupplierCartTranslations(supabase, payload);
 
     const result = Array.isArray(data) ? data[0] : data;
     backUrl.searchParams.set("imported", String(result?.imported ?? 0));
@@ -55,6 +58,40 @@ export async function POST(request: Request) {
       error instanceof Error ? error.message : "Excel import failed",
     );
     return NextResponse.redirect(backUrl, 303);
+  }
+}
+
+async function syncSupplierCartTranslations(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  payload: SupplierCartImportPayloadRow[],
+) {
+  const eans = payload.map((row) => row.ean13).filter(Boolean);
+  if (!eans.length) return;
+
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, external_id, name_it, name_zh")
+    .eq("external_source", "supplier_cart")
+    .in("external_id", eans);
+
+  if (error) throw new Error(error.message);
+
+  for (const product of data ?? []) {
+    const row = payload.find((candidate) => candidate.ean13 === product.external_id);
+    if (!row || !isCatalogChineseTranslationStale(product.name_it, product.name_zh)) {
+      continue;
+    }
+
+    const { error: updateError } = await supabase
+      .from("products")
+      .update({
+        name_zh: row.name_zh,
+        description_zh: row.description_zh,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", product.id);
+
+    if (updateError) throw new Error(updateError.message);
   }
 }
 

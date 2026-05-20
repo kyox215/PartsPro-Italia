@@ -1,4 +1,8 @@
 import { read, utils } from "xlsx";
+import {
+  getCatalogChineseDescription,
+  translateCatalogProductName,
+} from "@/lib/catalog-translation";
 
 export type SupplierCartImportRow = {
   rowNumber: number;
@@ -14,6 +18,8 @@ export type SupplierCartImportRow = {
   model: string;
   color: string | null;
   qualityGrade: "Original Pull" | "High Quality Compatible";
+  nameZh: string;
+  descriptionZh: string;
   category: "dock-connectors";
   compatibility: string[];
 };
@@ -32,6 +38,8 @@ export type SupplierCartImportPayloadRow = {
   model: string;
   color: string | null;
   quality_grade: string;
+  name_zh: string;
+  description_zh: string;
   category: string;
   compatibility: string[];
 };
@@ -111,6 +119,8 @@ export function toSupplierCartPayload(rows: SupplierCartImportRow[]) {
     model: row.model,
     color: row.color,
     quality_grade: row.qualityGrade,
+    name_zh: row.nameZh,
+    description_zh: row.descriptionZh,
     category: row.category,
     compatibility: row.compatibility,
   }));
@@ -127,6 +137,7 @@ function parseSupplierCartRow(row: RawCartRow, rowNumber: number) {
   }
 
   const parsedName = parseProductName(originalName);
+  const category = "dock-connectors" as const;
   const suffix = ean13.slice(-4);
   const sku = [
     "DCK",
@@ -152,7 +163,16 @@ function parseSupplierCartRow(row: RawCartRow, rowNumber: number) {
     model: parsedName.model,
     color: parsedName.color,
     qualityGrade: parsedName.qualityGrade,
-    category: "dock-connectors" as const,
+    nameZh: translateCatalogProductName({
+      originalName,
+      brand: parsedName.brand,
+      model: parsedName.model,
+      color: parsedName.color,
+      qualityGrade: parsedName.qualityGrade,
+      category,
+    }),
+    descriptionZh: getCatalogChineseDescription(category),
+    category,
     compatibility: [parsedName.model],
   };
 }

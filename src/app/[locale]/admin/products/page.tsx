@@ -28,6 +28,9 @@ export default async function AdminProductsPage({
   const processed = valueOf(query.processed);
   const importMessage = valueOf(query.message);
   const attributeSaved = valueOf(query.attribute);
+  const translations = valueOf(query.translations);
+  const translationUpdated = valueOf(query.updated);
+  const translationSkipped = valueOf(query.skipped);
 
   return (
     <div className="space-y-6">
@@ -96,6 +99,14 @@ export default async function AdminProductsPage({
           </div>
         ) : null}
 
+        {translations ? (
+          <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+            {locale === "it"
+              ? `Traduzioni catalogo salvate: ${translationUpdated || "0"} aggiornate, ${translationSkipped || "0"} saltate.`
+              : `目录中文翻译已保存：更新 ${translationUpdated || "0"} 条，跳过 ${translationSkipped || "0"} 条。`}
+          </div>
+        ) : null}
+
         <div className="mt-5 flex gap-3">
           <ButtonLink href={localizePath(locale, "/admin")} variant="secondary">
             {dictionary.nav.admin}
@@ -108,7 +119,7 @@ export default async function AdminProductsPage({
         </div>
       </section>
 
-      <section className="mt-6 grid gap-5 lg:grid-cols-[1fr_1.2fr]">
+      <section className="mt-6 grid gap-5 xl:grid-cols-3">
         <div className="rounded-lg border border-slate-200 bg-white p-5">
           <h2 className="text-lg font-bold text-slate-950">
             {locale === "it" ? "Import da price_*" : "从 price_* 导入"}
@@ -181,6 +192,46 @@ export default async function AdminProductsPage({
               type="submit"
             >
               {locale === "it" ? "Salva parametro" : "保存参数"}
+            </button>
+          </form>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-5">
+          <h2 className="text-lg font-bold text-slate-950">
+            {locale === "it" ? "Traduzioni cinese" : "中文商品名"}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {locale === "it"
+              ? "Genera nomi cinesi per i prodotti importati senza sovrascrivere modifiche manuali."
+              : "为导入商品批量生成中文名，不覆盖已经人工修改过的中文名。"}
+          </p>
+          <form
+            action="/api/admin/catalog/translations"
+            method="post"
+            className="mt-4 grid gap-3"
+          >
+            <input type="hidden" name="locale" value={locale} />
+            <input type="hidden" name="mode" value="batch" />
+            <label className="grid gap-2 text-sm font-medium text-slate-700">
+              Limit
+              <input
+                name="limit"
+                defaultValue="300"
+                type="number"
+                min="1"
+                max="1000"
+                className="h-11 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <input name="overwrite" type="checkbox" value="true" />
+              {locale === "it" ? "Sovrascrivi anche nomi manuali" : "覆盖人工中文名"}
+            </label>
+            <button
+              className="h-11 rounded-lg border border-blue-600 bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700"
+              type="submit"
+            >
+              {locale === "it" ? "Genera traduzioni" : "批量生成中文名"}
             </button>
           </form>
         </div>
@@ -325,12 +376,13 @@ export default async function AdminProductsPage({
           </h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1240px] text-left text-sm">
+          <table className="w-full min-w-[1680px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-4 py-3">SKU</th>
                 <th className="px-4 py-3">EAN</th>
                 <th className="px-4 py-3">Product</th>
+                <th className="px-4 py-3">中文维护</th>
                 <th className="px-4 py-3">Brand / Model</th>
                 <th className="px-4 py-3">Quality</th>
                 <th className="px-4 py-3">Cost</th>
@@ -355,7 +407,36 @@ export default async function AdminProductsPage({
                     <p className="font-semibold text-slate-950">
                       {locale === "it" ? row.nameIt : row.nameZh}
                     </p>
+                    <p className="mt-1 text-xs text-slate-500">IT: {row.nameIt}</p>
+                    <p className="mt-1 text-xs text-slate-500">ZH: {row.nameZh}</p>
                     <p className="text-xs text-slate-500">{row.slug}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <form
+                      action="/api/admin/catalog/translations"
+                      method="post"
+                      className="grid min-w-[260px] gap-2"
+                    >
+                      <input type="hidden" name="locale" value={locale} />
+                      <input type="hidden" name="mode" value="manual" />
+                      <input type="hidden" name="productId" value={row.productId} />
+                      <input
+                        name="nameZh"
+                        defaultValue={row.nameZh}
+                        className="h-9 rounded-lg border border-slate-300 px-2 text-xs outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                      />
+                      <textarea
+                        name="descriptionZh"
+                        defaultValue={row.descriptionZh ?? ""}
+                        className="min-h-16 rounded-lg border border-slate-300 p-2 text-xs outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                      />
+                      <button
+                        type="submit"
+                        className="h-9 rounded-lg border border-slate-900 bg-slate-950 px-3 text-xs font-bold text-white hover:bg-slate-800"
+                      >
+                        {locale === "it" ? "Salva ZH" : "保存中文"}
+                      </button>
+                    </form>
                   </td>
                   <td className="px-4 py-3 text-slate-700">
                     {row.brand} / {row.model}
