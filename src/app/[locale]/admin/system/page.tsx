@@ -1,5 +1,4 @@
 import {
-  Activity,
   AlertTriangle,
   CheckCircle2,
   Database,
@@ -8,8 +7,15 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
+import {
+  AdminButtonLink,
+  AdminDataTable,
+  AdminMetricCard,
+  AdminNotice,
+  AdminPageHeader,
+  AdminPanel,
+  StatusPill,
+} from "@/components/admin/admin-ui";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
 import {
@@ -18,18 +24,18 @@ import {
   getSystemHealth,
 } from "@/lib/system-health";
 
-const statusStyles: Record<CheckStatus, string> = {
-  ok: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  warning: "border-orange-200 bg-orange-50 text-orange-700",
-  error: "border-rose-200 bg-rose-50 text-rose-700",
-  skipped: "border-slate-200 bg-slate-50 text-slate-600",
-};
-
 const statusIcons: Record<CheckStatus, LucideIcon> = {
   ok: CheckCircle2,
   warning: AlertTriangle,
   error: XCircle,
   skipped: MinusCircle,
+};
+
+const statusTones: Record<CheckStatus, "green" | "amber" | "red" | "slate"> = {
+  ok: "green",
+  warning: "amber",
+  error: "red",
+  skipped: "slate",
 };
 
 export default async function AdminSystemPage({
@@ -42,7 +48,11 @@ export default async function AdminSystemPage({
   const envMissing = health.env.filter((item) => item.required && !item.configured);
   const databaseErrors = health.database.filter((item) => item.status === "error");
 
-  const summary = [
+  const summary: Array<{
+    label: string;
+    status: CheckStatus;
+    detail: string;
+  }> = [
     {
       label: locale === "it" ? "Supabase pubblico" : "Supabase 公共配置",
       status: health.integrations.supabasePublic ? "ok" : "error",
@@ -65,154 +75,132 @@ export default async function AdminSystemPage({
         ? `${databaseErrors.length} checks failed`
         : "Checks completed",
     },
-  ] as const;
+  ];
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
-        <Badge className="border-blue-200 bg-blue-50 text-blue-700">
-          {locale === "it" ? "Sistema" : "系统"}
-        </Badge>
-        <h1 className="mt-4 text-3xl font-bold text-slate-950">
-          {locale === "it" ? "Stato deployment" : "部署状态"}
-        </h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          {locale === "it"
+    <div className="space-y-5">
+      <AdminPageHeader
+        eyebrow={locale === "it" ? "Profile / notification patterns" : "系统信息模式"}
+        title={locale === "it" ? "Stato deployment" : "部署状态"}
+        description={
+          locale === "it"
             ? "Controlli rapidi per ambiente Vercel, Supabase, Stripe e tabelle richieste dal MVP."
-            : "快速检查 Vercel 环境变量、Supabase、Stripe 和 MVP 所需数据表。"}
-        </p>
+            : "快速检查 Vercel 环境变量、Supabase、Stripe 和 MVP 所需数据表。"
+        }
+        actions={
+          <>
+            <AdminButtonLink href={localizePath(locale, "/admin")} variant="secondary">
+              {locale === "it" ? "Dashboard" : "后台首页"}
+            </AdminButtonLink>
+            <AdminButtonLink href="/api/admin/health" variant="secondary">
+              JSON health
+            </AdminButtonLink>
+          </>
+        }
+      />
 
-        {auth.configured && !auth.isAdmin ? (
-          <div className="mt-5 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-900">
-            {locale === "it"
-              ? "Accesso admin non confermato. I controlli non mostrano valori segreti, ma le operazioni admin richiedono ruolo admin."
-              : "当前未确认管理员权限。检查不会显示密钥值，但后台操作仍需要 admin 权限。"}
-          </div>
-        ) : null}
+      {auth.configured && !auth.isAdmin ? (
+        <AdminNotice tone="warning">
+          {locale === "it"
+            ? "Accesso admin non confermato. I controlli non mostrano valori segreti, ma le operazioni admin richiedono ruolo admin."
+            : "当前未确认管理员权限。检查不会显示密钥值，但后台操作仍需要 admin 权限。"}
+        </AdminNotice>
+      ) : null}
 
-        <div className="mt-5 flex flex-wrap gap-3">
-          <ButtonLink href={localizePath(locale, "/admin")} variant="secondary">
-            {locale === "it" ? "Dashboard" : "后台首页"}
-          </ButtonLink>
-          <ButtonLink href="/api/admin/health" variant="secondary">
-            JSON health
-          </ButtonLink>
-        </div>
-      </section>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {summary.map((item) => {
+          const Icon = statusIcons[item.status];
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {summary.map((item) => (
-          <StatusCard
-            key={item.label}
-            label={item.label}
-            detail={item.detail}
-            status={item.status}
-          />
-        ))}
+          return (
+            <AdminMetricCard
+              key={item.label}
+              icon={Icon}
+              label={item.label}
+              value={item.detail}
+              tone={statusTones[item.status]}
+              trend={<StatusPill status={item.status} tone={statusTones[item.status]} />}
+            />
+          );
+        })}
       </div>
 
-      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
-        <div className="flex items-center gap-3">
-          <KeyRound className="h-5 w-5 text-blue-600" />
-          <h2 className="text-lg font-bold text-slate-950">
-            {locale === "it" ? "Variabili ambiente" : "环境变量"}
-          </h2>
-        </div>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[680px] text-left text-sm">
-            <thead className="text-xs uppercase text-slate-500">
-              <tr className="border-b border-slate-200">
+      <AdminPanel
+        title={locale === "it" ? "Variabili ambiente" : "环境变量"}
+        toolbar={<KeyRound className="h-5 w-5 text-stone-500" />}
+      >
+        <AdminDataTable minWidth={680}>
+          <table className="w-full text-left text-sm">
+            <thead className="text-xs uppercase text-stone-400">
+              <tr className="border-b border-black/5">
                 <th className="py-3 pr-4">Key</th>
                 <th className="py-3 pr-4">{locale === "it" ? "Scope" : "范围"}</th>
                 <th className="py-3 pr-4">{locale === "it" ? "Richiesta" : "必需"}</th>
                 <th className="py-3 pr-4">{locale === "it" ? "Stato" : "状态"}</th>
               </tr>
             </thead>
-            <tbody>
-              {health.env.map((item) => (
-                <tr key={item.key} className="border-b border-slate-100">
-                  <td className="py-3 pr-4 font-mono text-xs text-slate-800">
-                    {item.key}
-                  </td>
-                  <td className="py-3 pr-4 text-slate-600">{item.scope}</td>
-                  <td className="py-3 pr-4 text-slate-600">
-                    {item.required
-                      ? locale === "it"
-                        ? "Si"
-                        : "是"
-                      : locale === "it"
-                        ? "Compatibilità"
-                        : "兼容"}
-                  </td>
-                  <td className="py-3 pr-4">
-                    <Badge
-                      className={
-                        item.configured
-                          ? statusStyles.ok
-                          : item.required
-                            ? statusStyles.error
-                            : statusStyles.warning
-                      }
-                    >
-                      {item.configured
+            <tbody className="divide-y divide-black/5">
+              {health.env.map((item) => {
+                const status: CheckStatus = item.configured
+                  ? "ok"
+                  : item.required
+                    ? "error"
+                    : "warning";
+
+                return (
+                  <tr key={item.key} className="hover:bg-stone-50">
+                    <td className="py-3 pr-4 font-mono text-xs font-black text-stone-800">
+                      {item.key}
+                    </td>
+                    <td className="py-3 pr-4 font-semibold text-stone-600">{item.scope}</td>
+                    <td className="py-3 pr-4 font-semibold text-stone-600">
+                      {item.required
                         ? locale === "it"
-                          ? "Configurata"
-                          : "已配置"
+                          ? "Si"
+                          : "是"
                         : locale === "it"
-                          ? "Mancante"
-                          : "缺失"}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
+                          ? "Compatibilita"
+                          : "兼容"}
+                    </td>
+                    <td className="py-3 pr-4">
+                      <StatusPill
+                        status={
+                          item.configured
+                            ? locale === "it"
+                              ? "Configurata"
+                              : "已配置"
+                            : locale === "it"
+                              ? "Mancante"
+                              : "缺失"
+                        }
+                        tone={statusTones[status]}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
-        </div>
+        </AdminDataTable>
         {envMissing.length ? (
-          <p className="mt-4 text-sm text-rose-700">
+          <p className="mt-4 text-sm font-semibold text-rose-700">
             {locale === "it"
               ? `${envMissing.length} variabili richieste sono mancanti in produzione.`
               : `生产环境缺少 ${envMissing.length} 个必需变量。`}
           </p>
         ) : null}
-      </section>
+      </AdminPanel>
 
-      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
-        <div className="flex items-center gap-3">
-          <Database className="h-5 w-5 text-blue-600" />
-          <h2 className="text-lg font-bold text-slate-950">
-            {locale === "it" ? "Tabelle Supabase" : "Supabase 数据表"}
-          </h2>
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
+      <AdminPanel
+        title={locale === "it" ? "Tabelle Supabase" : "Supabase 数据表"}
+        toolbar={<Database className="h-5 w-5 text-stone-500" />}
+      >
+        <div className="grid gap-3 md:grid-cols-2">
           {health.database.map((item) => (
             <DatabaseStatus key={`${item.access}-${item.table}`} check={item} />
           ))}
         </div>
-      </section>
+      </AdminPanel>
     </div>
-  );
-}
-
-function StatusCard({
-  label,
-  detail,
-  status,
-}: Readonly<{ label: string; detail: string; status: CheckStatus }>) {
-  const Icon = statusIcons[status];
-
-  return (
-    <article className="rounded-lg border border-slate-200 bg-white p-5">
-      <div className="flex items-center justify-between gap-3">
-        <Activity className="h-5 w-5 text-blue-600" />
-        <Badge className={statusStyles[status]}>
-          <Icon className="mr-1 h-3.5 w-3.5" />
-          {status}
-        </Badge>
-      </div>
-      <p className="mt-4 text-sm font-medium text-slate-500">{label}</p>
-      <p className="mt-1 text-base font-bold text-slate-950">{detail}</p>
-    </article>
   );
 }
 
@@ -220,18 +208,24 @@ function DatabaseStatus({ check }: Readonly<{ check: DatabaseCheck }>) {
   const Icon = statusIcons[check.status];
 
   return (
-    <article className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+    <article className="min-w-0 rounded-lg border border-black/5 bg-stone-50 p-4">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-mono text-sm font-bold text-slate-950">{check.table}</p>
-          <p className="mt-1 text-xs uppercase text-slate-500">{check.access}</p>
+        <div className="min-w-0">
+          <p className="truncate font-mono text-sm font-black text-stone-950">
+            {check.table}
+          </p>
+          <p className="mt-1 text-xs font-black uppercase text-stone-400">
+            {check.access}
+          </p>
         </div>
-        <Badge className={statusStyles[check.status]}>
-          <Icon className="mr-1 h-3.5 w-3.5" />
-          {check.status}
-        </Badge>
+        <span className="flex shrink-0 items-center gap-1">
+          <Icon className="h-4 w-4 text-stone-500" />
+          <StatusPill status={check.status} tone={statusTones[check.status]} />
+        </span>
       </div>
-      <p className="mt-3 text-sm leading-6 text-slate-600">{check.detail}</p>
+      <p className="mt-3 break-words text-sm font-medium leading-6 text-stone-600">
+        {check.detail}
+      </p>
     </article>
   );
 }

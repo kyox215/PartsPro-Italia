@@ -1,8 +1,16 @@
-import { Badge } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
+import { CheckCircle2, Clock3, RotateCcw, Wrench } from "lucide-react";
 import { StatusSelectForm } from "@/components/admin/status-select-form";
-import { getAuthContext } from "@/lib/auth";
+import {
+  AdminButtonLink,
+  AdminEmptyState,
+  AdminMetricCard,
+  AdminNotice,
+  AdminPageHeader,
+  AdminPanel,
+  StatusPill,
+} from "@/components/admin/admin-ui";
 import { getAdminRmaRows } from "@/lib/admin-operations";
+import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
 
 const rmaStatuses = [
@@ -34,59 +42,130 @@ export default async function AdminRmaPage({
   const error = valueOf(query.error);
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
-        <Badge className="border-orange-200 bg-orange-50 text-orange-700">RMA</Badge>
-        <h1 className="mt-4 text-3xl font-bold text-slate-950">
-          {locale === "it" ? "Gestione RMA" : "RMA 售后管理"}
-        </h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          {locale === "it"
+    <div className="space-y-5">
+      <AdminPageHeader
+        eyebrow={locale === "it" ? "Refund request components" : "售后请求组件"}
+        title={locale === "it" ? "Gestione RMA" : "RMA 售后管理"}
+        description={
+          locale === "it"
             ? "Controlla richieste post-vendita, SKU, quantita, problema e stato."
-            : "查看售后申请、SKU、数量、问题类型并更新处理状态。"}
-        </p>
-        <Feedback saved={saved} error={error} locale={locale} />
-        <div className="mt-5">
-          <ButtonLink href={localizePath(locale, "/admin")} variant="secondary">
+            : "查看售后申请、SKU、数量、问题类型并更新处理状态。"
+        }
+        actions={
+          <AdminButtonLink href={localizePath(locale, "/admin")} variant="secondary">
             {locale === "it" ? "Torna admin" : "返回后台"}
-          </ButtonLink>
-        </div>
+          </AdminButtonLink>
+        }
+      />
+
+      <Feedback saved={saved} error={error} locale={locale} />
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <AdminMetricCard
+          icon={Clock3}
+          label={locale === "it" ? "Aperti" : "待处理"}
+          value={rmas.filter((rma) => rma.status !== "completed").length}
+          tone="amber"
+        />
+        <AdminMetricCard
+          icon={Wrench}
+          label={locale === "it" ? "In test" : "检测中"}
+          value={rmas.filter((rma) => rma.status === "testing").length}
+          tone="blue"
+        />
+        <AdminMetricCard
+          icon={CheckCircle2}
+          label={locale === "it" ? "Completati" : "已完成"}
+          value={rmas.filter((rma) => rma.status === "completed").length}
+          tone="green"
+        />
       </section>
 
-      <section className="mt-6 grid gap-4">
-        {rmas.map((rma) => (
-          <article key={rma.id} className="rounded-lg border border-slate-200 bg-white p-5">
-            <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
-              <div>
-                <p className="text-lg font-bold text-slate-950">
-                  {rma.orderNumber} / {rma.sku}
-                </p>
-                <p className="mt-1 text-sm text-slate-600">
-                  {rma.issueType} x {rma.quantity}
-                </p>
-                <p className="mt-3 text-sm leading-6 text-slate-600">
-                  {rma.description || "-"}
-                </p>
-                <p className="mt-2 font-mono text-xs text-slate-500">{rma.id}</p>
-              </div>
-              <StatusSelectForm
-                action="/api/admin/rma/status"
-                currentStatus={rma.status}
-                id={rma.id}
-                locale={locale}
-                statuses={rmaStatuses}
-              />
-              <ButtonLink
-                href={localizePath(locale, `/admin/rma/${rma.id}`)}
-                variant="secondary"
-                className="h-9 px-3 text-xs"
+      <AdminPanel
+        title={locale === "it" ? "Ticket RMA" : "RMA 工单"}
+        description={
+          locale === "it"
+            ? "Schede compatte con stato, SKU e azione rapida verso il dettaglio."
+            : "以紧凑卡片展示状态、SKU，并保留详情入口。"
+        }
+      >
+        {rmas.length ? (
+          <div className="grid gap-3">
+            {rmas.map((rma) => (
+              <article
+                key={rma.id}
+                className="grid gap-4 rounded-lg border border-black/5 bg-stone-50 p-4 xl:grid-cols-[1fr_auto]"
               >
-                {locale === "it" ? "Apri" : "查看"}
-              </ButtonLink>
-            </div>
-          </article>
-        ))}
-      </section>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="truncate text-lg font-black text-stone-950">
+                      {rma.orderNumber} / {rma.sku}
+                    </p>
+                    <StatusPill status={rma.status} />
+                  </div>
+                  <p className="mt-2 text-sm font-semibold text-stone-600">
+                    {rma.issueType} x {rma.quantity}
+                  </p>
+                  <p className="mt-3 max-w-3xl text-sm font-medium leading-6 text-stone-600">
+                    {rma.description || "-"}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-black text-stone-500">
+                    <span className="rounded-md bg-white px-2 py-1 shadow-sm">
+                      {rma.installationTested
+                        ? locale === "it"
+                          ? "Testato"
+                          : "已测试"
+                        : locale === "it"
+                          ? "Test n/d"
+                          : "未记录测试"}
+                    </span>
+                    <span className="rounded-md bg-white px-2 py-1 shadow-sm">
+                      {rma.installed
+                        ? locale === "it"
+                          ? "Installato"
+                          : "已安装"
+                        : locale === "it"
+                          ? "Non installato"
+                          : "未安装"}
+                    </span>
+                    <span className="rounded-md bg-white px-2 py-1 shadow-sm">
+                      {new Date(rma.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="mt-3 font-mono text-xs font-semibold text-stone-400">
+                    {rma.id}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                  <StatusSelectForm
+                    action="/api/admin/rma/status"
+                    currentStatus={rma.status}
+                    id={rma.id}
+                    locale={locale}
+                    statuses={rmaStatuses}
+                  />
+                  <AdminButtonLink
+                    href={localizePath(locale, `/admin/rma/${rma.id}`)}
+                    variant="secondary"
+                  >
+                    {locale === "it" ? "Apri" : "查看"}
+                  </AdminButtonLink>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <AdminEmptyState
+            icon={RotateCcw}
+            title={locale === "it" ? "Nessun RMA aperto" : "暂无 RMA 工单"}
+            description={
+              locale === "it"
+                ? "Le richieste post-vendita appariranno qui."
+                : "售后申请提交后会显示在这里。"
+            }
+          />
+        )}
+      </AdminPanel>
     </div>
   );
 }
@@ -97,17 +176,13 @@ function Feedback({
   locale,
 }: Readonly<{ saved?: string; error?: string; locale: Locale }>) {
   if (error) {
-    return (
-      <div className="mt-5 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
-        {decodeURIComponent(error)}
-      </div>
-    );
+    return <AdminNotice tone="danger">{decodeURIComponent(error)}</AdminNotice>;
   }
 
   if (!saved) return null;
 
   return (
-    <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+    <AdminNotice tone="success">
       {saved === "demo"
         ? locale === "it"
           ? "Demo: stato RMA ricevuto."
@@ -115,7 +190,7 @@ function Feedback({
         : locale === "it"
           ? "RMA aggiornato."
           : "RMA 已更新。"}
-    </div>
+    </AdminNotice>
   );
 }
 

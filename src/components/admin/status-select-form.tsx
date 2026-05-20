@@ -21,7 +21,7 @@ export function StatusSelectForm({
       <input type="hidden" name="locale" value={locale} />
       {extraFields}
       <select
-        className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700"
+        className="h-9 rounded-lg border border-black/10 bg-white px-2 text-xs font-black text-stone-700 outline-none transition focus:border-stone-950 focus:ring-2 focus:ring-stone-950/10"
         name="status"
         defaultValue={currentStatus}
       >
@@ -32,7 +32,7 @@ export function StatusSelectForm({
         ))}
       </select>
       <button
-        className="h-9 rounded-lg border border-blue-600 bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700"
+        className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white transition hover:bg-stone-800"
         type="submit"
       >
         Save

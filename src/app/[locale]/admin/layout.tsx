@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import {
-  WorkspaceShell,
-  type WorkspaceNavItem,
-} from "@/components/workspace-shell";
+  AdminShell,
+  type AdminNavItem,
+} from "@/components/admin/admin-shell";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
 
@@ -30,7 +30,7 @@ export default async function AdminLayout({
     redirect(localizePath(locale, "/account?error=admin-required"));
   }
 
-  const navItems: WorkspaceNavItem[] = [
+  const navItems: AdminNavItem[] = [
     {
       href: localizePath(locale, "/admin"),
       label: locale === "it" ? "Dashboard" : "后台总览",
@@ -76,7 +76,7 @@ export default async function AdminLayout({
   ];
 
   return (
-    <WorkspaceShell
+    <AdminShell
       title={locale === "it" ? "Admin" : "管理员后台"}
       subtitle={locale === "it" ? "Pannello operativo" : "运营工作台"}
       navItems={navItems}
@@ -86,6 +86,6 @@ export default async function AdminLayout({
       showSignOut={Boolean(auth.user)}
     >
       {children}
-    </WorkspaceShell>
+    </AdminShell>
   );
 }
