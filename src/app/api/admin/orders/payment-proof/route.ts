@@ -4,16 +4,17 @@ import {
   getAdminBackUrl,
   redirectOnInvalidAdminCsrf,
 } from "@/lib/admin-security";
+import { uploadAdminAttachmentFile } from "@/lib/admin-attachment-storage";
 import { assertAdmin } from "@/lib/auth";
 import { addOrderPaymentProof } from "@/lib/order-workflow";
-import { parseRequestBody } from "@/lib/request";
 import { hasSupabaseAdminConfig } from "@/lib/supabase/admin";
 import { adminOrderPaymentProofSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const rawBody = await parseRequestBody(request);
+  const formData = await request.formData();
+  const rawBody = Object.fromEntries(formData.entries());
   const parsed = adminOrderPaymentProofSchema.safeParse(rawBody);
   const locale = String(rawBody.locale ?? "it");
   const backUrl = getAdminBackUrl(request, {
@@ -46,14 +47,19 @@ export async function POST(request: Request) {
   }
 
   try {
+    const uploaded = await uploadAdminAttachmentFile({
+      file: formData.get("file"),
+      scope: "order-payment-proofs",
+      entityId: parsed.data.id,
+    });
     const result = await addOrderPaymentProof({
       orderId: parsed.data.id,
       paymentMethod: parsed.data.paymentMethod,
       paymentStatus: parsed.data.paymentStatus,
       amount: parsed.data.amount,
       providerReference: parsed.data.providerReference || null,
-      proofUrl: parsed.data.proofUrl || null,
-      proofLabel: parsed.data.proofLabel || null,
+      proofUrl: uploaded?.reference ?? (parsed.data.proofUrl || null),
+      proofLabel: parsed.data.proofLabel || uploaded?.label || null,
       note: parsed.data.note || null,
       actorProfileId: admin.context.user?.id,
     });

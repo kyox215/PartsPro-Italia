@@ -1,3 +1,4 @@
+import { toAttachmentHref } from "@/lib/admin-attachment-storage";
 import type { AuthContext } from "@/lib/auth";
 import { products } from "@/lib/catalog";
 import {
@@ -367,7 +368,7 @@ function mapAccountOrder(order: {
         currency: record.currency ?? "EUR",
         provider: record.provider ?? null,
         providerReference: record.provider_reference ?? null,
-        proofUrl: record.proof_url ?? null,
+        proofUrl: toAttachmentHref(record.proof_url),
         proofLabel: record.proof_label ?? null,
         note: record.note ?? null,
         createdAt: record.created_at,
@@ -448,7 +449,7 @@ function normalizeRmaAttachments(value: unknown) {
     .map((item) => ({
       id: String(item.id ?? ""),
       label: String(item.label ?? item.name ?? "Attachment"),
-      url: String(item.url ?? ""),
+      url: toAttachmentHref(String(item.url ?? "")) ?? "",
       note: typeof item.note === "string" ? item.note : null,
       createdAt: String(item.createdAt ?? item.created_at ?? ""),
     }))

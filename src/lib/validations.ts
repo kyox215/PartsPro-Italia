@@ -365,6 +365,6 @@ export const adminRmaAttachmentSchema = z.object({
   locale: z.enum(["it", "zh"]).default("it"),
   returnTo: z.string().optional().or(z.literal("")),
   label: z.string().min(1),
-  url: z.string().url(),
+  url: z.string().min(1),
   note: z.string().optional().or(z.literal("")),
 });

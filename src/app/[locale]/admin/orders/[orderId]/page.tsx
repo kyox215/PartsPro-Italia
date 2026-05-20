@@ -404,7 +404,12 @@ function PaymentProofForm({
   if (!order) return null;
 
   return (
-    <form action="/api/admin/orders/payment-proof" className="grid gap-3" method="post">
+    <form
+      action="/api/admin/orders/payment-proof"
+      className="grid gap-3"
+      encType="multipart/form-data"
+      method="post"
+    >
       <AdminCsrfField />
       <input type="hidden" name="id" value={order.id} />
       <input type="hidden" name="locale" value={locale} />
@@ -457,7 +462,16 @@ function PaymentProofForm({
         />
       </label>
       <label className="grid gap-1 text-xs font-black text-stone-500">
-        {locale === "it" ? "Link allegato" : "凭证链接"}
+        {locale === "it" ? "Carica file" : "上传文件"}
+        <input
+          accept="image/jpeg,image/png,image/webp,image/heic,application/pdf,text/plain"
+          className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-stone-950 file:mr-3 file:rounded-md file:border-0 file:bg-stone-100 file:px-3 file:py-1.5 file:text-xs file:font-black file:text-stone-700"
+          name="file"
+          type="file"
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Oppure link allegato" : "或填写凭证链接"}
         <input
           className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
           name="proofUrl"
