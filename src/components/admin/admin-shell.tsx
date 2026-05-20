@@ -250,7 +250,7 @@ function AdminSiteLink({
   );
 }
 
-function AdminBrand({
+export function AdminBrand({
   title,
   subtitle,
   compact = false,

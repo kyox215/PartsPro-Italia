@@ -219,16 +219,18 @@ export default async function AdminPage({
         }
       />
 
-      <AdminNotice
-        tone={auth.configured && !auth.isAdmin ? "danger" : "warning"}
-        title={locale === "it" ? "Accesso operativo" : "运营访问"}
-      >
-        {auth.configured && !auth.isAdmin
-          ? locale === "it"
-            ? "Accesso reale limitato agli admin. In locale puoi vedere la shell, ma le API admin richiedono ruolo admin."
-            : "真实后台仅管理员可访问。本地可查看界面，但后台 API 需要 admin 角色。"
-          : dictionary.admin.warning}
-      </AdminNotice>
+      {!auth.configured || !auth.isAdmin ? (
+        <AdminNotice
+          tone={auth.configured && !auth.isAdmin ? "danger" : "warning"}
+          title={locale === "it" ? "Accesso operativo" : "运营访问"}
+        >
+          {auth.configured && !auth.isAdmin
+            ? locale === "it"
+              ? "Accesso reale limitato agli admin. In locale puoi vedere la shell, ma le API admin richiedono ruolo admin."
+              : "真实后台仅管理员可访问。本地可查看界面，但后台 API 需要 admin 角色。"
+            : dictionary.admin.warning}
+        </AdminNotice>
+      ) : null}
 
       <AdminMetricStrip className="xl:grid-cols-4 2xl:grid-cols-8">
         {metrics.map(({ Icon, label, value, tone, trend }) => (
