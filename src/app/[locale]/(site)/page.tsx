@@ -68,7 +68,7 @@ export default async function LocaleHome({
                 {[
                   ["300-800", "SKU MVP"],
                   ["24/48h", "Italia"],
-                  ["B2B", "Tier pricing"],
+                  [locale === "it" ? "Wholesale" : "批发", locale === "it" ? "Prezzi dedicati" : "专属价格"],
                 ].map(([value, label]) => (
                   <div key={label} className="rounded-lg bg-white/10 p-4">
                     <p className="text-2xl font-bold">{value}</p>

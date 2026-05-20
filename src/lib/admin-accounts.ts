@@ -1,6 +1,8 @@
 import {
   getAllAdminPermissions,
+  getStaffPermissionMatrix,
   isStaffRole,
+  staffRoleOptions,
   staffRoleDescriptions,
   staffRoleLabels,
   type AdminPermission,
@@ -44,6 +46,12 @@ export type StaffRoleSummary = {
   permissions: AdminPermission[];
 };
 
+type StaffProfile = {
+  email: string;
+  fullName: string | null;
+  role: string | null;
+};
+
 export async function getAdminStaffRows(): Promise<AdminStaffRow[]> {
   if (!hasSupabaseAdminConfig()) {
     return [
@@ -64,9 +72,7 @@ export async function getAdminStaffRows(): Promise<AdminStaffRow[]> {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("staff_members")
-    .select(
-      "id, profile_id, role, status, display_name, invited_email, created_at, updated_at, profiles ( email, full_name, role )",
-    )
+    .select("id, profile_id, role, status, display_name, invited_email, created_at, updated_at")
     .order("updated_at", { ascending: false });
 
   if (error) {
@@ -74,14 +80,18 @@ export async function getAdminStaffRows(): Promise<AdminStaffRow[]> {
     return [];
   }
 
+  const profiles = await loadStaffProfiles(
+    Array.from(new Set((data ?? []).map((staff) => staff.profile_id).filter(Boolean))),
+  );
+
   return (data ?? []).flatMap((staff) => {
     if (!isStaffRole(staff.role)) return [];
-    const profile = Array.isArray(staff.profiles) ? staff.profiles[0] : staff.profiles;
+    const profile = profiles.get(staff.profile_id);
     return {
       id: staff.id,
       profileId: staff.profile_id,
       email: profile?.email ?? staff.invited_email ?? "-",
-      fullName: profile?.full_name ?? staff.display_name ?? null,
+      fullName: profile?.fullName ?? staff.display_name ?? null,
       role: staff.role,
       status: staff.status,
       profileRole: profile?.role ?? null,
@@ -89,6 +99,32 @@ export async function getAdminStaffRows(): Promise<AdminStaffRow[]> {
       updatedAt: staff.updated_at ?? null,
     };
   });
+}
+
+async function loadStaffProfiles(profileIds: string[]) {
+  const profiles = new Map<string, StaffProfile>();
+  if (!hasSupabaseAdminConfig() || profileIds.length === 0) return profiles;
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, email, full_name, role")
+    .in("id", profileIds);
+
+  if (error) {
+    console.error("Failed to load staff profiles", error);
+    return profiles;
+  }
+
+  (data ?? []).forEach((profile) => {
+    profiles.set(profile.id, {
+      email: profile.email,
+      fullName: profile.full_name ?? null,
+      role: profile.role ?? null,
+    });
+  });
+
+  return profiles;
 }
 
 export async function getCustomerAuditEvents(
@@ -188,40 +224,14 @@ export async function findProfileByEmail(email: string) {
   return data;
 }
 
-export function getStaffRoleSummaries(locale: "it" | "zh"): StaffRoleSummary[] {
-  const roles: StaffRole[] = ["owner", "sales", "catalog", "warehouse", "finance", "support"];
-  return roles.map((role) => ({
+export async function getStaffRoleSummaries(locale: "it" | "zh"): Promise<StaffRoleSummary[]> {
+  const matrix = await getStaffPermissionMatrix();
+  return staffRoleOptions.map((role) => ({
     role,
     label: staffRoleLabels[role][locale],
     description: staffRoleDescriptions[role][locale],
-    permissions: role === "owner" ? getAllAdminPermissions() : getRolePermissions(role),
+    permissions: role === "owner" ? getAllAdminPermissions() : matrix[role],
   }));
-}
-
-function getRolePermissions(role: StaffRole) {
-  if (role === "owner") return getAllAdminPermissions();
-  const lookup: Record<Exclude<StaffRole, "owner">, AdminPermission[]> = {
-    sales: [
-      "admin:access",
-      "accounts:read",
-      "accounts:write",
-      "b2b:review",
-      "audit:read",
-      "orders:write",
-      "rma:write",
-    ],
-    catalog: ["admin:access", "products:write", "system:read"],
-    warehouse: ["admin:access", "inventory:write", "orders:write", "system:read"],
-    finance: [
-      "admin:access",
-      "orders:write",
-      "payments:confirm",
-      "audit:read",
-      "system:read",
-    ],
-    support: ["admin:access", "accounts:read", "rma:write", "audit:read"],
-  };
-  return lookup[role];
 }
 
 function asRecordOrNull(value: unknown): Record<string, unknown> | null {

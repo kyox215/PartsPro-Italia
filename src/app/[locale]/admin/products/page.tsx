@@ -74,8 +74,8 @@ export default async function AdminProductsPage({
         title={locale === "it" ? "Gestione catalogo" : "商品目录管理"}
         description={
           locale === "it"
-            ? "Crea SKU operativi con prezzo retail, prezzo B2B, stock e incoming. I salvataggi restano collegati a products, skus e inventory."
-            : "创建带零售价、B2B 价、库存和在途数量的 SKU。保存仍连接 products、skus 和 inventory。"
+            ? "Crea SKU operativi con prezzo retail, prezzo wholesale, stock e incoming. I salvataggi restano collegati a products, skus e inventory."
+            : "创建带零售价、批发价、库存和在途数量的 SKU。保存仍连接 products、skus 和 inventory。"
         }
         actions={
           <>
@@ -220,7 +220,7 @@ export default async function AdminProductsPage({
                 <AdminInput name="moq" label="MOQ" defaultValue="1" type="number" />
                 <AdminInput name="costPrice" label="Cost EUR" defaultValue="" type="number" step="0.01" required={false} />
                 <AdminInput name="retailPrice" label="Retail EUR" defaultValue="119.90" type="number" step="0.01" />
-                <AdminInput name="b2bPrice" label="B2B EUR" defaultValue="92.50" type="number" step="0.01" />
+                <AdminInput name="b2bPrice" label={locale === "it" ? "Wholesale EUR" : "批发 EUR"} defaultValue="92.50" type="number" step="0.01" />
                 <AdminInput name="stockOnHand" label="Stock" defaultValue="20" type="number" />
                 <AdminInput name="incomingQty" label="Incoming" defaultValue="60" type="number" />
                 <AdminInput name="imageUrl" label="Image URL" defaultValue="https://images.unsplash.com/photo-1581993192008-63e896f4f744?auto=format&fit=crop&w=900&q=80" />
@@ -296,7 +296,7 @@ export default async function AdminProductsPage({
                   <th className="px-2.5 py-2">Quality</th>
                   <th className="px-2.5 py-2">Cost</th>
                   <th className="px-2.5 py-2">Retail</th>
-                  <th className="px-2.5 py-2">B2B</th>
+                  <th className="px-2.5 py-2">{locale === "it" ? "Wholesale" : "批发"}</th>
                   <th className="px-2.5 py-2">Stock</th>
                   <th className="px-2.5 py-2">Reserved</th>
                   <th className="px-2.5 py-2">Incoming</th>
@@ -619,7 +619,7 @@ function ProductMobileCards({
               </p>
             </div>
             <div>
-              <p className="font-black text-stone-400">B2B</p>
+              <p className="font-black text-stone-400">{locale === "it" ? "Wholesale" : "批发"}</p>
               <p className="mt-0.5 font-black text-sky-700">
                 {formatMoney(row.b2bPrice, locale)}
               </p>

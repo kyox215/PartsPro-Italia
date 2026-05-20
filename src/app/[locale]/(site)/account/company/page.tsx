@@ -53,7 +53,7 @@ export default async function AccountCompanyPage({
     <div className="space-y-6">
       <section className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
         <Badge className="border-blue-200 bg-blue-50 text-blue-700">
-          {locale === "it" ? "Profilo B2B" : "B2B 公司资料"}
+          {locale === "it" ? "Profilo wholesale" : "批发公司资料"}
         </Badge>
         <h1 className="mt-4 text-3xl font-bold text-slate-950">
           {locale === "it" ? "Dati aziendali" : "公司与发票资料"}
@@ -76,15 +76,15 @@ export default async function AccountCompanyPage({
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <p className="text-xs font-bold uppercase text-slate-500">
-              {locale === "it" ? "Price group" : "价格组"}
+              {locale === "it" ? "Tipo cliente" : "客户类型"}
             </p>
             <p className="mt-2 text-lg font-black text-slate-950">
               {formatAccountRole(draft.priceGroup, locale)}
             </p>
             <p className="mt-2 text-xs leading-5 text-slate-600">
               {locale === "it"
-                ? "I prezzi B2B sono applicati dopo approvazione admin."
-                : "后台审核通过后，前台会显示对应 B2B 价格。"}
+                ? "Il prezzo wholesale si applica dopo approvazione admin."
+                : "后台审核通过后，前台会显示批发价格。"}
             </p>
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -149,8 +149,8 @@ export default async function AccountCompanyPage({
             </h2>
             <p className="mt-1 text-sm leading-6 text-slate-600">
               {locale === "it"
-                ? "Gli admin aggiornano stato e price group dal pannello B2B. I clienti possono aggiornare solo dati operativi e fattura."
-                : "管理员在 B2B 后台更新审核状态和价格组。客户只能维护运营和发票资料。"}
+                ? "Gli admin aggiornano stato e tipo cliente dal pannello clienti. I clienti possono aggiornare solo dati operativi e fattura."
+                : "管理员在客户管理中更新审核状态和客户类型。客户只能维护运营和发票资料。"}
             </p>
           </div>
           <ButtonLink href={localizePath(locale, "/account")} variant="secondary">
@@ -238,14 +238,14 @@ function CompanyForm({
           value="submitB2B"
         >
           <ShieldCheck className="h-4 w-4" />
-          {locale === "it" ? "Invia revisione B2B" : "提交 B2B 审核"}
+          {locale === "it" ? "Invia revisione wholesale" : "提交批发审核"}
         </button>
       </div>
       {completionPercent < 60 ? (
         <p className="text-xs leading-5 text-amber-700 md:col-span-2">
           {locale === "it"
-            ? "Completa almeno i dati principali prima di inviare la revisione B2B."
-            : "请先补齐主要公司资料，再提交 B2B 审核。"}
+            ? "Completa almeno i dati principali prima di inviare la revisione wholesale."
+            : "请先补齐主要公司资料，再提交批发审核。"}
         </p>
       ) : null}
     </form>
@@ -275,8 +275,8 @@ function Feedback({
           : "演示：已接收公司资料，连接 Supabase 后可保存。"
         : saved === "b2b"
           ? locale === "it"
-            ? "Profilo salvato e revisione B2B inviata."
-            : "公司资料已保存，并已提交 B2B 审核。"
+            ? "Profilo salvato e revisione wholesale inviata."
+            : "公司资料已保存，并已提交批发审核。"
           : locale === "it"
             ? "Profilo aziendale salvato."
             : "公司资料已保存。"}

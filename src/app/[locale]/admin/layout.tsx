@@ -3,7 +3,7 @@ import {
   AdminShell,
   type AdminNavItem,
 } from "@/components/admin/admin-shell";
-import { hasAdminPermission, type AdminPermission } from "@/lib/admin-permissions";
+import { hasAdminPermission, staffRoleLabels, type AdminPermission } from "@/lib/admin-permissions";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
 
@@ -67,7 +67,7 @@ export default async function AdminLayout({
     {
       href: localizePath(locale, "/admin/accounts"),
       label: locale === "it" ? "Account" : "账号管理",
-      description: locale === "it" ? "Clienti, B2B e ruoli" : "客户、B2B 与权限",
+      description: locale === "it" ? "Clienti e ruoli" : "客户与权限",
       icon: "users",
       permission: "accounts:read",
       children: [
@@ -76,12 +76,6 @@ export default async function AdminLayout({
           label: locale === "it" ? "Clienti" : "客户管理",
           icon: "users",
           permission: "accounts:read",
-        },
-        {
-          href: localizePath(locale, "/admin/accounts/b2b"),
-          label: locale === "it" ? "B2B review" : "B2B 审核",
-          icon: "user",
-          permission: "b2b:review",
         },
         {
           href: localizePath(locale, "/admin/accounts/permissions"),
@@ -147,6 +141,6 @@ function getIdentityRoleLabel(
   locale: Locale,
 ) {
   if (auth.isAdmin) return locale === "it" ? "Admin owner" : "总管理员";
-  if (auth.staffRole) return locale === "it" ? `Staff: ${auth.staffRole}` : `员工：${auth.staffRole}`;
+  if (auth.staffRole) return staffRoleLabels[auth.staffRole][locale];
   return locale === "it" ? "Admin" : "管理员";
 }

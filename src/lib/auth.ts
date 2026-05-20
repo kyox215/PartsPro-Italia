@@ -9,7 +9,7 @@ import {
 } from "@/lib/supabase/admin";
 import {
   getAllAdminPermissions,
-  getStaffPermissions,
+  getStaffPermissionsForRole,
   isStaffRole,
   type AdminPermission,
   type StaffRole,
@@ -32,6 +32,7 @@ export type AuthContext = {
 };
 
 const b2bPriceRoles = new Set([
+  "wholesale",
   "b2b_basic",
   "b2b_silver",
   "b2b_gold",
@@ -141,7 +142,9 @@ export async function getRoleForUser(user: { id: string; email?: string | null }
   const isAdmin = role === "admin" || user.email?.toLowerCase() === adminEmail;
   const isSuspended = accountStatus === "suspended" || accountStatus === "archived";
   const isStaff = Boolean(staffRole && staffStatus === "active" && !isSuspended);
-  const adminPermissions = isAdmin ? getAllAdminPermissions() : getStaffPermissions(staffRole);
+  const adminPermissions = isAdmin
+    ? getAllAdminPermissions()
+    : await getStaffPermissionsForRole(staffRole);
   const canAccessAdmin = Boolean((isAdmin || isStaff) && !isSuspended);
 
   return {

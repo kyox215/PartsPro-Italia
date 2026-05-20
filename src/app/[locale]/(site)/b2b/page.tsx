@@ -63,14 +63,14 @@ export default async function B2BPage({
           <li className="flex gap-2">
             <ShieldCheck className="mt-1 h-4 w-4 shrink-0 text-emerald-600" />
             {locale === "it"
-              ? "Admin approva azienda, assegna livello e gruppo prezzo."
-              : "后台审核公司资料，分配客户等级和价格组。"}
+              ? "Admin approva azienda e attiva il tipo cliente wholesale."
+              : "后台审核公司资料，并将客户类型设为批发客户。"}
           </li>
           <li className="flex gap-2">
             <ShieldCheck className="mt-1 h-4 w-4 shrink-0 text-emerald-600" />
             {locale === "it"
-              ? "Dopo approvazione il cliente vede prezzi B2B e scalari."
-              : "审核通过后客户可看到 B2B 价格和阶梯价。"}
+              ? "Dopo approvazione il cliente vede il prezzo wholesale."
+              : "审核通过后客户可看到批发价格。"}
           </li>
         </ul>
       </aside>

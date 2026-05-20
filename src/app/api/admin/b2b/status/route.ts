@@ -15,7 +15,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const rawBody = await parseRequestBody(request);
   const locale = String(rawBody.locale ?? "it");
-  const backUrl = new URL(`/${locale}/admin/accounts/b2b`, request.url);
+  const backUrl = new URL(`/${locale}/admin/accounts/customers?filter=wholesale_pending`, request.url);
   const parsed = adminB2BStatusSchema.safeParse(rawBody);
 
   if (!parsed.success) {
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
   if (csrfRedirect) return csrfRedirect;
 
-  const admin = await assertAdminPermission("b2b:review");
+  const admin = await assertAdminPermission("accounts:write");
 
   if (!admin.ok) {
     backUrl.searchParams.set("error", admin.error);

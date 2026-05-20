@@ -39,7 +39,7 @@ export default async function ProductsPage({
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <Badge className="border-blue-200 bg-blue-50 text-blue-700">
-              {locale === "it" ? "Catalogo B2B" : "B2B 商品目录"}
+              {locale === "it" ? "Catalogo wholesale" : "批发商品目录"}
             </Badge>
             <h1 className="mt-4 text-3xl font-bold text-slate-950">
               {dictionary.products.title}
@@ -383,7 +383,7 @@ function CatalogToolbar({
         href={localizePath(locale, "/b2b")}
         className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 px-3 text-sm font-bold text-slate-900 hover:border-blue-300 hover:text-blue-700"
       >
-        {locale === "it" ? "Apri conto B2B" : "申请批发账户"}
+        {locale === "it" ? "Apri conto wholesale" : "申请批发账户"}
       </Link>
     </div>
   );
@@ -490,7 +490,7 @@ function CatalogProductCard({
           <div>
             {isB2BPriceVisible ? (
               <>
-                <p className="text-xs text-slate-500">{locale === "it" ? "B2B" : "批发价"}</p>
+                <p className="text-xs text-slate-500">{locale === "it" ? "Wholesale" : "批发价"}</p>
                 <p className="font-bold text-blue-700">
                   {formatMoney(item.b2bPrice ?? 0, locale)}
                 </p>

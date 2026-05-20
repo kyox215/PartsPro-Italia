@@ -4,23 +4,26 @@ import { AccountManagementTabs } from "@/components/admin/account-management-nav
 import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
 import {
   AdminActionRail,
-  AdminInput,
+  AdminEmptyState,
+  AdminButtonLink,
   AdminMetricCard,
   AdminNotice,
   AdminPageHeader,
   AdminPanel,
   AdminRecordList,
-  AdminSelect,
+  AdminToggle,
   AdminWorkspaceGrid,
   StatusPill,
 } from "@/components/admin/admin-ui";
-import { formatAdminStatus, formatPermissionLabel, staffStatusOptions } from "@/lib/admin-display";
+import { formatAdminStatus, formatCustomerType, formatPermissionLabel } from "@/lib/admin-display";
 import { getAdminStaffRows, getStaffRoleSummaries } from "@/lib/admin-accounts";
-import { hasAdminPermission, staffRoleLabels, type StaffRole } from "@/lib/admin-permissions";
+import {
+  getConfigurableAdminPermissions,
+  hasAdminPermission,
+  staffRoleLabels,
+} from "@/lib/admin-permissions";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
-
-const staffRoles: StaffRole[] = ["owner", "sales", "catalog", "warehouse", "finance", "support"];
 
 export default async function AdminAccountPermissionsPage({
   params,
@@ -37,7 +40,8 @@ export default async function AdminAccountPermissionsPage({
     redirect(localizePath(locale, "/admin/accounts?error=permission-denied"));
   }
   const staff = await getAdminStaffRows();
-  const summaries = getStaffRoleSummaries(locale);
+  const summaries = await getStaffRoleSummaries(locale);
+  const configurablePermissions = getConfigurableAdminPermissions();
   const activeStaff = staff.filter((member) => member.status === "active");
 
   return (
@@ -47,8 +51,8 @@ export default async function AdminAccountPermissionsPage({
         title={locale === "it" ? "Permessi staff" : "权限管理"}
         description={
           locale === "it"
-            ? "Ruoli fissi per owner, vendite, catalogo, magazzino, finanza e supporto."
-            : "固定员工角色矩阵：老板/总管理员、销售、商品、仓库、财务和客服售后。"
+            ? "Configura quali menu e azioni puo usare ogni ruolo staff."
+            : "配置每个员工角色可以访问哪些后台菜单和操作能力。"
         }
       />
 
@@ -58,36 +62,17 @@ export default async function AdminAccountPermissionsPage({
       <AdminWorkspaceGrid
         rail={
           <AdminActionRail
-            title={locale === "it" ? "Assegna ruolo" : "分配员工权限"}
-            description={locale === "it" ? "L'email deve essere gia registrata." : "邮箱必须已注册为站点用户。"}
+            title={locale === "it" ? "Assegna staff dai clienti" : "员工分配在客户管理完成"}
+            description={
+              locale === "it"
+                ? "Apri un cliente registrato e scegli il ruolo staff nella scheda identita."
+                : "打开已注册客户详情，在“身份与权限”里选择员工角色。"
+            }
           >
             <AdminPanel>
-              <form action="/api/admin/accounts/staff" method="post" className="grid gap-2">
-                <AdminCsrfField />
-                <input type="hidden" name="locale" value={locale} />
-                <input type="hidden" name="returnTo" value={localizePath(locale, "/admin/accounts/permissions")} />
-                <AdminInput name="email" type="email" label="Email" placeholder="staff@example.it" />
-                <AdminSelect name="role" label={locale === "it" ? "Ruolo" : "角色"} defaultValue="support">
-                  {staffRoles.map((role) => (
-                    <option key={role} value={role}>
-                      {staffRoleLabels[role][locale]}
-                    </option>
-                  ))}
-                </AdminSelect>
-                <AdminSelect name="status" label={locale === "it" ? "Stato" : "状态"} defaultValue="active">
-                  {staffStatusOptions.map((status) => {
-                    const option = formatAdminStatus("account", status, locale);
-                    return (
-                      <option key={status} value={status}>
-                        {option.label}
-                      </option>
-                    );
-                  })}
-                </AdminSelect>
-                <button className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white" type="submit">
-                  {locale === "it" ? "Salva staff" : "保存员工权限"}
-                </button>
-              </form>
+              <AdminButtonLink href={localizePath(locale, "/admin/accounts/customers?filter=staff")} variant="secondary">
+                {locale === "it" ? "Apri staff" : "查看员工账号"}
+              </AdminButtonLink>
             </AdminPanel>
           </AdminActionRail>
         }
@@ -99,7 +84,7 @@ export default async function AdminAccountPermissionsPage({
         </section>
 
         <AdminPanel title={locale === "it" ? "Matrice ruoli" : "角色权限矩阵"}>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-2 xl:grid-cols-2">
             {summaries.map((summary) => (
               <article key={summary.role} className="rounded-lg border border-black/5 bg-stone-50 p-3">
                 <div className="flex items-center justify-between gap-2">
@@ -107,45 +92,81 @@ export default async function AdminAccountPermissionsPage({
                   <StatusPill status={summary.label} tone={summary.role === "owner" ? "violet" : "blue"} />
                 </div>
                 <p className="mt-2 text-xs font-semibold leading-5 text-stone-500">{summary.description}</p>
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {summary.permissions.map((permission) => (
-                    <StatusPill key={permission} status={formatPermissionLabel(permission, locale)} tone="slate" />
-                  ))}
-                </div>
+                {summary.role === "owner" ? (
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {summary.permissions.map((permission) => (
+                      <StatusPill key={permission} status={formatPermissionLabel(permission, locale)} tone="slate" />
+                    ))}
+                  </div>
+                ) : (
+                  <form action="/api/admin/accounts/permissions/matrix" method="post" className="mt-3 grid gap-2">
+                    <AdminCsrfField />
+                    <input type="hidden" name="locale" value={locale} />
+                    <input type="hidden" name="returnTo" value={localizePath(locale, "/admin/accounts/permissions")} />
+                    <input type="hidden" name="role" value={summary.role} />
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {configurablePermissions.map((permission) => (
+                        <AdminToggle
+                          key={permission}
+                          name={`permission:${permission}`}
+                          label={formatPermissionLabel(permission, locale)}
+                          defaultChecked={summary.permissions.includes(permission)}
+                        />
+                      ))}
+                    </div>
+                    <button className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white" type="submit">
+                      {locale === "it" ? "Salva matrice" : "保存权限矩阵"}
+                    </button>
+                  </form>
+                )}
               </article>
             ))}
           </div>
         </AdminPanel>
 
         <AdminPanel title={locale === "it" ? "Staff configurato" : "已配置员工"}>
-          <AdminRecordList>
-            {staff.map((member) => {
-              const status = formatAdminStatus("account", member.status, locale);
-              const profileRole = member.profileRole
-                ? formatAdminStatus("staffRole", member.profileRole, locale)
-                : null;
-              return (
-                <article
-                  key={member.id}
-                  className="grid min-w-0 gap-3 rounded-lg bg-stone-50 p-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
-                >
-                  <div className="min-w-0">
-                    <p className="break-words font-black text-stone-950">{member.fullName ?? member.email}</p>
-                    <p className="mt-1 break-words text-xs font-semibold text-stone-500">{member.email}</p>
-                    <p className="mt-1 text-xs font-semibold text-stone-400">
-                      {locale === "it" ? "Aggiornato" : "更新时间"}:{" "}
-                      {member.updatedAt ? new Date(member.updatedAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN") : "-"}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-1 md:justify-end">
-                    <StatusPill status={staffRoleLabels[member.role][locale]} tone={member.role === "owner" ? "violet" : "blue"} />
-                    <StatusPill status={status.label} tone={status.tone} />
-                    {profileRole ? <StatusPill status={profileRole.label} tone={profileRole.tone} /> : null}
-                  </div>
-                </article>
-              );
-            })}
-          </AdminRecordList>
+          {staff.length > 0 ? (
+            <AdminRecordList>
+              {staff.map((member) => {
+                const status = formatAdminStatus("account", member.status, locale);
+                const profileRole = member.profileRole
+                  ? member.profileRole === "admin"
+                    ? formatAdminStatus("staffRole", "admin", locale)
+                    : formatCustomerType(member.profileRole, locale)
+                  : null;
+                return (
+                  <article
+                    key={member.id}
+                    className="grid min-w-0 gap-3 rounded-lg bg-stone-50 p-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
+                  >
+                    <div className="min-w-0">
+                      <p className="break-words font-black text-stone-950">{member.fullName ?? member.email}</p>
+                      <p className="mt-1 break-words text-xs font-semibold text-stone-500">{member.email}</p>
+                      <p className="mt-1 text-xs font-semibold text-stone-400">
+                        {locale === "it" ? "Aggiornato" : "更新时间"}:{" "}
+                        {member.updatedAt ? new Date(member.updatedAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN") : "-"}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-1 md:justify-end">
+                      <StatusPill status={staffRoleLabels[member.role][locale]} tone={member.role === "owner" ? "violet" : "blue"} />
+                      <StatusPill status={status.label} tone={status.tone} />
+                      {profileRole ? <StatusPill status={profileRole.label} tone={profileRole.tone} /> : null}
+                    </div>
+                  </article>
+                );
+              })}
+            </AdminRecordList>
+          ) : (
+            <AdminEmptyState
+              icon={UserCog}
+              title={locale === "it" ? "Nessuno staff configurato" : "暂无已配置员工"}
+              description={
+                locale === "it"
+                  ? "Assegna un ruolo staff nella scheda cliente per vederlo qui."
+                  : "在客户详情里分配员工角色后，会显示在这里。"
+              }
+            />
+          )}
         </AdminPanel>
       </AdminWorkspaceGrid>
     </div>
@@ -157,13 +178,28 @@ function Feedback({
   locale,
 }: Readonly<{ query: Record<string, string | string[] | undefined>; locale: Locale }>) {
   const error = valueOf(query.error);
-  if (error) return <AdminNotice tone="danger">{decodeURIComponent(error)}</AdminNotice>;
+  if (error) return <AdminNotice tone="danger">{formatStaffFeedback(error, locale)}</AdminNotice>;
   if (!valueOf(query.saved)) return null;
   return (
     <AdminNotice tone="success">
       {locale === "it" ? "Permessi aggiornati." : "员工权限已更新。"}
     </AdminNotice>
   );
+}
+
+function formatStaffFeedback(error: string, locale: Locale) {
+  const decoded = decodeURIComponent(error);
+  if (decoded.includes("No registered profile found")) {
+    return locale === "it"
+      ? "Questa email non ha ancora un account registrato. Falla accedere una volta al sito, poi assegna i permessi."
+      : "这个邮箱还没有注册站点账号。请先让该邮箱注册或登录一次，再分配员工权限。";
+  }
+  if (decoded.includes("Only owner/admin can assign owner role")) {
+    return locale === "it"
+      ? "Solo owner o amministratori possono assegnare il ruolo owner."
+      : "只有老板/总管理员可以分配老板角色。";
+  }
+  return decoded;
 }
 
 function valueOf(value: string | string[] | undefined) {

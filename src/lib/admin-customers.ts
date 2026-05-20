@@ -6,7 +6,7 @@ import {
   type AdminOrderRow,
   type AdminRmaRow,
 } from "@/lib/admin-operations";
-import { normalizeCustomerPriceGroup } from "@/lib/admin-display";
+import { normalizeCustomerType } from "@/lib/admin-display";
 import {
   getSupabaseAdminClient,
   hasSupabaseAdminConfig,
@@ -21,6 +21,8 @@ export type AdminCustomerRow = {
   email: string | null;
   profileId: string | null;
   profileRole: string | null;
+  staffRole: string | null;
+  staffStatus: string | null;
   accountStatus: string;
   contactName: string | null;
   phone: string | null;
@@ -89,7 +91,7 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
 
   const ownerIds = [...new Set((companies ?? []).map((row) => row.owner_id).filter(Boolean))];
   const companyIds = (companies ?? []).map((row) => row.id);
-  const [profiles, allProfiles, notesAndTasks, tagMap, orders, rmas, applications] = await Promise.all([
+  const [profiles, allProfiles, notesAndTasks, tagMap, orders, rmas, applications, staffMembers] = await Promise.all([
     loadProfiles(ownerIds),
     loadAllProfiles(),
     loadCustomerActivityCounts(companyIds),
@@ -97,11 +99,13 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
     getAdminOrderRows(),
     getAdminRmaRows(),
     loadOpenApplications(),
+    loadAllStaffMembers(),
   ]);
 
   const rows = (companies ?? []).map((company): AdminCustomerRow => {
     const profile = company.owner_id ? profiles.get(company.owner_id) : undefined;
     const email = company.contact_email ?? profile?.email ?? null;
+    const staff = company.owner_id ? staffMembers.get(company.owner_id) : undefined;
     const customerOrders = matchCustomerOrders(orders, company.owner_id, company.company_name, email);
     const customerRmas = matchCustomerRmas(rmas, company.owner_id, customerOrders);
     const activity = notesAndTasks.get(company.id);
@@ -115,6 +119,8 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
       email,
       profileId: company.owner_id ?? null,
       profileRole: profile?.role ?? null,
+      staffRole: staff?.role ?? null,
+      staffStatus: staff?.status ?? null,
       accountStatus: profile?.accountStatus ?? "active",
       contactName: company.contact_name ?? null,
       phone: company.phone ?? null,
@@ -122,7 +128,7 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
       vatNumber: company.vat_number ?? null,
       status: company.status,
       crmStatus: company.crm_status ?? "lead",
-      priceGroup: normalizeCustomerPriceGroup(company.price_group),
+      priceGroup: normalizeCustomerType(company.price_group),
       orderCount: customerOrders.length,
       totalSpent: customerOrders.reduce((sum, order) => sum + order.total, 0),
       rmaCount: customerRmas.length,
@@ -153,6 +159,7 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
     }
 
     const application = emailKey ? applicationByEmail.get(emailKey) : undefined;
+    const staff = staffMembers.get(profile.id);
     const customerOrders = matchCustomerOrders(orders, profile.id, null, profile.email);
     const customerRmas = matchCustomerRmas(rmas, profile.id, customerOrders);
 
@@ -165,6 +172,8 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
       email: profile.email,
       profileId: profile.id,
       profileRole: profile.role,
+      staffRole: staff?.role ?? null,
+      staffStatus: staff?.status ?? null,
       accountStatus: profile.accountStatus,
       contactName: profile.fullName,
       phone: null,
@@ -172,7 +181,7 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
       vatNumber: application?.vatNumber ?? null,
       status: profile.accountStatus,
       crmStatus: application ? `b2b_${application.status}` : "registered",
-      priceGroup: normalizeCustomerPriceGroup(profile.role),
+      priceGroup: normalizeCustomerType(profile.role),
       orderCount: customerOrders.length,
       totalSpent: customerOrders.reduce((sum, order) => sum + order.total, 0),
       rmaCount: customerRmas.length,
@@ -203,6 +212,8 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
       email: application.email,
       profileId: null,
       profileRole: null,
+      staffRole: null,
+      staffStatus: null,
       accountStatus: "active",
       contactName: null,
       phone: null,
@@ -249,13 +260,15 @@ export async function getAdminCustomerDetail(
   }
   if (!company) return getAdminProfileCustomerDetail(customerId);
 
-  const [profileMap, notes, tasks, tagMap] = await Promise.all([
+  const [profileMap, notes, tasks, tagMap, staffMembers] = await Promise.all([
     loadProfiles(company.owner_id ? [company.owner_id] : []),
     loadCustomerNotes(company.id),
     loadCustomerTasks(company.id),
     loadCustomerTags([company.id]),
+    loadAllStaffMembers(),
   ]);
   const profile = company.owner_id ? profileMap.get(company.owner_id) : undefined;
+  const staff = company.owner_id ? staffMembers.get(company.owner_id) : undefined;
   const email = company.contact_email ?? profile?.email ?? null;
   const customerOrders = await getAdminOrderRowsForCustomer({
     profileId: company.owner_id,
@@ -276,6 +289,8 @@ export async function getAdminCustomerDetail(
     email,
     profileId: company.owner_id ?? null,
     profileRole: profile?.role ?? null,
+    staffRole: staff?.role ?? null,
+    staffStatus: staff?.status ?? null,
     accountStatus: profile?.accountStatus ?? "active",
     contactName: company.contact_name ?? null,
     phone: company.phone ?? null,
@@ -283,7 +298,7 @@ export async function getAdminCustomerDetail(
     vatNumber: company.vat_number ?? null,
     status: company.status,
     crmStatus: company.crm_status ?? "lead",
-    priceGroup: normalizeCustomerPriceGroup(company.price_group),
+    priceGroup: normalizeCustomerType(company.price_group),
     orderCount: customerOrders.length,
     totalSpent: customerOrders.reduce((sum, order) => sum + order.total, 0),
     rmaCount: customerRmas.length,
@@ -374,6 +389,30 @@ async function loadAllProfiles() {
   }));
 }
 
+async function loadAllStaffMembers() {
+  const staff = new Map<string, { role: string; status: string }>();
+  if (!hasSupabaseAdminConfig()) return staff;
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("staff_members")
+    .select("profile_id, role, status");
+
+  if (error) {
+    console.error("Failed to load staff members for customer directory", error);
+    return staff;
+  }
+
+  (data ?? []).forEach((member) => {
+    staff.set(member.profile_id, {
+      role: member.role,
+      status: member.status ?? "active",
+    });
+  });
+
+  return staff;
+}
+
 async function getAdminProfileCustomerDetail(
   profileId: string,
 ): Promise<AdminCustomerDetail | null> {
@@ -390,10 +429,14 @@ async function getAdminProfileCustomerDetail(
   }
   if (!profile) return null;
 
-  const applications = await loadOpenApplications();
+  const [applications, staffMembers] = await Promise.all([
+    loadOpenApplications(),
+    loadAllStaffMembers(),
+  ]);
   const application = applications.find(
     (item) => normalizeEmail(item.email) === normalizeEmail(profile.email),
   );
+  const staff = staffMembers.get(profile.id);
   const customerOrders = await getAdminOrderRowsForCustomer({
     profileId: profile.id,
     email: profile.email,
@@ -413,6 +456,8 @@ async function getAdminProfileCustomerDetail(
     email: profile.email,
     profileId: profile.id,
     profileRole: profile.role,
+    staffRole: staff?.role ?? null,
+    staffStatus: staff?.status ?? null,
     accountStatus: profile.account_status ?? "active",
     contactName: profile.full_name ?? null,
     phone: null,
@@ -420,7 +465,7 @@ async function getAdminProfileCustomerDetail(
     vatNumber: application?.vatNumber ?? null,
     status: profile.account_status ?? "active",
     crmStatus: application ? `b2b_${application.status}` : "registered",
-    priceGroup: normalizeCustomerPriceGroup(profile.role),
+    priceGroup: normalizeCustomerType(profile.role),
     orderCount: customerOrders.length,
     totalSpent: customerOrders.reduce((sum, order) => sum + order.total, 0),
     rmaCount: customerRmas.length,
@@ -606,6 +651,8 @@ function demoCustomers(): AdminCustomerRow[] {
       email: "buyer@example.it",
       profileId: "demo-profile",
       profileRole: "b2b_basic",
+      staffRole: null,
+      staffStatus: null,
       accountStatus: "active",
       contactName: "Marco Rossi",
       phone: "+39 02 123456",
@@ -613,7 +660,7 @@ function demoCustomers(): AdminCustomerRow[] {
       vatNumber: "IT12345678901",
       status: "active",
       crmStatus: "active",
-      priceGroup: "b2b_basic",
+      priceGroup: "wholesale",
       orderCount: 1,
       totalSpent: 519.24,
       rmaCount: 1,
@@ -646,7 +693,7 @@ async function demoCustomerDetail(companyId: string): Promise<AdminCustomerDetai
     notes: [
       {
         id: "demo-note-1",
-        body: "客户主要采购屏幕和电池，优先展示 B2B 价格。",
+        body: "客户主要采购屏幕和电池，优先展示批发价格。",
         createdAt: new Date().toISOString(),
       },
     ],

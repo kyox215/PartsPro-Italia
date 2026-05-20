@@ -16,11 +16,10 @@ import {
   AdminWorkspaceGrid,
   StatusPill,
 } from "@/components/admin/admin-ui";
-import { formatAdminCount, formatAdminStatus, isApprovedB2BPriceGroup } from "@/lib/admin-display";
+import { formatAdminCount, formatAdminStatus } from "@/lib/admin-display";
 import { getCustomerAuditEvents, getAdminStaffRows } from "@/lib/admin-accounts";
 import { hasAdminPermission } from "@/lib/admin-permissions";
 import { getAdminCustomerRows } from "@/lib/admin-customers";
-import { getAdminB2BApplicationRows } from "@/lib/admin-operations";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
 import { formatMoney } from "@/lib/pricing";
@@ -34,19 +33,18 @@ export default async function AdminAccountsPage({
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "it";
   const auth = await getAuthContext();
 
-  const [customers, applications, staff, auditEvents] =
+  const [customers, staff, auditEvents] =
     !auth.configured || hasAdminPermission(auth, "accounts:read")
       ? await Promise.all([
           getAdminCustomerRows(),
-          hasAdminPermission(auth, "b2b:review") ? getAdminB2BApplicationRows() : Promise.resolve([]),
           hasAdminPermission(auth, "staff:manage") ? getAdminStaffRows() : Promise.resolve([]),
           hasAdminPermission(auth, "audit:read") ? getCustomerAuditEvents(8) : Promise.resolve([]),
         ])
-      : [[], [], [], []];
+      : [[], [], []];
 
-  const b2bCustomers = customers.filter((customer) => isApprovedB2BPriceGroup(customer.priceGroup) || customer.crmStatus.includes("approved"));
+  const wholesaleCustomers = customers.filter((customer) => customer.priceGroup === "wholesale");
   const suspendedCustomers = customers.filter((customer) => customer.accountStatus !== "active");
-  const pendingB2B = applications.filter((application) => application.status === "pending");
+  const pendingWholesale = customers.filter((customer) => customer.source === "application" || customer.crmStatus.includes("b2b_pending"));
   const totalSpent = customers.reduce((sum, customer) => sum + customer.totalSpent, 0);
 
   return (
@@ -56,18 +54,13 @@ export default async function AdminAccountsPage({
         title={locale === "it" ? "Gestione account" : "账号管理"}
         description={
           locale === "it"
-            ? "Clienti registrati, revisioni B2B, ruoli staff e audit in un solo pannello."
-            : "集中处理已注册客户、B2B 审核、客户权限、员工角色和账号操作日志。"
+            ? "Clienti registrati, richieste wholesale, ruoli staff e audit in un solo pannello."
+            : "集中处理已注册客户、批发申请、客户类型、员工角色和账号操作日志。"
         }
         actions={
-          <>
-            <AdminButtonLink href={localizePath(locale, "/admin/accounts/customers")} variant="secondary">
-              {locale === "it" ? "Clienti" : "客户管理"}
-            </AdminButtonLink>
-            <AdminButtonLink href={localizePath(locale, "/admin/accounts/b2b")} variant="secondary">
-              {locale === "it" ? "B2B" : "B2B 审核"}
-            </AdminButtonLink>
-          </>
+          <AdminButtonLink href={localizePath(locale, "/admin/accounts/customers")} variant="secondary">
+            {locale === "it" ? "Clienti" : "客户管理"}
+          </AdminButtonLink>
         }
       />
 
@@ -77,7 +70,6 @@ export default async function AdminAccountsPage({
         active="overview"
         counts={{
           customers: customers.length,
-          b2b: pendingB2B.length,
           staff: staff.length,
           audit: auditEvents.length,
         }}
@@ -87,7 +79,7 @@ export default async function AdminAccountsPage({
         rail={
           <div className="grid gap-2">
             <AdminMetricCard icon={UsersRound} label={locale === "it" ? "Clienti" : "注册客户"} value={customers.length} tone="blue" />
-            <AdminMetricCard icon={Building2} label="B2B" value={b2bCustomers.length} tone="green" />
+            <AdminMetricCard icon={Building2} label={locale === "it" ? "Wholesale" : "批发客户"} value={wholesaleCustomers.length} tone="green" />
             <AdminMetricCard icon={ShieldCheck} label={locale === "it" ? "Staff attivi" : "员工账号"} value={staff.filter((item) => item.status === "active").length} tone="violet" />
             <AdminMetricCard icon={BadgeCheck} label={locale === "it" ? "Spesa totale" : "历史总额"} value={formatMoney(totalSpent, locale)} tone="amber" />
           </div>
@@ -96,10 +88,10 @@ export default async function AdminAccountsPage({
         <section className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
           <AdminMetricCard
             icon={ClipboardList}
-            label={locale === "it" ? "B2B da revisionare" : "待审核 B2B"}
-            value={pendingB2B.length}
+            label={locale === "it" ? "Richieste wholesale" : "待处理批发申请"}
+            value={pendingWholesale.length}
             tone="amber"
-            caption={locale === "it" ? "Richieste da gestire" : "需要集中处理"}
+            caption={locale === "it" ? "Gestite dai clienti" : "在客户管理中处理"}
           />
           <AdminMetricCard
             icon={UsersRound}
@@ -127,10 +119,10 @@ export default async function AdminAccountsPage({
         >
           <div className="grid gap-2 md:grid-cols-3">
             <QuickAction
-              href={localizePath(locale, "/admin/accounts/b2b?filter=pending")}
-              title={locale === "it" ? "Revisioni B2B" : "B2B 待审核"}
-              value={pendingB2B.length}
-              label={locale === "it" ? "Apri coda" : "打开审核队列"}
+              href={localizePath(locale, "/admin/accounts/customers?filter=wholesale_pending")}
+              title={locale === "it" ? "Richieste wholesale" : "批发申请"}
+              value={pendingWholesale.length}
+              label={locale === "it" ? "Apri clienti" : "打开客户队列"}
             />
             <QuickAction
               href={localizePath(locale, "/admin/accounts/customers?filter=registered")}

@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { recordAdminActivity } from "@/lib/admin-audit";
 import { recordCustomerAuditEvent } from "@/lib/admin-accounts";
 import {
+  normalizeCustomerType,
+  toStoredCustomerPriceGroup,
+} from "@/lib/admin-display";
+import { hasAdminPermission } from "@/lib/admin-permissions";
+import {
   getAdminBackUrl,
   redirectOnInvalidAdminCsrf,
 } from "@/lib/admin-security";
@@ -41,12 +46,14 @@ export async function POST(request: Request) {
     return NextResponse.redirect(backUrl, 303);
   }
 
-  if (
-    parsed.data.priceGroup === "distributor" &&
-    !admin.context.isAdmin &&
-    admin.context.staffRole !== "owner"
-  ) {
-    backUrl.searchParams.set("error", "Only owner/admin can assign distributor.");
+  const customerType = parsed.data.customerType ?? normalizeCustomerType(parsed.data.priceGroup);
+  const storedPriceGroup = toStoredCustomerPriceGroup(customerType);
+  const shouldManageStaff = parsed.data.staffRole !== undefined;
+  const desiredStaffRole = parsed.data.staffRole ?? "none";
+  const desiredStaffStatus = parsed.data.staffStatus ?? "active";
+
+  if (shouldManageStaff && !hasAdminPermission(admin.context, "staff:manage")) {
+    backUrl.searchParams.set("error", "Permission denied");
     return NextResponse.redirect(backUrl, 303);
   }
 
@@ -58,6 +65,7 @@ export async function POST(request: Request) {
   const supabase = getSupabaseAdminClient();
   let profileId: string | null = null;
   let companyId: string | null = null;
+  let profileRole: string | null = null;
   let beforeData: Record<string, unknown> | null = null;
 
   if (parsed.data.source === "company") {
@@ -79,6 +87,7 @@ export async function POST(request: Request) {
       status: company.status,
       crmStatus: company.crm_status,
       priceGroup: company.price_group,
+      customerType: normalizeCustomerType(company.price_group),
       nextFollowUpAt: company.next_follow_up_at,
       ownerId: company.owner_id,
     };
@@ -86,7 +95,7 @@ export async function POST(request: Request) {
     const { error: companyError } = await supabase
       .from("companies")
       .update({
-        price_group: parsed.data.priceGroup,
+        price_group: storedPriceGroup,
         status: parsed.data.crmStatus === "lead" ? "pending" : parsed.data.crmStatus,
         crm_status: parsed.data.crmStatus,
         next_follow_up_at: parsed.data.nextFollowUpAt || null,
@@ -124,18 +133,37 @@ export async function POST(request: Request) {
     beforeData = {
       source: "profile",
       role: profile.role,
+      customerType: normalizeCustomerType(profile.role),
       accountStatus: profile.account_status,
     };
+    profileRole = profile.role;
   }
 
   if (profileId) {
+    if (!profileRole) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", profileId)
+        .maybeSingle();
+      profileRole = profile?.role ?? null;
+    }
+
+    const profileUpdate: {
+      role?: string;
+      account_status: string;
+      updated_at: string;
+    } = {
+      account_status: parsed.data.accountStatus,
+      updated_at: new Date().toISOString(),
+    };
+    if (profileRole !== "admin") {
+      profileUpdate.role = storedPriceGroup;
+    }
+
     const { error: profileError } = await supabase
       .from("profiles")
-      .update({
-        role: parsed.data.priceGroup,
-        account_status: parsed.data.accountStatus,
-        updated_at: new Date().toISOString(),
-      })
+      .update(profileUpdate)
       .eq("id", profileId);
 
     if (profileError) {
@@ -144,14 +172,78 @@ export async function POST(request: Request) {
     }
   }
 
+  let beforeStaff: Record<string, unknown> | null = null;
+  if (shouldManageStaff) {
+    if (!profileId) {
+      backUrl.searchParams.set("error", "Registered profile required before assigning staff access.");
+      return NextResponse.redirect(backUrl, 303);
+    }
+
+    if (desiredStaffRole === "owner" && !admin.context.isAdmin && admin.context.staffRole !== "owner") {
+      backUrl.searchParams.set("error", "Only owner/admin can assign owner role.");
+      return NextResponse.redirect(backUrl, 303);
+    }
+
+    const { data: existingStaff } = await supabase
+      .from("staff_members")
+      .select("id, role, status")
+      .eq("profile_id", profileId)
+      .maybeSingle();
+
+    beforeStaff = existingStaff ?? null;
+    const nextRole = desiredStaffRole === "none" ? existingStaff?.role ?? "support" : desiredStaffRole;
+    const nextStatus = desiredStaffRole === "none" ? "archived" : desiredStaffStatus;
+
+    if (await wouldRemoveLastOwner(supabase, profileId, nextRole, nextStatus)) {
+      backUrl.searchParams.set("error", "Cannot remove the last active owner.");
+      return NextResponse.redirect(backUrl, 303);
+    }
+
+    if (desiredStaffRole === "none") {
+      if (existingStaff) {
+        const { error: staffArchiveError } = await supabase
+          .from("staff_members")
+          .update({
+            status: "archived",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("profile_id", profileId);
+        if (staffArchiveError) {
+          backUrl.searchParams.set("error", staffArchiveError.message);
+          return NextResponse.redirect(backUrl, 303);
+        }
+      }
+    } else {
+      const { error: staffError } = await supabase
+        .from("staff_members")
+        .upsert(
+          {
+            profile_id: profileId,
+            role: desiredStaffRole,
+            status: desiredStaffStatus,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "profile_id" },
+        );
+      if (staffError) {
+        backUrl.searchParams.set("error", staffError.message);
+        return NextResponse.redirect(backUrl, 303);
+      }
+    }
+  }
+
   const afterData = {
     source: parsed.data.source,
-    priceGroup: parsed.data.priceGroup,
+    customerType,
+    priceGroup: storedPriceGroup,
     accountStatus: parsed.data.accountStatus,
     crmStatus: parsed.data.crmStatus,
     nextFollowUpAt: parsed.data.nextFollowUpAt || null,
     profileId,
     companyId,
+    staffRole: shouldManageStaff ? desiredStaffRole : undefined,
+    staffStatus: shouldManageStaff ? desiredStaffStatus : undefined,
+    beforeStaff,
   };
 
   await recordCustomerAuditEvent({
@@ -178,3 +270,26 @@ export async function POST(request: Request) {
 }
 
 export const PATCH = POST;
+
+async function wouldRemoveLastOwner(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  profileId: string,
+  nextRole: string,
+  nextStatus: string,
+) {
+  const { data, error } = await supabase
+    .from("staff_members")
+    .select("profile_id")
+    .eq("role", "owner")
+    .eq("status", "active");
+
+  if (error) {
+    console.error("Failed to verify active owners", error.message);
+    return false;
+  }
+
+  const ownerIds = new Set((data ?? []).map((owner) => owner.profile_id));
+  const isCurrentOwner = ownerIds.has(profileId);
+  const willRemainOwner = nextRole === "owner" && nextStatus === "active";
+  return isCurrentOwner && !willRemainOwner && ownerIds.size <= 1;
+}

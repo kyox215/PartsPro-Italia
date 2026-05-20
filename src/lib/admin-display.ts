@@ -24,6 +24,7 @@ export type AdminStatusDisplay = {
 
 const priceGroupValues = [
   "retail",
+  "wholesale",
   "b2b_pending",
   "b2b_basic",
   "b2b_silver",
@@ -31,6 +32,7 @@ const priceGroupValues = [
   "distributor",
 ] as const;
 
+const customerTypeValues = ["retail", "wholesale"] as const;
 const b2bPriceGroupValues = [
   "b2b_basic",
   "b2b_silver",
@@ -39,9 +41,11 @@ const b2bPriceGroupValues = [
 ] as const;
 
 export type CustomerPriceGroup = (typeof priceGroupValues)[number];
+export type CustomerType = (typeof customerTypeValues)[number];
 export type ApprovedB2BPriceGroup = (typeof b2bPriceGroupValues)[number];
 
 export const customerPriceGroupOptions = [...priceGroupValues];
+export const customerTypeOptions = [...customerTypeValues];
 export const approvedB2BPriceGroupOptions = [...b2bPriceGroupValues];
 
 export const accountStatusOptions = ["active", "suspended", "archived"] as const;
@@ -63,7 +67,22 @@ export const crmStatusOptions = [
 ] as const;
 
 export function normalizeCustomerPriceGroup(value: string | null | undefined): CustomerPriceGroup {
-  return isCustomerPriceGroup(value) ? value : "retail";
+  const key = normalizeKey(value);
+  if (key === "wholesale") return "wholesale";
+  return isCustomerPriceGroup(key) ? key : "retail";
+}
+
+export function normalizeCustomerType(value: string | null | undefined): CustomerType {
+  return isWholesaleCustomerValue(value) ? "wholesale" : "retail";
+}
+
+export function toStoredCustomerPriceGroup(type: CustomerType) {
+  return type === "wholesale" ? "b2b_basic" : "retail";
+}
+
+export function isWholesaleCustomerValue(value: string | null | undefined) {
+  const key = normalizeKey(value);
+  return key === "wholesale" || b2bPriceGroupValues.includes(key as ApprovedB2BPriceGroup);
 }
 
 export function isCustomerPriceGroup(
@@ -123,6 +142,10 @@ export function formatPermissionLabel(value: string, locale: Locale) {
   return formatAdminStatus("permission", value, locale).label;
 }
 
+export function formatCustomerType(value: string | null | undefined, locale: Locale) {
+  return formatAdminStatus("priceGroup", normalizeCustomerType(value), locale);
+}
+
 function normalizeKey(value: string | null | undefined) {
   return String(value ?? "").trim().toLowerCase();
 }
@@ -153,7 +176,7 @@ const rawStatusLabels = {
     archived: entry("已归档", "Archiviato", "slate"),
   },
   auditAction: {
-    "b2b_application.status.update": entry("B2B 审核更新", "Revisione B2B aggiornata", "blue"),
+    "b2b_application.status.update": entry("批发申请更新", "Richiesta wholesale aggiornata", "blue"),
     "customer.access.update": entry("客户权限更新", "Accesso cliente aggiornato", "blue"),
     "customer.company.link.create": entry("创建公司档案", "Scheda azienda creata", "green"),
     "customer.company.link.update": entry("更新公司档案", "Scheda azienda aggiornata", "green"),
@@ -161,6 +184,7 @@ const rawStatusLabels = {
     "staff.member.create": entry("员工权限创建", "Permesso staff creato", "violet"),
     "staff.member.update": entry("员工权限更新", "Permesso staff aggiornato", "violet"),
     "staff.member.upsert": entry("员工权限保存", "Permesso staff salvato", "violet"),
+    "staff.matrix.update": entry("角色权限矩阵更新", "Matrice permessi aggiornata", "violet"),
   },
   b2bApplication: {
     pending: entry("待审核", "Da revisionare", "amber"),
@@ -171,19 +195,19 @@ const rawStatusLabels = {
     lead: entry("线索", "Lead", "amber"),
     registered: entry("已注册", "Registrato", "blue"),
     pending: entry("待处理", "In attesa", "amber"),
-    b2b_pending: entry("B2B 待审核", "B2B in revisione", "amber"),
+    b2b_pending: entry("批发申请待处理", "Richiesta wholesale in revisione", "amber"),
     approved: entry("已通过", "Approvato", "green"),
-    b2b_approved: entry("B2B 已通过", "B2B approvato", "green"),
+    b2b_approved: entry("批发申请已通过", "Richiesta wholesale approvata", "green"),
     approved_pending_signup: entry("已通过，待注册", "Approvato, attesa registrazione", "green"),
     active: entry("合作中", "Attivo", "green"),
     paused: entry("暂停跟进", "In pausa", "red"),
     rejected: entry("已拒绝", "Rifiutato", "red"),
-    b2b_rejected: entry("B2B 已拒绝", "B2B rifiutato", "red"),
+    b2b_rejected: entry("批发申请已拒绝", "Richiesta wholesale rifiutata", "red"),
     archived: entry("已归档", "Archiviato", "slate"),
   },
   customerSource: {
     company: entry("公司档案", "Azienda", "slate"),
-    application: entry("B2B 申请", "Richiesta B2B", "amber"),
+    application: entry("批发申请", "Richiesta wholesale", "amber"),
     profile: entry("已注册账号", "Account registrato", "blue"),
   },
   order: {
@@ -209,7 +233,7 @@ const rawStatusLabels = {
     "admin:access": entry("进入后台", "Accesso admin", "slate"),
     "accounts:read": entry("查看账号", "Legge account", "blue"),
     "accounts:write": entry("维护账号", "Modifica account", "blue"),
-    "b2b:review": entry("审核 B2B", "Revisiona B2B", "amber"),
+    "b2b:review": entry("批发申请兼容权限", "Permesso legacy wholesale", "amber"),
     "staff:manage": entry("管理员工", "Gestisce staff", "violet"),
     "audit:read": entry("查看日志", "Legge audit", "slate"),
     "products:write": entry("维护商品", "Modifica prodotti", "green"),
@@ -221,11 +245,12 @@ const rawStatusLabels = {
   },
   priceGroup: {
     retail: entry("零售客户", "Cliente retail", "slate"),
-    b2b_pending: entry("B2B 待定价", "B2B da assegnare", "amber"),
-    b2b_basic: entry("B2B Basic", "B2B Basic", "green"),
-    b2b_silver: entry("B2B Silver", "B2B Silver", "green"),
-    b2b_gold: entry("B2B Gold", "B2B Gold", "green"),
-    distributor: entry("Distributor", "Distributore", "violet"),
+    wholesale: entry("批发客户", "Cliente wholesale", "green"),
+    b2b_pending: entry("待处理批发申请", "Richiesta wholesale", "amber"),
+    b2b_basic: entry("批发客户", "Cliente wholesale", "green"),
+    b2b_silver: entry("批发客户", "Cliente wholesale", "green"),
+    b2b_gold: entry("批发客户", "Cliente wholesale", "green"),
+    distributor: entry("批发客户", "Cliente wholesale", "green"),
     admin: entry("站内管理员", "Admin sito", "violet"),
     owner: entry("总管理员", "Owner", "violet"),
     sales: entry("销售账号", "Vendite", "blue"),
@@ -247,7 +272,8 @@ const rawStatusLabels = {
     rejected: entry("已拒绝", "Rifiutata", "red"),
   },
   staffRole: {
-    owner: entry("老板 / 总管理员", "Owner", "violet"),
+    owner: entry("总管理员", "Owner", "violet"),
+    manager: entry("运营管理", "Responsabile operativo", "violet"),
     sales: entry("销售 / 客户经理", "Vendite", "blue"),
     catalog: entry("商品目录", "Catalogo", "blue"),
     warehouse: entry("仓库", "Magazzino", "blue"),
@@ -280,8 +306,9 @@ function formatAuditField(key: string, locale: Locale) {
     accountStatus: { zh: "账号状态", it: "Stato account" },
     companyId: { zh: "公司", it: "Azienda" },
     crmStatus: { zh: "CRM", it: "CRM" },
+    customerType: { zh: "客户类型", it: "Tipo cliente" },
     nextFollowUpAt: { zh: "下次跟进", it: "Prossimo follow-up" },
-    priceGroup: { zh: "价格组", it: "Gruppo prezzi" },
+    priceGroup: { zh: "客户类型", it: "Tipo cliente" },
     profileId: { zh: "账号", it: "Profilo" },
     status: { zh: "状态", it: "Stato" },
     syncedCustomer: { zh: "已同步客户", it: "Cliente sincronizzato" },

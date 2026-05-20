@@ -28,10 +28,12 @@ import {
 import {
   accountStatusOptions,
   crmStatusOptions,
-  customerPriceGroupOptions,
+  customerTypeOptions,
   formatAdminStatus,
+  formatCustomerType,
+  normalizeCustomerType,
 } from "@/lib/admin-display";
-import { hasAdminPermission } from "@/lib/admin-permissions";
+import { hasAdminPermission, staffRoleLabels, staffRoleOptions } from "@/lib/admin-permissions";
 import { getAdminCustomerDetail, type AdminCustomerDetail } from "@/lib/admin-customers";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
@@ -63,11 +65,18 @@ export default async function AdminAccountCustomerDetailPage({
   const source = formatAdminStatus("customerSource", customer.source, locale);
   const account = formatAdminStatus("account", customer.accountStatus, locale);
   const crm = formatAdminStatus("crm", customer.crmStatus, locale);
-  const priceGroup = formatAdminStatus("priceGroup", customer.priceGroup, locale);
+  const customerType = normalizeCustomerType(customer.priceGroup);
+  const priceGroup = formatCustomerType(customer.priceGroup, locale);
   const role = customer.profileRole
-    ? formatAdminStatus("staffRole", customer.profileRole, locale)
+    ? customer.profileRole === "admin"
+      ? formatAdminStatus("staffRole", "admin", locale)
+      : formatCustomerType(customer.profileRole, locale)
+    : null;
+  const staffRole = customer.staffRole && customer.staffStatus === "active"
+    ? formatAdminStatus("staffRole", customer.staffRole, locale)
     : null;
   const crmOptions = getSelectOptions(crmStatusOptions, customer.crmStatus);
+  const canManageStaff = !auth.configured || hasAdminPermission(auth, "staff:manage");
 
   return (
     <div className="space-y-3">
@@ -76,18 +85,13 @@ export default async function AdminAccountCustomerDetailPage({
         title={customer.companyName}
         description={
           locale === "it"
-            ? "Accesso, gruppo prezzi, azienda, ordini, RMA, note e follow-up."
-            : "集中维护客户权限、价格组、公司资料、订单、RMA、备注和跟进任务。"
+            ? "Tipo cliente, accesso staff, azienda, ordini, RMA, note e follow-up."
+            : "集中维护客户类型、员工权限、公司资料、订单、RMA、备注和跟进任务。"
         }
         actions={
-          <>
-            <AdminButtonLink href={localizePath(locale, "/admin/accounts/customers")} variant="secondary">
-              {locale === "it" ? "Lista clienti" : "客户列表"}
-            </AdminButtonLink>
-            <AdminButtonLink href={localizePath(locale, "/admin/accounts/b2b")} variant="secondary">
-              {locale === "it" ? "Revisioni B2B" : "B2B 审核"}
-            </AdminButtonLink>
-          </>
+          <AdminButtonLink href={localizePath(locale, "/admin/accounts/customers")} variant="secondary">
+            {locale === "it" ? "Lista clienti" : "客户列表"}
+          </AdminButtonLink>
         }
       />
 
@@ -98,18 +102,18 @@ export default async function AdminAccountCustomerDetailPage({
         rail={
           <AdminActionRail
             title={locale === "it" ? "Azioni account" : "账号操作"}
-            description={locale === "it" ? "Accesso, prezzo e CRM" : "权限、价格组与跟进"}
+            description={locale === "it" ? "Cliente, staff e CRM" : "客户类型、员工角色与跟进"}
           >
-            <AdminPanel title={locale === "it" ? "Accesso cliente" : "客户权限"}>
+            <AdminPanel title={locale === "it" ? "Identita account" : "身份与权限"}>
               <form action="/api/admin/accounts/customers/access" method="post" className="grid gap-2">
                 <AdminCsrfField />
                 <input type="hidden" name="locale" value={locale} />
                 <input type="hidden" name="returnTo" value={customerPath} />
                 <input type="hidden" name="id" value={customer.id} />
                 <input type="hidden" name="source" value={customer.source === "company" ? "company" : "profile"} />
-                <AdminSelect name="priceGroup" label={locale === "it" ? "Gruppo prezzi" : "价格组"} defaultValue={customer.priceGroup}>
-                  {customerPriceGroupOptions.map((group) => {
-                    const option = formatAdminStatus("priceGroup", group, locale);
+                <AdminSelect name="customerType" label={locale === "it" ? "Tipo cliente" : "客户类型"} defaultValue={customerType}>
+                  {customerTypeOptions.map((group) => {
+                    const option = formatCustomerType(group, locale);
                     return (
                       <option key={group} value={group}>
                         {option.label}
@@ -117,6 +121,39 @@ export default async function AdminAccountCustomerDetailPage({
                     );
                   })}
                 </AdminSelect>
+                {canManageStaff ? (
+                  customer.profileId ? (
+                    <>
+                      <AdminSelect
+                        name="staffRole"
+                        label={locale === "it" ? "Ruolo staff" : "员工角色"}
+                        defaultValue={customer.staffRole && customer.staffStatus !== "archived" ? customer.staffRole : "none"}
+                      >
+                        <option value="none">{locale === "it" ? "Nessun accesso admin" : "无后台权限"}</option>
+                        {staffRoleOptions.map((roleOption) => (
+                          <option key={roleOption} value={roleOption}>
+                            {staffRoleLabels[roleOption][locale]}
+                          </option>
+                        ))}
+                      </AdminSelect>
+                      <AdminSelect
+                        name="staffStatus"
+                        label={locale === "it" ? "Stato staff" : "员工状态"}
+                        defaultValue={customer.staffStatus ?? "active"}
+                      >
+                        <option value="active">{formatAdminStatus("account", "active", locale).label}</option>
+                        <option value="suspended">{formatAdminStatus("account", "suspended", locale).label}</option>
+                        <option value="archived">{formatAdminStatus("account", "archived", locale).label}</option>
+                      </AdminSelect>
+                    </>
+                  ) : (
+                    <AdminNotice tone="warning">
+                      {locale === "it"
+                        ? "Lo staff admin richiede un account registrato."
+                        : "分配后台员工权限前，该邮箱需要先注册/登录过站点账号。"}
+                    </AdminNotice>
+                  )
+                ) : null}
                 <AdminSelect name="accountStatus" label={locale === "it" ? "Stato account" : "账号状态"} defaultValue={customer.accountStatus}>
                   {accountStatusOptions.map((status) => {
                     const option = formatAdminStatus("account", status, locale);
@@ -139,7 +176,7 @@ export default async function AdminAccountCustomerDetailPage({
                 </AdminSelect>
                 <AdminInput name="nextFollowUpAt" label={locale === "it" ? "Prossimo follow-up" : "下次跟进"} type="date" defaultValue={dateValue(customer.nextFollowUpAt)} required={false} />
                 <button className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white" type="submit">
-                  {locale === "it" ? "Salva accesso" : "保存权限"}
+                  {locale === "it" ? "Salva identita" : "保存身份权限"}
                 </button>
               </form>
             </AdminPanel>
@@ -197,8 +234,8 @@ export default async function AdminAccountCustomerDetailPage({
         <section className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
           <AdminMetricCard icon={UserRound} label={locale === "it" ? "Fonte" : "来源"} value={<StatusPill status={source.label} tone={source.tone} />} tone={source.tone} />
           <AdminMetricCard icon={ShieldCheck} label={locale === "it" ? "Accesso" : "账号状态"} value={<StatusPill status={account.label} tone={account.tone} />} tone={account.tone} />
-          <AdminMetricCard icon={Building2} label={locale === "it" ? "Gruppo prezzi" : "价格组"} value={<StatusPill status={priceGroup.label} tone={priceGroup.tone} />} tone={priceGroup.tone} />
-          <AdminMetricCard icon={Clock3} label={locale === "it" ? "Follow-up" : "跟进"} value={formatFollowUp(customer, locale)} tone={customer.pendingTaskCount ? "amber" : "slate"} />
+          <AdminMetricCard icon={Building2} label={locale === "it" ? "Tipo cliente" : "客户类型"} value={<StatusPill status={priceGroup.label} tone={priceGroup.tone} />} tone={priceGroup.tone} />
+          <AdminMetricCard icon={Clock3} label={locale === "it" ? "Ruolo staff" : "员工角色"} value={staffRole ? <StatusPill status={staffRole.label} tone={staffRole.tone} /> : locale === "it" ? "Nessuno" : "无后台权限"} tone={staffRole?.tone ?? "slate"} />
         </section>
 
         <AdminPanel title={locale === "it" ? "Salute account" : "账号健康"} toolbar={<StatusPill status={crm.label} tone={crm.tone} />}>
@@ -218,6 +255,7 @@ export default async function AdminAccountCustomerDetailPage({
             <InfoRow label={locale === "it" ? "Email" : "邮箱"} value={customer.email ?? "-"} />
             <InfoRow label={locale === "it" ? "Profilo" : "用户账号 ID"} value={customer.profileId ?? "-"} />
             <InfoRow label={locale === "it" ? "Ruolo sito" : "站内角色"} value={role?.label ?? "-"} />
+            <InfoRow label={locale === "it" ? "Ruolo staff" : "员工角色"} value={staffRole?.label ?? (locale === "it" ? "Nessuno" : "无后台权限")} />
             <InfoRow label={locale === "it" ? "P.IVA" : "税号"} value={customer.vatNumber ?? "-"} />
             <InfoRow label={locale === "it" ? "Contatto" : "联系人"} value={customer.contactName ?? "-"} />
             <InfoRow label={locale === "it" ? "Telefono" : "电话"} value={customer.phone ?? "-"} />
@@ -231,6 +269,7 @@ export default async function AdminAccountCustomerDetailPage({
             <StatusPill status={account.label} tone={account.tone} />
             <StatusPill status={crm.label} tone={crm.tone} />
             <StatusPill status={priceGroup.label} tone={priceGroup.tone} />
+            {staffRole ? <StatusPill status={staffRole.label} tone={staffRole.tone} /> : null}
             {customer.tags.map((tag) => (
               <StatusPill key={tag} status={formatCustomerTag(tag, locale)} tone="violet" />
             ))}
@@ -371,9 +410,9 @@ function getHealthItems(customer: AdminCustomerDetail, locale: Locale) {
       description: locale === "it" ? "Azienda, contatto e indirizzi." : "公司、联系人与地址资料。",
     },
     {
-      label: locale === "it" ? "Diritti B2B" : "B2B 权益",
-      value: formatAdminStatus("priceGroup", customer.priceGroup, locale).label,
-      description: locale === "it" ? "Usato per prezzi e catalogo." : "用于前台价格与目录权限。",
+      label: locale === "it" ? "Tipo cliente" : "客户类型",
+      value: formatCustomerType(customer.priceGroup, locale).label,
+      description: locale === "it" ? "Determina prezzo retail o wholesale." : "决定前台显示零售价或批发价。",
     },
     {
       label: locale === "it" ? "Storico" : "交易记录",
@@ -390,7 +429,7 @@ function getHealthItems(customer: AdminCustomerDetail, locale: Locale) {
 
 function getNextStep(customer: AdminCustomerDetail, locale: Locale) {
   if (!customer.companyId) return locale === "it" ? "Collegare azienda" : "补公司资料";
-  if (customer.crmStatus.includes("pending")) return locale === "it" ? "Revisionare B2B" : "审核 B2B";
+  if (customer.crmStatus.includes("pending")) return locale === "it" ? "Gestire richiesta wholesale" : "处理批发申请";
   if (customer.accountStatus !== "active" || customer.crmStatus === "paused") {
     return locale === "it" ? "Verificare accesso" : "检查权限";
   }
@@ -399,20 +438,10 @@ function getNextStep(customer: AdminCustomerDetail, locale: Locale) {
   return locale === "it" ? "Monitorare" : "持续维护";
 }
 
-function formatFollowUp(customer: AdminCustomerDetail, locale: Locale) {
-  if (customer.pendingTaskCount) {
-    return locale === "it" ? `${customer.pendingTaskCount} attivita` : `${customer.pendingTaskCount} 个任务`;
-  }
-  if (customer.nextFollowUpAt) {
-    return new Date(customer.nextFollowUpAt).toLocaleDateString(locale === "it" ? "it-IT" : "zh-CN");
-  }
-  return locale === "it" ? "Non pianificato" : "未安排";
-}
-
 function formatCustomerTag(value: string, locale: Locale) {
   const normalized = value.toLowerCase();
   if (normalized === "b2b application") {
-    return locale === "it" ? "Richiesta B2B" : "B2B 申请";
+    return locale === "it" ? "Richiesta wholesale" : "批发申请";
   }
   if (normalized === "registered") {
     return locale === "it" ? "Registrato" : "已注册";

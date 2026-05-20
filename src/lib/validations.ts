@@ -335,7 +335,7 @@ export const adminCustomerStatusSchema = z.object({
 export const adminCustomerPriceGroupSchema = z.object({
   id: z.string().min(1),
   locale: z.enum(["it", "zh"]).default("it"),
-  priceGroup: z.enum(["retail", "b2b_basic", "b2b_silver", "b2b_gold", "distributor"]),
+  priceGroup: z.enum(["retail", "wholesale", "b2b_basic", "b2b_silver", "b2b_gold", "distributor"]),
 });
 
 export const adminAccountCustomerAccessSchema = z.object({
@@ -343,7 +343,8 @@ export const adminAccountCustomerAccessSchema = z.object({
   source: z.enum(["company", "profile"]).default("company"),
   locale: z.enum(["it", "zh"]).default("it"),
   returnTo: z.string().optional().or(z.literal("")),
-  priceGroup: z.enum(["retail", "b2b_pending", "b2b_basic", "b2b_silver", "b2b_gold", "distributor"]),
+  customerType: z.enum(["retail", "wholesale"]).optional(),
+  priceGroup: z.enum(["retail", "wholesale", "b2b_pending", "b2b_basic", "b2b_silver", "b2b_gold", "distributor"]).optional(),
   accountStatus: z.enum(["active", "suspended", "archived"]).default("active"),
   crmStatus: z.enum([
     "lead",
@@ -360,6 +361,8 @@ export const adminAccountCustomerAccessSchema = z.object({
     "archived",
   ]).default("active"),
   nextFollowUpAt: z.string().optional().or(z.literal("")),
+  staffRole: z.enum(["none", "owner", "manager", "sales", "catalog", "warehouse", "finance", "support"]).optional(),
+  staffStatus: z.enum(["active", "suspended", "archived"]).default("active").optional(),
 });
 
 export const adminAccountLinkCompanySchema = z.object({
@@ -375,8 +378,14 @@ export const adminStaffMemberSchema = z.object({
   locale: z.enum(["it", "zh"]).default("it"),
   returnTo: z.string().optional().or(z.literal("")),
   email: z.string().email(),
-  role: z.enum(["owner", "sales", "catalog", "warehouse", "finance", "support"]),
+  role: z.enum(["owner", "manager", "sales", "catalog", "warehouse", "finance", "support"]),
   status: z.enum(["active", "suspended", "archived"]).default("active"),
+});
+
+export const adminStaffPermissionMatrixSchema = z.object({
+  locale: z.enum(["it", "zh"]).default("it"),
+  returnTo: z.string().optional().or(z.literal("")),
+  role: z.enum(["manager", "sales", "catalog", "warehouse", "finance", "support"]),
 });
 
 export const adminCustomerNoteSchema = z.object({

@@ -161,7 +161,7 @@ export default async function AdminProductDetailPage({
               <AdminInput name="moq" label="MOQ" defaultValue={String(product.moq)} type="number" />
               <AdminInput name="costPrice" label="Cost EUR" defaultValue={product.costPrice === null ? "" : String(product.costPrice)} type="number" step="0.01" required={false} />
               <AdminInput name="retailPrice" label="Retail EUR" defaultValue={String(product.retailPrice)} type="number" step="0.01" />
-              <AdminInput name="b2bPrice" label="B2B EUR" defaultValue={String(product.b2bPrice)} type="number" step="0.01" />
+              <AdminInput name="b2bPrice" label={locale === "it" ? "Wholesale EUR" : "批发 EUR"} defaultValue={String(product.b2bPrice)} type="number" step="0.01" />
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <AdminInput name="nameIt" label="Nome IT" defaultValue={product.nameIt} />
@@ -185,7 +185,7 @@ export default async function AdminProductDetailPage({
         >
           <div className="grid gap-2 md:grid-cols-4">
             <SummaryTile label="Retail" value={formatMoney(product.retailPrice, locale)} />
-            <SummaryTile label="B2B" value={formatMoney(product.b2bPrice, locale)} />
+            <SummaryTile label={locale === "it" ? "Wholesale" : "批发"} value={formatMoney(product.b2bPrice, locale)} />
             <SummaryTile label="Cost" value={product.costPrice === null ? "-" : formatMoney(product.costPrice, locale)} />
             <SummaryTile label="Attrs" value={String(product.attributeCount)} />
           </div>

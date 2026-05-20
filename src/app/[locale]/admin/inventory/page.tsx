@@ -143,7 +143,7 @@ export default async function AdminInventoryPage({
               <form action="/api/admin/inventory/settings" method="post" className="grid gap-2">
                 <AdminCsrfField />
                 <input type="hidden" name="locale" value={locale} />
-                <AdminInput name="b2bMarkup" label="B2B x" defaultValue={String(settings.b2bMarkup)} step="0.001" type="number" />
+                <AdminInput name="b2bMarkup" label={locale === "it" ? "Wholesale x" : "批发 x"} defaultValue={String(settings.b2bMarkup)} step="0.001" type="number" />
                 <AdminInput name="retailMarkup" label="Retail x" defaultValue={String(settings.retailMarkup)} step="0.001" type="number" />
                 <AdminInput name="preorderLeadTimeMinDays" label={locale === "it" ? "Min giorni" : "最短天数"} defaultValue={String(settings.preorderLeadTimeMinDays)} type="number" />
                 <AdminInput name="preorderLeadTimeMaxDays" label={locale === "it" ? "Max giorni" : "最长天数"} defaultValue={String(settings.preorderLeadTimeMaxDays)} type="number" />

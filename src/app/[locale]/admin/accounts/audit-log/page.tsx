@@ -36,8 +36,8 @@ export default async function AdminAccountAuditLogPage({
         title={locale === "it" ? "Audit account" : "账号操作日志"}
         description={
           locale === "it"
-            ? "Log delle modifiche a clienti, B2B e staff."
-            : "记录客户权限、B2B 审核、员工权限等账号相关操作。"
+            ? "Log delle modifiche a clienti, richieste wholesale e staff."
+            : "记录客户权限、批发申请、员工权限等账号相关操作。"
         }
       />
 

@@ -8,5 +8,5 @@ export default async function LegacyAdminB2BPage({
 }>) {
   const { locale: rawLocale } = await params;
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "it";
-  redirect(localizePath(locale, "/admin/accounts/b2b"));
+  redirect(localizePath(locale, "/admin/accounts/customers?filter=wholesale_pending"));
 }

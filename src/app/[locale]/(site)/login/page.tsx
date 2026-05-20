@@ -89,8 +89,8 @@ export default async function LoginPage({
         </h2>
         <p className="mt-3 text-sm leading-6 text-slate-600">
           {locale === "it"
-            ? "Per prezzo wholesale usa anche la richiesta B2B dopo la registrazione."
-            : "注册后如需批发价，请继续提交 B2B 开户注册。"}
+            ? "Per prezzo wholesale invia la richiesta wholesale dopo la registrazione."
+            : "注册后如需批发价，请继续提交批发开户申请。"}
         </p>
         <form className="mt-6 grid gap-4" action="/api/auth/sign-up" method="post">
           <input type="hidden" name="locale" value={locale} />

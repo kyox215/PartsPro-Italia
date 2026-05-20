@@ -19,8 +19,8 @@ export function AccountManagementTabs({
 }: Readonly<{
   auth: AuthContext;
   locale: Locale;
-  active: "overview" | "customers" | "b2b" | "permissions" | "audit";
-  counts?: Partial<Record<"customers" | "b2b" | "staff" | "audit", number | string>>;
+  active: "overview" | "customers" | "permissions" | "audit";
+  counts?: Partial<Record<"customers" | "staff" | "audit", number | string>>;
 }>) {
   const tabs: AccountTab[] = [
     {
@@ -35,13 +35,6 @@ export function AccountManagementTabs({
       label: locale === "it" ? "Clienti" : "客户管理",
       permission: "accounts:read",
       count: counts?.customers,
-    },
-    {
-      key: "b2b",
-      href: localizePath(locale, "/admin/accounts/b2b"),
-      label: locale === "it" ? "B2B" : "B2B 审核",
-      permission: "b2b:review",
-      count: counts?.b2b,
     },
     {
       key: "permissions",

@@ -1,7 +1,12 @@
 import type { AuthContext } from "@/lib/auth";
+import {
+  getSupabaseAdminClient,
+  hasSupabaseAdminConfig,
+} from "@/lib/supabase/admin";
 
 export type StaffRole =
   | "owner"
+  | "manager"
   | "sales"
   | "catalog"
   | "warehouse"
@@ -22,8 +27,19 @@ export type AdminPermission =
   | "rma:write"
   | "system:read";
 
+export const staffRoleOptions: StaffRole[] = [
+  "owner",
+  "manager",
+  "sales",
+  "catalog",
+  "warehouse",
+  "finance",
+  "support",
+];
+
 export const staffRoleLabels: Record<StaffRole, { zh: string; it: string }> = {
-  owner: { zh: "老板 / 总管理员", it: "Owner" },
+  owner: { zh: "总管理员", it: "Owner" },
+  manager: { zh: "运营管理", it: "Responsabile operativo" },
   sales: { zh: "销售 / 客户经理", it: "Vendite" },
   catalog: { zh: "商品目录", it: "Catalogo" },
   warehouse: { zh: "仓库", it: "Magazzino" },
@@ -33,12 +49,16 @@ export const staffRoleLabels: Record<StaffRole, { zh: string; it: string }> = {
 
 export const staffRoleDescriptions: Record<StaffRole, { zh: string; it: string }> = {
   owner: {
-    zh: "全部后台权限，可管理员工、客户、订单、库存、财务和系统配置。",
+    zh: "全部后台权限，可管理员工、角色权限、客户、订单、库存、财务和系统配置。",
     it: "Accesso completo a staff, clienti, ordini, stock, finanza e sistema.",
   },
+  manager: {
+    zh: "运营工作台全局管理，能处理客户、商品、库存、订单、售后和日志，但不默认拥有系统配置。",
+    it: "Gestione operativa completa senza accesso sistema predefinito.",
+  },
   sales: {
-    zh: "客户管理、B2B 审核、客户跟进，可分配普通 B2B 价格组。",
-    it: "Gestione clienti, revisioni B2B e follow-up commerciali.",
+    zh: "客户管理、批发申请、客户跟进和订单协作。",
+    it: "Gestione clienti, richieste wholesale e follow-up commerciali.",
   },
   catalog: {
     zh: "商品、翻译、价格、目录和导入维护。",
@@ -73,13 +93,28 @@ const allPermissions: AdminPermission[] = [
   "system:read",
 ];
 
+const configurablePermissions: AdminPermission[] = allPermissions.filter(
+  (permission) => permission !== "b2b:review",
+);
+
 const staffPermissions: Record<StaffRole, AdminPermission[]> = {
   owner: allPermissions,
+  manager: [
+    "admin:access",
+    "accounts:read",
+    "accounts:write",
+    "staff:manage",
+    "audit:read",
+    "products:write",
+    "inventory:write",
+    "orders:write",
+    "payments:confirm",
+    "rma:write",
+  ],
   sales: [
     "admin:access",
     "accounts:read",
     "accounts:write",
-    "b2b:review",
     "audit:read",
     "orders:write",
     "rma:write",
@@ -100,12 +135,78 @@ export function getStaffPermissions(role: StaffRole | null | undefined) {
   return role ? staffPermissions[role] ?? [] : [];
 }
 
+export async function getStaffPermissionsForRole(role: StaffRole | null | undefined) {
+  if (!role) return [];
+  if (role === "owner" || !hasSupabaseAdminConfig()) return getStaffPermissions(role);
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("staff_role_permissions")
+    .select("permission, enabled")
+    .eq("role", role);
+
+  if (error) {
+    console.error("Failed to load staff role permissions", error.message);
+    return getStaffPermissions(role);
+  }
+
+  const permissions = (data ?? [])
+    .filter((row) => row.enabled && isAdminPermission(row.permission))
+    .map((row) => row.permission as AdminPermission);
+
+  return (data ?? []).length ? permissions : getStaffPermissions(role);
+}
+
+export async function getStaffPermissionMatrix() {
+  const matrix = Object.fromEntries(
+    staffRoleOptions.map((role) => [role, getStaffPermissions(role)]),
+  ) as Record<StaffRole, AdminPermission[]>;
+
+  if (!hasSupabaseAdminConfig()) return matrix;
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("staff_role_permissions")
+    .select("role, permission, enabled");
+
+  if (error) {
+    console.error("Failed to load staff permission matrix", error.message);
+    return matrix;
+  }
+
+  const grouped = new Map<StaffRole, AdminPermission[]>();
+  const seenRoles = new Set<StaffRole>();
+  (data ?? []).forEach((row) => {
+    if (!isStaffRole(row.role) || !isAdminPermission(row.permission)) return;
+    seenRoles.add(row.role);
+    if (row.enabled) grouped.set(row.role, [...(grouped.get(row.role) ?? []), row.permission]);
+  });
+
+  staffRoleOptions.forEach((role) => {
+    if (role === "owner") {
+      matrix[role] = getStaffPermissions(role);
+      return;
+    }
+    if (seenRoles.has(role)) matrix[role] = grouped.get(role) ?? [];
+  });
+
+  return matrix;
+}
+
 export function getAllAdminPermissions() {
   return allPermissions;
 }
 
+export function getConfigurableAdminPermissions() {
+  return configurablePermissions;
+}
+
 export function isStaffRole(value: string | null | undefined): value is StaffRole {
   return Boolean(value && value in staffPermissions);
+}
+
+export function isAdminPermission(value: string | null | undefined): value is AdminPermission {
+  return Boolean(value && allPermissions.includes(value as AdminPermission));
 }
 
 export function hasAdminPermission(

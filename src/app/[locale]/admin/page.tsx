@@ -103,10 +103,10 @@ export default async function AdminPage({
     },
     {
       Icon: UsersRound,
-      label: locale === "it" ? "B2B pending" : "待审核 B2B",
+      label: locale === "it" ? "Wholesale pending" : "待处理批发",
       value: String(dashboard.pendingB2BCount),
       tone: "blue",
-      trend: locale === "it" ? "Review queue" : "审核队列",
+      trend: locale === "it" ? "Customer queue" : "客户队列",
     },
     {
       Icon: TicketCheck,
@@ -129,8 +129,8 @@ export default async function AdminPage({
       title: locale === "it" ? "Prodotti e SKU" : "商品与 SKU",
       description:
         locale === "it"
-          ? "Crea SKU, prezzi B2B e stock iniziale."
-          : "创建 SKU、B2B 价格和初始库存。",
+          ? "Crea SKU, prezzi wholesale e stock iniziale."
+          : "创建 SKU、批发价格和初始库存。",
       href: localizePath(locale, "/admin/products"),
       tone: "bg-sky-50 text-sky-700",
     },
@@ -166,12 +166,12 @@ export default async function AdminPage({
     },
     {
       Icon: UsersRound,
-      title: locale === "it" ? "Revisioni B2B" : "B2B 审核",
+      title: locale === "it" ? "Richieste wholesale" : "批发申请",
       description:
         locale === "it"
-          ? "Approva richieste wholesale e collega lead CRM."
-          : "审核批发申请并同步到客户档案。",
-      href: localizePath(locale, "/admin/accounts/b2b"),
+          ? "Gestisci richieste wholesale dentro clienti."
+          : "在客户管理中处理批发申请。",
+      href: localizePath(locale, "/admin/accounts/customers?filter=wholesale_pending"),
       tone: "bg-violet-50 text-violet-700",
     },
     {
@@ -267,9 +267,9 @@ export default async function AdminPage({
                 />
                 <QueueRow
                   icon={UsersRound}
-                  label={locale === "it" ? "B2B review" : "待审核 B2B"}
+                  label={locale === "it" ? "Wholesale" : "批发申请"}
                   value={dashboard.pendingB2BCount}
-                  href={localizePath(locale, "/admin/accounts/b2b")}
+                  href={localizePath(locale, "/admin/accounts/customers?filter=wholesale_pending")}
                 />
                 <QueueRow
                   icon={TicketCheck}

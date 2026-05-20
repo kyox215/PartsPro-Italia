@@ -4,6 +4,7 @@ import {
   getAdminBackUrl,
   redirectOnInvalidAdminCsrf,
 } from "@/lib/admin-security";
+import { normalizeCustomerType, toStoredCustomerPriceGroup } from "@/lib/admin-display";
 import { assertAdmin } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
 import {
@@ -46,6 +47,8 @@ export async function POST(request: Request) {
   }
 
   const supabase = getSupabaseAdminClient();
+  const customerType = normalizeCustomerType(parsed.data.priceGroup);
+  const storedPriceGroup = toStoredCustomerPriceGroup(customerType);
   const { data: company, error: loadError } = await supabase
     .from("companies")
     .select("owner_id")
@@ -60,9 +63,9 @@ export async function POST(request: Request) {
   const { error: companyError } = await supabase
     .from("companies")
     .update({
-      price_group: parsed.data.priceGroup,
-      status: parsed.data.priceGroup === "retail" ? "pending" : "active",
-      crm_status: parsed.data.priceGroup === "retail" ? "lead" : "active",
+      price_group: storedPriceGroup,
+      status: customerType === "retail" ? "pending" : "active",
+      crm_status: customerType === "retail" ? "lead" : "active",
       updated_at: new Date().toISOString(),
     })
     .eq("id", parsed.data.id);
@@ -76,10 +79,11 @@ export async function POST(request: Request) {
     const { error: profileError } = await supabase
       .from("profiles")
       .update({
-        role: parsed.data.priceGroup,
+        role: storedPriceGroup,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", company.owner_id);
+      .eq("id", company.owner_id)
+      .neq("role", "admin");
 
     if (profileError) {
       backUrl.searchParams.set("error", profileError.message);
@@ -94,7 +98,8 @@ export async function POST(request: Request) {
     entityType: "company",
     entityId: parsed.data.id,
     afterData: {
-      priceGroup: parsed.data.priceGroup,
+      customerType,
+      priceGroup: storedPriceGroup,
       profileId: company?.owner_id ?? null,
     },
   });

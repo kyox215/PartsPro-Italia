@@ -14,7 +14,7 @@ export const dictionaries = {
     languageName: "Italiano",
     nav: {
       products: "Catalogo",
-      b2b: "B2B",
+      b2b: "Wholesale",
       rma: "RMA",
       account: "Account",
       admin: "Admin",
@@ -26,21 +26,21 @@ export const dictionaries = {
       outOfStock: "Esaurito",
       preorder: "In arrivo",
       retail: "Prezzo retail",
-      b2b: "Prezzo B2B",
+      b2b: "Prezzo wholesale",
       vat: "IVA esclusa",
       moq: "MOQ",
       search: "Cerca modello, SKU o ricambio",
       viewProduct: "Apri scheda",
       addToCart: "Aggiungi",
-      requestB2b: "Richiedi conto B2B",
+      requestB2b: "Richiedi conto wholesale",
       startOrder: "Inizia ordine",
       submit: "Invia",
     },
     home: {
       eyebrow: "Ricambi per riparatori in Italia",
-      title: "Ricambi smartphone pronti per ordini B2B rapidi",
+      title: "Ricambi smartphone pronti per ordini wholesale rapidi",
       subtitle:
-        "Cerca per brand, modello, qualita e SKU. Gestisci prezzi B2B, stock, ordini, fatturazione e RMA con una piattaforma pensata per negozi di riparazione.",
+        "Cerca per brand, modello, qualita e SKU. Gestisci prezzi wholesale, stock, ordini, fatturazione e RMA con una piattaforma pensata per negozi di riparazione.",
       primaryCta: "Sfoglia catalogo",
       secondaryCta: "Apri conto wholesale",
       stockPromise: "24/48h spedizione Italia",
@@ -76,7 +76,7 @@ export const dictionaries = {
       bank: "Bonifico bancario",
     },
     b2b: {
-      title: "Registrazione conto B2B",
+      title: "Registrazione conto wholesale",
       subtitle:
         "Raccogli dati aziendali, P.IVA, SDI/PEC, canale commerciale e volume previsto. Il backend salva la richiesta per revisione admin.",
       review: "Stato iniziale: in revisione",
@@ -94,7 +94,7 @@ export const dictionaries = {
     admin: {
       title: "Pannello operativo",
       subtitle:
-        "Console interna per prodotti, stock, ordini, clienti B2B e RMA. L'accesso e limitato agli admin.",
+        "Console interna per prodotti, stock, ordini, clienti wholesale e RMA. L'accesso e limitato agli admin.",
       warning:
         "Collegare Supabase e impostare ADMIN_EMAIL prima di usare dati reali.",
     },
@@ -125,7 +125,7 @@ export const dictionaries = {
       outOfStock: "缺货",
       preorder: "在途",
       retail: "零售价",
-      b2b: "B2B 批发价",
+      b2b: "批发价",
       vat: "未税",
       moq: "起订量",
       search: "搜索型号、SKU 或配件",
@@ -137,9 +137,9 @@ export const dictionaries = {
     },
     home: {
       eyebrow: "面向意大利维修店的配件平台",
-      title: "为 B2B 采购设计的手机维修配件网站",
+      title: "为批发采购设计的手机维修配件网站",
       subtitle:
-        "按品牌、型号、质量等级和 SKU 快速找货。首版支持 B2B 价格、库存、订单、发票资料和 RMA 售后流程。",
+        "按品牌、型号、质量等级和 SKU 快速找货。首版支持批发价格、库存、订单、发票资料和 RMA 售后流程。",
       primaryCta: "查看商品目录",
       secondaryCta: "申请批发账户",
       stockPromise: "意大利 24/48 小时发货",
@@ -175,7 +175,7 @@ export const dictionaries = {
       bank: "银行转账",
     },
     b2b: {
-      title: "B2B 批发开户注册",
+      title: "批发开户注册",
       subtitle:
         "收集公司资料、P.IVA、SDI/PEC、客户类型和月采购额，提交后进入后台审核。",
       review: "初始状态：等待审核",
@@ -193,7 +193,7 @@ export const dictionaries = {
     admin: {
       title: "运营后台",
       subtitle:
-        "内部管理商品、库存、订单、B2B 客户和 RMA。只有管理员角色可以访问。",
+        "内部管理商品、库存、订单、批发客户和 RMA。只有管理员角色可以访问。",
       warning: "使用真实数据前，请先配置 Supabase 和 ADMIN_EMAIL。",
     },
     legal: {
