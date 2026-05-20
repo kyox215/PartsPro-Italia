@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import type { ReactNode } from "react";
 import { Banknote, CreditCard, Landmark } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
@@ -146,24 +147,27 @@ export default async function CheckoutPage({
               {cartLines.map((line) => (
                 <div key={line.sku} className="grid gap-1 border-b border-slate-200 pb-2 last:border-b-0">
                   <div className="flex justify-between gap-4">
-                    <span>
-                      {line.name} x {line.quantity}
+                    <span className="font-semibold text-slate-900">
+                      {line.displayName} x {line.quantity}
                     </span>
                     <strong>{formatMoney(line.subtotal, locale)}</strong>
                   </div>
-                  <p className="text-xs text-slate-500">
-                    {line.fulfillmentType === "stock"
-                      ? locale === "it"
-                        ? "Da stock disponibile"
-                        : "现货发货"
-                      : line.fulfillmentType === "preorder"
-                        ? locale === "it"
-                          ? `Preordine ${line.preorderLeadTimeMinDays}-${line.preorderLeadTimeMaxDays} giorni`
-                          : `预购 ${line.preorderLeadTimeMinDays}-${line.preorderLeadTimeMaxDays} 天到货`
-                        : locale === "it"
-                          ? "Stock + preordine"
-                          : "现货 + 预购"}
-                  </p>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    {line.quality ? (
+                      <CheckoutMetaPill className="bg-blue-50 text-blue-700">
+                        {line.quality}
+                      </CheckoutMetaPill>
+                    ) : null}
+                    <CheckoutMetaPill className="bg-white font-mono text-slate-600">
+                      {line.sku}
+                    </CheckoutMetaPill>
+                    <CheckoutMetaPill className="bg-white text-slate-700">
+                      MOQ {line.moq}
+                    </CheckoutMetaPill>
+                    <CheckoutMetaPill className="bg-emerald-50 text-emerald-700">
+                      {checkoutFulfillmentLabel(line, locale)}
+                    </CheckoutMetaPill>
+                  </div>
                 </div>
               ))}
               <div className="flex justify-between border-t border-slate-200 pt-2">
@@ -193,13 +197,45 @@ export default async function CheckoutPage({
 function Fieldset({
   title,
   children,
-}: Readonly<{ title: string; children: React.ReactNode }>) {
+}: Readonly<{ title: string; children: ReactNode }>) {
   return (
     <fieldset className="grid gap-4 rounded-lg border border-slate-200 p-4 md:grid-cols-2">
       <legend className="px-2 text-sm font-bold text-slate-950">{title}</legend>
       {children}
     </fieldset>
   );
+}
+
+function CheckoutMetaPill({
+  children,
+  className,
+}: Readonly<{ children: ReactNode; className?: string }>) {
+  return (
+    <span className={`rounded-md px-2 py-1 font-semibold ${className ?? ""}`}>
+      {children}
+    </span>
+  );
+}
+
+function checkoutFulfillmentLabel(
+  line: {
+    fulfillmentType: "stock" | "preorder" | "mixed";
+    preorderLeadTimeMinDays: number;
+    preorderLeadTimeMaxDays: number;
+  },
+  locale: Locale,
+) {
+  if (line.fulfillmentType === "stock") {
+    return locale === "it" ? "Da stock disponibile" : "现货发货";
+  }
+
+  if (line.fulfillmentType === "preorder") {
+    return locale === "it"
+      ? `Preordine ${line.preorderLeadTimeMinDays}-${line.preorderLeadTimeMaxDays} giorni`
+      : `预购 ${line.preorderLeadTimeMinDays}-${line.preorderLeadTimeMaxDays} 天到货`;
+  }
+
+  return locale === "it" ? "Stock + preordine" : "现货 + 预购";
 }
 
 function itemsFromSearchParams(searchParams: Record<string, string | string[] | undefined>) {

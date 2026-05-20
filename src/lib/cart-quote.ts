@@ -1,5 +1,6 @@
 import { canViewB2BPrice, getAuthContext } from "@/lib/auth";
 import { products } from "@/lib/catalog";
+import { getCartDisplayName, getQualityLabel } from "@/lib/cart-display";
 import type { Locale } from "@/lib/i18n";
 import { calculateLineTotal } from "@/lib/pricing";
 import {
@@ -16,6 +17,8 @@ export type CartQuoteLine = {
   sku: string;
   slug: string | null;
   name: string;
+  displayName: string;
+  quality: string;
   quantity: number;
   moq: number;
   unitPrice: number | null;
@@ -48,6 +51,7 @@ type CartCatalogRow = {
   sku: string;
   name_it: string;
   name_zh: string;
+  quality_grade?: string | null;
   moq: number | null;
   retail_price?: number | string | null;
   b2b_price?: number | string | null;
@@ -156,6 +160,11 @@ export async function loadCartQuote({
         sku: product.sku,
         slug: product.slug,
         name: product.names[locale],
+        displayName: getCartDisplayName({
+          name: product.names[locale],
+          quality: product.quality,
+        }),
+        quality: getQualityLabel(product.quality, locale),
         quantity: item.quantity,
         moq: product.moq,
         unitPrice: isPriceVisible ? totals.unitPrice : null,
@@ -199,6 +208,7 @@ function mapSupabaseQuoteLine(
   const vatRate = Number(row.vat_rate ?? 0.22);
   const subtotal = unitPrice * quantity;
   const vat = subtotal * vatRate;
+  const localizedName = locale === "it" ? row.name_it : row.name_zh;
   const errors = buildLineErrors({
     sku: row.sku,
     quantity,
@@ -211,7 +221,12 @@ function mapSupabaseQuoteLine(
   return {
     sku: row.sku,
     slug: row.slug,
-    name: locale === "it" ? row.name_it : row.name_zh,
+    name: localizedName,
+    displayName: getCartDisplayName({
+      name: localizedName,
+      quality: row.quality_grade,
+    }),
+    quality: getQualityLabel(row.quality_grade, locale),
     quantity,
     moq,
     unitPrice: isPriceVisible ? unitPrice : null,

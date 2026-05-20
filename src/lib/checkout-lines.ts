@@ -1,5 +1,6 @@
 import { canViewB2BPrice, getAuthContext } from "@/lib/auth";
 import { products } from "@/lib/catalog";
+import { getCartDisplayName, getQualityLabel } from "@/lib/cart-display";
 import type { Locale } from "@/lib/i18n";
 import { calculateLineTotal } from "@/lib/pricing";
 import {
@@ -10,7 +11,10 @@ import {
 export type CheckoutLine = {
   sku: string;
   name: string;
+  displayName: string;
+  quality: string;
   quantity: number;
+  moq: number;
   unitPrice: number;
   vatRate: number;
   subtotal: number;
@@ -33,6 +37,8 @@ type CheckoutCatalogRow = {
   sku: string;
   name_it: string;
   name_zh: string;
+  quality_grade: string | null;
+  moq: number | null;
   retail_price: number | string | null;
   b2b_price: number | string | null;
   available_stock: number | null;
@@ -79,12 +85,19 @@ export async function loadCheckoutLines({
           const vat = subtotal * vatRate;
           const availableStock = Number(row.available_stock ?? 0);
           const incomingAvailable = Number(row.incoming_available ?? row.incoming_qty ?? 0);
+          const localizedName = locale === "it" ? row.name_it : row.name_zh;
 
           return [
             {
               sku: row.sku,
-              name: locale === "it" ? row.name_it : row.name_zh,
+              name: localizedName,
+              displayName: getCartDisplayName({
+                name: localizedName,
+                quality: row.quality_grade,
+              }),
+              quality: getQualityLabel(row.quality_grade, locale),
               quantity: item.quantity,
+              moq: Number(row.moq ?? 1),
               unitPrice,
               vatRate,
               subtotal,
@@ -125,7 +138,13 @@ export async function loadCheckoutLines({
         {
           sku: product.sku,
           name: product.names[locale],
+          displayName: getCartDisplayName({
+            name: product.names[locale],
+            quality: product.quality,
+          }),
+          quality: getQualityLabel(product.quality, locale),
           quantity: item.quantity,
+          moq: product.moq,
           unitPrice: totals.unitPrice,
           vatRate: product.vatRate,
           subtotal: totals.subtotal,

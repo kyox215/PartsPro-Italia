@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
 import {
   cartStorageKey,
@@ -17,6 +17,8 @@ type QuoteLine = {
   sku: string;
   slug: string | null;
   name: string;
+  displayName: string;
+  quality: string;
   quantity: number;
   moq: number;
   unitPrice: number | null;
@@ -216,13 +218,20 @@ export function CartClient({
                   href={line.slug ? `/${locale}/products/${line.slug}` : productsHref}
                   className="line-clamp-2 font-bold text-slate-950 hover:text-blue-700"
                 >
-                  {line.name}
+                  {line.displayName}
                 </Link>
-                <p className="mt-1 font-mono text-xs text-slate-500">{line.sku}</p>
                 <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                  <span className="rounded-md bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+                  {line.quality ? (
+                    <CartMetaPill className="bg-blue-50 text-blue-700">
+                      {line.quality}
+                    </CartMetaPill>
+                  ) : null}
+                  <CartMetaPill className="bg-slate-100 font-mono text-slate-600">
+                    {line.sku}
+                  </CartMetaPill>
+                  <CartMetaPill className="bg-slate-100 text-slate-700">
                     MOQ {line.moq}
-                  </span>
+                  </CartMetaPill>
                   <FulfillmentPill line={line} locale={locale} />
                 </div>
               </div>
@@ -352,6 +361,17 @@ function FulfillmentPill({
   return (
     <span className="rounded-md bg-blue-50 px-2 py-1 font-semibold text-blue-700">
       {locale === "it" ? "Stock + preorder" : "现货 + 预购"}
+    </span>
+  );
+}
+
+function CartMetaPill({
+  children,
+  className,
+}: Readonly<{ children: ReactNode; className?: string }>) {
+  return (
+    <span className={cn("rounded-md px-2 py-1 font-semibold", className)}>
+      {children}
     </span>
   );
 }
