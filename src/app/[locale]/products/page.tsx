@@ -4,7 +4,6 @@ import {
   ChevronRight,
   Lock,
   PackageSearch,
-  Search,
   ShoppingCart,
   SlidersHorizontal,
   X,
@@ -148,7 +147,7 @@ function FilterPanel({
   locale,
 }: Readonly<{ catalog: CatalogPageData; locale: Locale }>) {
   return (
-    <form action={localizePath(locale, "/products")} className="rounded-lg border border-slate-200 bg-white p-4">
+    <nav className="rounded-lg border border-slate-200 bg-white p-4" aria-label={locale === "it" ? "Filtri catalogo" : "筛选目录"}>
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-bold text-slate-950">
           {locale === "it" ? "Filtra catalogo" : "筛选目录"}
@@ -164,78 +163,12 @@ function FilterPanel({
 
       <DeviceMenu catalog={catalog} locale={locale} />
 
-      <input type="hidden" name="brand" value={catalog.state.brand} />
-      <input type="hidden" name="model" value={catalog.state.model} />
-
-      <label className="mt-4 grid gap-2 text-xs font-bold uppercase text-slate-500">
-        {locale === "it" ? "Cerca modello o SKU" : "搜索型号或 SKU"}
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            name="q"
-            defaultValue={catalog.state.q}
-            placeholder={locale === "it" ? "iPhone 15, A3101, OLED" : "iPhone 15、A3101、OLED"}
-            className="h-11 w-full rounded-lg border border-slate-300 pl-9 pr-3 text-sm normal-case text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-          />
-        </div>
-      </label>
-
-      <label className="mt-4 grid gap-2 text-xs font-bold uppercase text-slate-500">
-        {locale === "it" ? "Ordina" : "排序"}
-        <select
-          name="sort"
-          defaultValue={catalog.state.sort}
-          className="h-11 rounded-lg border border-slate-300 px-3 text-sm normal-case text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-        >
-          <option value="relevance">{locale === "it" ? "Rilevanza" : "默认"}</option>
-          <option value="brand_asc">Brand / Model</option>
-          <option value="name_asc">{locale === "it" ? "Nome A-Z" : "名称 A-Z"}</option>
-          {catalog.isPriceVisible ? (
-            <>
-              <option value="price_asc">{locale === "it" ? "Prezzo crescente" : "价格从低到高"}</option>
-              <option value="price_desc">{locale === "it" ? "Prezzo decrescente" : "价格从高到低"}</option>
-            </>
-          ) : null}
-        </select>
-      </label>
-
-      {catalog.isPriceVisible ? (
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <label className="grid gap-2 text-xs font-bold uppercase text-slate-500">
-            Min EUR
-            <input
-              name="minPrice"
-              defaultValue={catalog.state.minPrice}
-              inputMode="decimal"
-              className="h-10 rounded-lg border border-slate-300 px-3 text-sm normal-case text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-            />
-          </label>
-          <label className="grid gap-2 text-xs font-bold uppercase text-slate-500">
-            Max EUR
-            <input
-              name="maxPrice"
-              defaultValue={catalog.state.maxPrice}
-              inputMode="decimal"
-              className="h-10 rounded-lg border border-slate-300 px-3 text-sm normal-case text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-            />
-          </label>
-        </div>
-      ) : null}
-
-      <div className="mt-5 space-y-5">
+      <div className="mt-5 space-y-3">
         {catalog.facets.map((facet) => (
-          <FacetGroup key={facet.key} facet={facet} />
+          <FacetGroup key={facet.key} catalog={catalog} facet={facet} locale={locale} />
         ))}
       </div>
-
-      <button
-        type="submit"
-        className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-blue-600 bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700"
-      >
-        <Search className="h-4 w-4" />
-        {locale === "it" ? "Applica filtri" : "应用筛选"}
-      </button>
-    </form>
+    </nav>
   );
 }
 
@@ -353,7 +286,15 @@ function DeviceMenu({
   );
 }
 
-function FacetGroup({ facet }: Readonly<{ facet: CatalogFacet }>) {
+function FacetGroup({
+  catalog,
+  facet,
+  locale,
+}: Readonly<{
+  catalog: CatalogPageData;
+  facet: CatalogFacet;
+  locale: Locale;
+}>) {
   const activeCount = facet.options.filter((option) => option.active).length;
 
   return (
@@ -372,39 +313,53 @@ function FacetGroup({ facet }: Readonly<{ facet: CatalogFacet }>) {
         </span>
         <ChevronRight className="h-3.5 w-3.5 text-slate-400 transition group-open:rotate-90 group-open:text-blue-500" />
       </summary>
-      <fieldset className="mt-2 max-h-56 space-y-2 overflow-auto pr-1">
-        <legend className="sr-only">{facet.label}</legend>
+      <div className="mt-2 max-h-56 space-y-1 overflow-auto pr-1">
         {facet.options.map((option) => (
-          <FacetInput key={option.value} facet={facet} option={option} />
+          <FacetOptionLink
+            key={option.value}
+            catalog={catalog}
+            facet={facet}
+            locale={locale}
+            option={option}
+          />
         ))}
-      </fieldset>
+      </div>
     </details>
   );
 }
 
-function FacetInput({
+function FacetOptionLink({
+  catalog,
   facet,
+  locale,
   option,
 }: Readonly<{
+  catalog: CatalogPageData;
   facet: CatalogFacet;
+  locale: Locale;
   option: CatalogFacet["options"][number];
 }>) {
-  const type = facet.kind === "multi" ? "checkbox" : "radio";
-
   return (
-    <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
-      <input
-        type={type}
-        name={facet.key}
-        value={option.value}
-        defaultChecked={option.active}
-        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-      />
+    <Link
+      href={facetOptionHref(locale, catalog, facet, option)}
+      aria-current={option.active ? "true" : undefined}
+      className={cn(
+        "grid min-h-9 grid-cols-[1fr_auto] items-center gap-2 rounded-md px-2.5 py-1 text-sm transition",
+        option.active
+          ? "bg-slate-900 font-bold text-white"
+          : "text-slate-700 hover:bg-slate-50 hover:text-blue-700",
+      )}
+    >
       <span className="min-w-0 flex-1 truncate">{option.label}</span>
-      <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-500">
+      <span
+        className={cn(
+          "rounded-md px-1.5 py-0.5 text-xs font-semibold",
+          option.active ? "bg-white/15 text-white" : "bg-slate-100 text-slate-500",
+        )}
+      >
         {option.count}
       </span>
-    </label>
+    </Link>
   );
 }
 
@@ -711,6 +666,70 @@ function buildActiveChips(catalog: CatalogPageData) {
   }
 
   return chips.filter((chip) => fixed.has(chip.key) || chip.key.startsWith("attr_") || chip.key);
+}
+
+function facetOptionHref(
+  locale: Locale,
+  catalog: CatalogPageData,
+  facet: CatalogFacet,
+  option: CatalogFacet["options"][number],
+) {
+  if (facet.key === "category") {
+    return productsHref(
+      locale,
+      catalogStateToParams(catalog.state, {
+        category: option.active ? "" : option.value,
+        page: 1,
+      }),
+    );
+  }
+
+  if (facet.key === "quality") {
+    return productsHref(
+      locale,
+      catalogStateToParams(catalog.state, {
+        quality: option.active ? "" : option.value,
+        page: 1,
+      }),
+    );
+  }
+
+  if (facet.key === "availability") {
+    return productsHref(
+      locale,
+      catalogStateToParams(catalog.state, {
+        availability: option.active ? "" : option.value,
+        page: 1,
+      }),
+    );
+  }
+
+  if (facet.key.startsWith("attr_")) {
+    const attrKey = facet.key.slice(5);
+    const values = new Set(catalog.state.attrs[attrKey] ?? []);
+    if (option.active) {
+      values.delete(option.value);
+    } else {
+      values.add(option.value);
+    }
+
+    const attrs = { ...catalog.state.attrs };
+    if (values.size > 0) {
+      attrs[attrKey] = [...values];
+    } else {
+      delete attrs[attrKey];
+    }
+
+    return productsHref(
+      locale,
+      catalogStateToParams(catalog.state, {
+        attrs,
+        page: 1,
+      }),
+    );
+  }
+
+  return productsHref(locale, catalogStateToParams(catalog.state, { page: 1 }));
 }
 
 function productsHref(locale: Locale, params: URLSearchParams) {
