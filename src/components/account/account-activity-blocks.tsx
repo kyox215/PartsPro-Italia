@@ -95,9 +95,10 @@ export function AccountTodoPanel({
       order.paymentStatus !== "refunded" &&
       order.status !== "cancelled",
   );
+  const generatedAtMs = Date.parse(activity.generatedAt);
   const expiringReservations = pendingPayments.filter((order) => {
     if (!order.reservationExpiresAt) return false;
-    return Date.parse(order.reservationExpiresAt) - Date.now() < 6 * 60 * 60 * 1000;
+    return Date.parse(order.reservationExpiresAt) - generatedAtMs < 6 * 60 * 60 * 1000;
   });
   const preorderOrders = activity.orders.filter(
     (order) => order.fulfillmentStatus === "awaiting_preorder",

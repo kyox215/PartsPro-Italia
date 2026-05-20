@@ -1,4 +1,4 @@
-import type { AccountOrderRow, AccountRmaRow } from "@/lib/account-activity";
+import type { AccountOrderRow } from "@/lib/account-activity";
 import type { AccountCompany } from "@/lib/account-company";
 import type { AuthContext } from "@/lib/auth";
 import type { Locale } from "@/lib/i18n";
@@ -26,7 +26,7 @@ export type AccountNextAction = {
   formAction?: string;
 };
 
-const roleLabels = {
+const roleLabels: Record<Locale, Record<string, string>> = {
   it: {
     admin: "Account admin",
     retail: "Cliente retail",
@@ -49,7 +49,7 @@ const roleLabels = {
     demo: "演示账户",
     unknown: "客户",
   },
-} satisfies Record<Locale, Record<string, string>>;
+};
 
 export function formatAccountRole(
   authOrRole: Pick<AuthContext, "role" | "isAdmin" | "configured"> | string | null,
@@ -107,11 +107,11 @@ export function formatOrderStatus(status: string | null | undefined, locale: Loc
 }
 
 export function formatPaymentMethod(method: string | null | undefined, locale: Locale) {
-  const labels = {
+  const labels: Record<string, Record<Locale, string>> = {
     stripe: { it: "Carta Stripe", zh: "Stripe 银行卡" },
     cash: { it: "Contanti", zh: "现金支付" },
     bank_transfer: { it: "Bonifico bancario", zh: "银行转账" },
-  } satisfies Record<string, Record<Locale, string>>;
+  };
 
   return labels[method ?? ""]?.[locale] ?? (method || "-");
 }
@@ -238,33 +238,33 @@ export function formatRmaStatus(status: string | null | undefined, locale: Local
 }
 
 export function formatRmaIssueType(type: string | null | undefined, locale: Locale) {
-  const labels = {
+  const labels: Record<string, Record<Locale, string>> = {
     defective: { it: "Difettoso", zh: "产品故障" },
     wrong_item: { it: "Articolo errato", zh: "发错商品" },
     damaged: { it: "Danneggiato", zh: "运输/外观损坏" },
     compatibility: { it: "Compatibilita", zh: "兼容问题" },
     touch_issue: { it: "Problema touch", zh: "触控问题" },
     other: { it: "Altro", zh: "其他问题" },
-  } satisfies Record<string, Record<Locale, string>>;
+  };
 
   return labels[type ?? ""]?.[locale] ?? (type || "-");
 }
 
 export function formatResolutionType(type: string | null | undefined, locale: Locale) {
-  const labels = {
+  const labels: Record<string, Record<Locale, string>> = {
     pending: { it: "In attesa", zh: "待处理" },
     repair: { it: "Riparazione", zh: "维修" },
     replace: { it: "Sostituzione", zh: "换货" },
     refund: { it: "Rimborso", zh: "退款" },
     reject: { it: "Rifiuto", zh: "拒绝" },
     credit_note: { it: "Nota di credito", zh: "信用额度/贷项" },
-  } satisfies Record<string, Record<Locale, string>>;
+  };
 
   return labels[type ?? ""]?.[locale] ?? (type || "-");
 }
 
 export function formatTimelineEvent(type: string | null | undefined, locale: Locale) {
-  const labels = {
+  const labels: Record<string, Record<Locale, string>> = {
     order_created: { it: "Ordine creato", zh: "订单创建" },
     reservation_released: { it: "Prenotazione rilasciata", zh: "库存锁定释放" },
     payment_paid: { it: "Pagamento confermato", zh: "付款确认" },
@@ -285,7 +285,7 @@ export function formatTimelineEvent(type: string | null | undefined, locale: Loc
     resolution_updated: { it: "Esito aggiornato", zh: "处理结果更新" },
     attachment_added: { it: "Allegato aggiunto", zh: "附件添加" },
     rma_customer_message: { it: "Messaggio cliente", zh: "客户补充说明" },
-  } satisfies Record<string, Record<Locale, string>>;
+  };
 
   return labels[type ?? ""]?.[locale] ?? (type || "-");
 }

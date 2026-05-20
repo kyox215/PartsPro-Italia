@@ -2,6 +2,12 @@ import { CircleAlert, Save, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { getAccountCompany, type AccountCompany } from "@/lib/account-company";
+import {
+  formatAccountRole,
+  formatCompanyStatus,
+  getCompanyCompletion,
+  statusBadgeClass,
+} from "@/lib/account-display";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
 
@@ -38,6 +44,8 @@ export default async function AccountCompanyPage({
   const auth = await getAuthContext();
   const { company, demoMode, error } = await getAccountCompany(auth);
   const draft = company ?? emptyCompany;
+  const status = formatCompanyStatus(draft.status, locale);
+  const completion = getCompanyCompletion(company);
   const saved = valueOf(query.saved);
   const formError = valueOf(query.error) ?? error;
 
@@ -56,12 +64,50 @@ export default async function AccountCompanyPage({
             : "维护发票资料、地址、联系人和采购品类。审核状态和价格组由后台管理员管理。"}
         </p>
 
+        <div className="mt-5 grid gap-3 lg:grid-cols-3">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-bold uppercase text-slate-500">
+              {locale === "it" ? "Stato profilo" : "资料状态"}
+            </p>
+            <Badge className={`mt-2 ${statusBadgeClass(status.tone)}`}>
+              {status.label}
+            </Badge>
+            <p className="mt-2 text-xs leading-5 text-slate-600">{status.description}</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-bold uppercase text-slate-500">
+              {locale === "it" ? "Price group" : "价格组"}
+            </p>
+            <p className="mt-2 text-lg font-black text-slate-950">
+              {formatAccountRole(draft.priceGroup, locale)}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-slate-600">
+              {locale === "it"
+                ? "I prezzi B2B sono applicati dopo approvazione admin."
+                : "后台审核通过后，前台会显示对应 B2B 价格。"}
+            </p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-bold uppercase text-slate-500">
+              {locale === "it" ? "Completezza" : "资料完整度"}
+            </p>
+            <p className="mt-2 text-lg font-black text-slate-950">
+              {completion.percent}%
+            </p>
+            <p className="mt-2 text-xs leading-5 text-slate-600">
+              {locale === "it"
+                ? `${completion.completed}/${completion.total} campi chiave completati`
+                : `${completion.completed}/${completion.total} 个关键字段已完成`}
+            </p>
+          </div>
+        </div>
+
         <div className="mt-5 flex flex-wrap gap-3">
-          <Badge className="border-slate-300 bg-slate-100 text-slate-800">
-            {locale === "it" ? "Stato" : "状态"}: {draft.status}
+          <Badge className={statusBadgeClass(status.tone)}>
+            {locale === "it" ? "Stato" : "状态"}: {status.label}
           </Badge>
           <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
-            Price group: {draft.priceGroup}
+            Price group: {formatAccountRole(draft.priceGroup, locale)}
           </Badge>
           {demoMode ? (
             <Badge className="border-orange-200 bg-orange-50 text-orange-700">
@@ -73,7 +119,7 @@ export default async function AccountCompanyPage({
         <Feedback saved={saved} error={formError} locale={locale} />
 
         {!auth.configured || auth.user ? (
-          <CompanyForm company={draft} locale={locale} />
+          <CompanyForm company={draft} locale={locale} completionPercent={completion.percent} />
         ) : (
           <div className="mt-8 rounded-lg border border-orange-200 bg-orange-50 p-5">
             <CircleAlert className="h-6 w-6 text-orange-700" />
@@ -119,7 +165,8 @@ export default async function AccountCompanyPage({
 function CompanyForm({
   company,
   locale,
-}: Readonly<{ company: AccountCompany; locale: Locale }>) {
+  completionPercent,
+}: Readonly<{ company: AccountCompany; locale: Locale; completionPercent: number }>) {
   const fields = [
     ["companyName", locale === "it" ? "Ragione sociale" : "公司名称", company.companyName],
     ["vatNumber", "P.IVA / VAT", company.vatNumber],
@@ -173,13 +220,34 @@ function CompanyForm({
           placeholder="display, battery, charging"
         />
       </label>
-      <button
-        className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-blue-600 bg-blue-600 px-5 text-sm font-bold text-white hover:bg-blue-700 md:col-span-2"
-        type="submit"
-      >
-        <Save className="h-4 w-4" />
-        {locale === "it" ? "Salva profilo" : "保存资料"}
-      </button>
+      <div className="grid gap-3 md:col-span-2 md:grid-cols-2">
+        <button
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-blue-600 bg-blue-600 px-5 text-sm font-bold text-white hover:bg-blue-700"
+          name="intent"
+          type="submit"
+          value="save"
+        >
+          <Save className="h-4 w-4" />
+          {locale === "it" ? "Salva profilo" : "保存资料"}
+        </button>
+        <button
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-slate-900 bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={completionPercent < 60}
+          name="intent"
+          type="submit"
+          value="submitB2B"
+        >
+          <ShieldCheck className="h-4 w-4" />
+          {locale === "it" ? "Invia revisione B2B" : "提交 B2B 审核"}
+        </button>
+      </div>
+      {completionPercent < 60 ? (
+        <p className="text-xs leading-5 text-amber-700 md:col-span-2">
+          {locale === "it"
+            ? "Completa almeno i dati principali prima di inviare la revisione B2B."
+            : "请先补齐主要公司资料，再提交 B2B 审核。"}
+        </p>
+      ) : null}
     </form>
   );
 }
@@ -205,9 +273,13 @@ function Feedback({
         ? locale === "it"
           ? "Demo: profilo ricevuto, collega Supabase per salvare."
           : "演示：已接收公司资料，连接 Supabase 后可保存。"
-        : locale === "it"
-          ? "Profilo aziendale salvato."
-          : "公司资料已保存。"}
+        : saved === "b2b"
+          ? locale === "it"
+            ? "Profilo salvato e revisione B2B inviata."
+            : "公司资料已保存，并已提交 B2B 审核。"
+          : locale === "it"
+            ? "Profilo aziendale salvato."
+            : "公司资料已保存。"}
     </div>
   );
 }

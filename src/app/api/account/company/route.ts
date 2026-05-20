@@ -36,6 +36,9 @@ export async function POST(request: Request) {
     return NextResponse.redirect(backUrl, 303);
   }
 
-  backUrl.searchParams.set("saved", result.demoMode ? "demo" : "1");
+  backUrl.searchParams.set(
+    "saved",
+    result.demoMode ? "demo" : parsed.data.intent === "submitB2B" ? "b2b" : "1",
+  );
   return NextResponse.redirect(backUrl, 303);
 }

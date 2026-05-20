@@ -117,6 +117,7 @@ export type AccountActivity = {
   orders: AccountOrderRow[];
   rmas: AccountRmaRow[];
   notifications: AccountNotificationRow[];
+  generatedAt: string;
   orderCount: number;
   openRmaCount: number;
   totalSpend: number;
@@ -492,6 +493,7 @@ function mapAccountRma(rma: {
     event_type: string;
     title: string;
     body?: string | null;
+    customer_visible?: boolean | null;
     created_at: string;
   }> | null;
 }): AccountRmaRow {
@@ -516,6 +518,7 @@ function mapAccountRma(rma: {
     attachments: normalizeRmaAttachments(rma.attachments),
     createdAt: rma.created_at,
     events: (rma.rma_events ?? [])
+      .filter((event) => event.customer_visible ?? true)
       .map((event) => ({
         id: event.id,
         eventType: event.event_type,
@@ -578,8 +581,11 @@ function summarizeActivity({
     orders,
     rmas,
     notifications,
+    generatedAt: new Date().toISOString(),
     orderCount: orders.length,
-    openRmaCount: rmas.filter((rma) => rma.status !== "completed").length,
+    openRmaCount: rmas.filter(
+      (rma) => !["completed", "rejected"].includes(rma.status),
+    ).length,
     totalSpend: orders.reduce(
       (sum, order) => sum + order.total - (order.refundTotal ?? 0),
       0,

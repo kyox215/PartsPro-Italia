@@ -55,6 +55,7 @@ export const accountCompanySchema = z.object({
   companyType: z.string().optional().or(z.literal("")),
   monthlyVolume: z.string().optional().or(z.literal("")),
   interestedCategories: z.string().optional().or(z.literal("")),
+  intent: z.string().optional().or(z.literal("")),
 });
 
 export const rmaSchema = z.object({

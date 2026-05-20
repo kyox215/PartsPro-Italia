@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth";
+import { createAccountRma } from "@/lib/account-workflow";
 import { parseRequestBody } from "@/lib/request";
-import { generateRmaNumber, recordRmaEvent } from "@/lib/rma-workflow";
-import { getSupabaseAdminClient, hasSupabaseAdminConfig } from "@/lib/supabase/admin";
+import { hasSupabaseAdminConfig } from "@/lib/supabase/admin";
 import { rmaSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
@@ -25,64 +25,77 @@ export async function POST(request: Request) {
     );
   }
 
-  const rmaId = crypto.randomUUID();
-  const rmaNumber = generateRmaNumber(rmaId);
   const auth = await getAuthContext();
 
-  if (hasSupabaseAdminConfig()) {
-    const supabase = getSupabaseAdminClient();
-    const { error } = await supabase.from("rmas").insert({
-      id: rmaId,
-      rma_number: rmaNumber,
-      profile_id: auth.user?.id ?? null,
+  if (auth.configured && !auth.user) {
+    if (wantsRedirect(request)) {
+      return NextResponse.redirect(
+        new URL(`/${parsed.data.locale}/login?error=login-required`, request.url),
+        303,
+      );
+    }
+
+    return NextResponse.json({ error: "Login required" }, { status: 401 });
+  }
+
+  if (!hasSupabaseAdminConfig()) {
+    const demoRmaId = crypto.randomUUID();
+    if (wantsRedirect(request)) {
+      const accountUrl = new URL(`/${parsed.data.locale}/account`, request.url);
+      accountUrl.searchParams.set("rma", demoRmaId);
+      accountUrl.searchParams.set("status", "submitted");
+      return NextResponse.redirect(accountUrl, 303);
+    }
+
+    return NextResponse.json({
+      rmaId: demoRmaId,
+      rmaNumber: `RMA-DEMO-${demoRmaId.slice(0, 6).toUpperCase()}`,
       status: "submitted",
-      order_number: parsed.data.orderNumber,
+    });
+  }
+
+  if (!auth.user) {
+    return NextResponse.json({ error: "Login required" }, { status: 401 });
+  }
+
+  let result: { rmaId: string; rmaNumber: string };
+  try {
+    result = await createAccountRma({
+      orderId: parsed.data.orderNumber,
       sku: parsed.data.sku,
       quantity: parsed.data.quantity,
-      issue_type: parsed.data.issueType,
-      description: parsed.data.description || null,
+      issueType: parsed.data.issueType,
+      description: parsed.data.description,
+      user: auth.user,
     });
-
-    if (error) {
-      if (wantsRedirect(request)) {
-        const rmaUrl = new URL(`/${parsed.data.locale}/rma`, request.url);
-        rmaUrl.searchParams.set("error", error.message);
-        return NextResponse.redirect(rmaUrl, 303);
-      }
-
-      return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    if (wantsRedirect(request)) {
+      const rmaUrl = new URL(`/${parsed.data.locale}/rma`, request.url);
+      rmaUrl.searchParams.set(
+        "error",
+        error instanceof Error ? error.message : "rma_failed",
+      );
+      return NextResponse.redirect(rmaUrl, 303);
     }
 
-    try {
-      await recordRmaEvent({
-        supabase,
-        rmaId,
-        eventType: "rma_submitted",
-        title: "RMA submitted",
-        body: "Customer submitted a return request.",
-        actorProfileId: auth.user?.id,
-        metadata: {
-          rmaNumber,
-          sku: parsed.data.sku,
-          quantity: parsed.data.quantity,
-          issueType: parsed.data.issueType,
-        },
-      });
-    } catch (eventError) {
-      console.error("Failed to record RMA submission event", eventError);
-    }
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "RMA failed" },
+      { status: 400 },
+    );
   }
 
   if (wantsRedirect(request)) {
-    const accountUrl = new URL(`/${parsed.data.locale}/account`, request.url);
-    accountUrl.searchParams.set("rma", rmaId);
-    accountUrl.searchParams.set("status", "submitted");
+    const accountUrl = new URL(
+      `/${parsed.data.locale}/account/rma/${result.rmaId}`,
+      request.url,
+    );
+    accountUrl.searchParams.set("saved", "created");
     return NextResponse.redirect(accountUrl, 303);
   }
 
   return NextResponse.json({
-    rmaId,
-    rmaNumber,
+    rmaId: result.rmaId,
+    rmaNumber: result.rmaNumber,
     status: "submitted",
   });
 }

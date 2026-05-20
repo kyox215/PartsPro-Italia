@@ -3,6 +3,7 @@ import {
   WorkspaceShell,
   type WorkspaceNavItem,
 } from "@/components/workspace-shell";
+import { formatAccountRole } from "@/lib/account-display";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
 
@@ -66,7 +67,7 @@ export default async function AccountLayout({
       navItems={navItems}
       locale={locale}
       identityEmail={auth.user?.email ?? (!auth.configured ? "demo-customer" : undefined)}
-      identityRole={auth.role ?? (auth.configured ? "retail" : "demo")}
+      identityRole={formatAccountRole(auth, locale)}
       showSignOut={Boolean(auth.user)}
     >
       {children}
