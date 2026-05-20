@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { recordAdminActivity } from "@/lib/admin-audit";
+import { redirectOnInvalidAdminCsrf } from "@/lib/admin-security";
 import { assertAdmin } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
 import {
@@ -22,6 +24,9 @@ export async function POST(request: Request) {
     );
     return NextResponse.redirect(backUrl, 303);
   }
+
+  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
+  if (csrfRedirect) return csrfRedirect;
 
   const admin = await assertAdmin();
   if (!admin.ok) {
@@ -52,6 +57,20 @@ export async function POST(request: Request) {
     backUrl.searchParams.set("error", error.message);
     return NextResponse.redirect(backUrl, 303);
   }
+
+  await recordAdminActivity({
+    request,
+    actor: admin.context,
+    action: "inventory.settings.update",
+    entityType: "inventory_settings",
+    entityId: "default",
+    afterData: {
+      b2bMarkup: payload.b2bMarkup,
+      retailMarkup: payload.retailMarkup,
+      preorderLeadTimeMinDays: payload.preorderLeadTimeMinDays,
+      preorderLeadTimeMaxDays: payload.preorderLeadTimeMaxDays,
+    },
+  });
 
   backUrl.searchParams.set("settings", "1");
   return NextResponse.redirect(backUrl, 303);

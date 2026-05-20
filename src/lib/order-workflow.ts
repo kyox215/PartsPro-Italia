@@ -61,6 +61,8 @@ type WorkflowOrder = {
   payment_method: string;
   payment_status?: string | null;
   fulfillment_status?: string | null;
+  total?: number | string | null;
+  currency?: string | null;
   released_at?: string | null;
   fulfilled_at?: string | null;
   order_items?: WorkflowOrderItem[] | null;
@@ -73,15 +75,6 @@ type WorkflowOrderItem = {
   stock_qty?: number | null;
   preorder_qty?: number | null;
   fulfillment_type?: string | null;
-};
-
-type InventoryRow = {
-  id: string;
-  sku_id: string;
-  stock_on_hand: number;
-  stock_reserved: number;
-  incoming_qty: number;
-  incoming_reserved: number;
 };
 
 export function getPaymentStatus(paymentMethod: PaymentMethod) {
@@ -257,97 +250,155 @@ export async function reserveSupabaseInventory(
   }
 }
 
+export async function createSupabaseOrderWithReservations({
+  supabase,
+  orderId,
+  profileId,
+  status,
+  paymentStatus,
+  fulfillmentStatus,
+  reservationExpiresAt,
+  reservedAt,
+  paymentMethod,
+  email,
+  customerName,
+  companyName,
+  vatNumber,
+  fiscalCode,
+  sdi,
+  pec,
+  shippingAddress,
+  currency = "EUR",
+  metadata,
+  lines,
+}: {
+  supabase: SupabaseClient;
+  orderId: string;
+  profileId: string;
+  status: string;
+  paymentStatus: string;
+  fulfillmentStatus: string;
+  reservationExpiresAt: string;
+  reservedAt: string;
+  paymentMethod: PaymentMethod;
+  email?: string | null;
+  customerName?: string | null;
+  companyName?: string | null;
+  vatNumber?: string | null;
+  fiscalCode?: string | null;
+  sdi?: string | null;
+  pec?: string | null;
+  shippingAddress?: string | null;
+  currency?: string;
+  metadata: Record<string, unknown>;
+  lines: OrderLine[];
+}) {
+  const payload = {
+    order_id: orderId,
+    profile_id: profileId,
+    status,
+    payment_status: paymentStatus,
+    fulfillment_status: fulfillmentStatus,
+    reservation_expires_at: reservationExpiresAt,
+    reserved_at: reservedAt,
+    payment_method: paymentMethod,
+    email,
+    customer_name: customerName,
+    company_name: companyName,
+    vat_number: vatNumber,
+    fiscal_code: fiscalCode,
+    sdi,
+    pec,
+    shipping_address: shippingAddress,
+    currency,
+    metadata,
+    lines: lines.map((line) => ({
+      sku_id: line.skuId,
+      inventory_id: line.inventoryId,
+      sku: line.sku,
+      name: line.name,
+      quantity: line.quantity,
+      unit_price: line.totals.unitPrice,
+      vat_rate: line.vatRate,
+    })),
+  };
+
+  const { data, error } = await supabase.rpc("create_order_with_reservations", {
+    payload,
+  });
+
+  if (error) throw new Error(error.message);
+  return data as {
+    order_id: string;
+    subtotal: number;
+    vat: number;
+    total: number;
+    line_count: number;
+    fulfillment_status: string;
+    reservation_expires_at: string;
+  };
+}
+
 export async function releaseOrderReservations({
   orderId,
   paymentStatus = "cancelled",
   status = "cancelled",
   note = "Order reservation released",
+  actorProfileId,
 }: {
   orderId: string;
   paymentStatus?: "cancelled" | "failed";
   status?: "cancelled";
   note?: string;
+  actorProfileId?: string | null;
 }) {
   if (!hasSupabaseAdminConfig()) {
     return { released: 0, demoMode: true };
   }
 
   const supabase = getSupabaseAdminClient();
-  const order = await loadWorkflowOrder(supabase, orderId);
-  if (!order || order.released_at || order.fulfilled_at) {
-    return { released: 0, demoMode: false };
-  }
-
-  const skuMap = await getSkuIdMap(
-    supabase,
-    (order.order_items ?? []).map((item) => item.sku),
-  );
-  let released = 0;
-
-  for (const item of order.order_items ?? []) {
-    const skuId = skuMap.get(item.sku);
-    if (!skuId) continue;
-    const stockQty = Number(item.stock_qty ?? 0);
-    const preorderQty = Number(item.preorder_qty ?? 0);
-    if (stockQty <= 0 && preorderQty <= 0) continue;
-
-    const inventory = await loadMainInventory(supabase, skuId);
-    if (!inventory) continue;
-
-    const { error } = await supabase
-      .from("inventory")
-      .update({
-        stock_reserved: Math.max(Number(inventory.stock_reserved ?? 0) - stockQty, 0),
-        incoming_reserved: Math.max(
-          Number(inventory.incoming_reserved ?? 0) - preorderQty,
-          0,
-        ),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", inventory.id);
-
-    if (error) throw new Error(error.message);
-
-    await insertInventoryMovement(supabase, {
-      skuId,
-      orderId,
-      movementType: "release_reservation",
-      quantity: stockQty + preorderQty,
-      reservedDelta: -stockQty,
-      incomingReservedDelta: -preorderQty,
-      note,
-    });
-    released += stockQty + preorderQty;
-  }
-
-  const now = new Date().toISOString();
-  const { error } = await supabase
-    .from("orders")
-    .update({
-      status,
-      payment_status: paymentStatus,
-      fulfillment_status: "cancelled",
-      released_at: now,
-      cancelled_at: now,
-      updated_at: now,
-      admin_note: note,
-    })
-    .eq("id", orderId);
+  const { data, error } = await supabase.rpc("release_order_reservations", {
+    p_order_id: orderId,
+    p_payment_status: paymentStatus,
+    p_order_status: status,
+    p_note: note,
+  });
 
   if (error) throw new Error(error.message);
-  return { released, demoMode: false };
+  const result = {
+    ...((data as Record<string, unknown> | null) ?? {}),
+    released: Number((data as { released?: number } | null)?.released ?? 0),
+    demoMode: false,
+  };
+  await tryRecordOrderEvent({
+    supabase,
+    orderId,
+    eventType: "reservation_released",
+    title: note,
+    body: `Released ${Number((data as { released?: number } | null)?.released ?? 0)} reserved units.`,
+    actorProfileId,
+    metadata: {
+      paymentStatus,
+      status,
+      result: data,
+    },
+  });
+  return result;
 }
 
 export async function markOrderPaid({
   orderId,
   stripeCheckoutSessionId,
   note,
+  actorProfileId,
 }: {
   orderId: string;
   stripeCheckoutSessionId?: string;
   note?: string;
+  actorProfileId?: string | null;
 }) {
   const supabase = getSupabaseAdminClient();
+  const order = await loadWorkflowOrder(supabase, orderId);
   const now = new Date().toISOString();
   const payload: Record<string, string> = {
     status: "paid",
@@ -366,14 +417,53 @@ export async function markOrderPaid({
 
   const { error } = await supabase.from("orders").update(payload).eq("id", orderId);
   if (error) throw new Error(error.message);
+
+  await tryRecordOrderPaymentRecord({
+    supabase,
+    orderId,
+    paymentMethod:
+      order?.payment_method === "stripe" ||
+      order?.payment_method === "cash" ||
+      order?.payment_method === "bank_transfer"
+        ? order.payment_method
+        : stripeCheckoutSessionId
+          ? "stripe"
+          : "bank_transfer",
+    paymentStatus: "paid",
+    amount: Number(order?.total ?? 0),
+    currency: order?.currency ?? "EUR",
+    provider: stripeCheckoutSessionId ? "stripe" : order?.payment_method ?? null,
+    providerReference: stripeCheckoutSessionId,
+    recordedBy: actorProfileId,
+    note: note ?? "Payment marked paid",
+    metadata: {
+      stripeCheckoutSessionId: stripeCheckoutSessionId ?? null,
+      source: stripeCheckoutSessionId ? "stripe_webhook" : "admin_manual",
+    },
+  });
+
+  await tryRecordOrderEvent({
+    supabase,
+    orderId,
+    eventType: "payment_paid",
+    title: note ?? "Payment marked paid",
+    body: `Payment confirmed for ${Number(order?.total ?? 0).toFixed(2)} ${order?.currency ?? "EUR"}.`,
+    actorProfileId,
+    metadata: {
+      paymentMethod: order?.payment_method ?? null,
+      stripeCheckoutSessionId: stripeCheckoutSessionId ?? null,
+    },
+  });
 }
 
 export async function confirmManualPayment({
   orderId,
   expectedMethod,
+  actorProfileId,
 }: {
   orderId: string;
   expectedMethod: "cash" | "bank_transfer";
+  actorProfileId?: string | null;
 }) {
   const supabase = getSupabaseAdminClient();
   const order = await loadWorkflowOrder(supabase, orderId);
@@ -383,6 +473,7 @@ export async function confirmManualPayment({
   }
   await markOrderPaid({
     orderId,
+    actorProfileId,
     note:
       expectedMethod === "cash"
         ? "Cash payment confirmed by admin"
@@ -390,7 +481,7 @@ export async function confirmManualPayment({
   });
 }
 
-export async function startOrderPicking(orderId: string) {
+export async function startOrderPicking(orderId: string, actorProfileId?: string | null) {
   const supabase = getSupabaseAdminClient();
   const now = new Date().toISOString();
   const { error } = await supabase
@@ -402,183 +493,92 @@ export async function startOrderPicking(orderId: string) {
     })
     .eq("id", orderId);
   if (error) throw new Error(error.message);
+  await tryRecordOrderEvent({
+    supabase,
+    orderId,
+    eventType: "picking_started",
+    title: "Picking started",
+    body: "Admin moved the order into picking.",
+    actorProfileId,
+  });
 }
 
-export async function allocatePreorderStock(orderId: string) {
+export async function allocatePreorderStock(
+  orderId: string,
+  actorProfileId?: string | null,
+) {
   const supabase = getSupabaseAdminClient();
-  const order = await loadWorkflowOrder(supabase, orderId);
-  if (!order) throw new Error("Order not found.");
-
-  const preorderItems = (order.order_items ?? []).filter(
-    (item) => Number(item.preorder_qty ?? 0) > 0,
-  );
-  const skuMap = await getSkuIdMap(
-    supabase,
-    preorderItems.map((item) => item.sku),
-  );
-  let allocated = 0;
-
-  for (const item of preorderItems) {
-    const preorderQty = Number(item.preorder_qty ?? 0);
-    const skuId = skuMap.get(item.sku);
-    if (!skuId || preorderQty <= 0) continue;
-
-    const inventory = await loadMainInventory(supabase, skuId);
-    if (!inventory) throw new Error(`Inventory row missing for SKU ${item.sku}.`);
-
-    const availableStock = Math.max(
-      Number(inventory.stock_on_hand ?? 0) - Number(inventory.stock_reserved ?? 0),
-      0,
-    );
-
-    if (availableStock < preorderQty) {
-      throw new Error(
-        `SKU ${item.sku} needs ${preorderQty} arrived units, only ${availableStock} available.`,
-      );
-    }
-
-    const { error: inventoryError } = await supabase
-      .from("inventory")
-      .update({
-        stock_reserved: Number(inventory.stock_reserved ?? 0) + preorderQty,
-        incoming_reserved: Math.max(
-          Number(inventory.incoming_reserved ?? 0) - preorderQty,
-          0,
-        ),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", inventory.id);
-
-    if (inventoryError) throw new Error(inventoryError.message);
-
-    const nextStockQty = Number(item.stock_qty ?? 0) + preorderQty;
-    const { error: itemError } = await supabase
-      .from("order_items")
-      .update({
-        stock_qty: nextStockQty,
-        preorder_qty: 0,
-        fulfillment_type: "stock",
-      })
-      .eq("id", item.id);
-
-    if (itemError) throw new Error(itemError.message);
-
-    await insertInventoryMovement(supabase, {
-      skuId,
-      orderId,
-      movementType: "allocate_preorder",
-      quantity: preorderQty,
-      reservedDelta: preorderQty,
-      incomingReservedDelta: -preorderQty,
-      note: "Arrived preorder stock allocated to order",
-    });
-    allocated += preorderQty;
-  }
-
-  const now = new Date().toISOString();
-  const { error } = await supabase
-    .from("orders")
-    .update({
-      fulfillment_status: "reserved",
-      updated_at: now,
-      admin_note: allocated > 0 ? `Allocated ${allocated} preorder units` : "No preorder units to allocate",
-    })
-    .eq("id", orderId);
-
+  const { data, error } = await supabase.rpc("allocate_order_preorders", {
+    p_order_id: orderId,
+  });
   if (error) throw new Error(error.message);
-  return { allocated };
+  const result = {
+    ...((data as Record<string, unknown> | null) ?? {}),
+    allocated: Number((data as { allocated?: number } | null)?.allocated ?? 0),
+  };
+  await tryRecordOrderEvent({
+    supabase,
+    orderId,
+    eventType: "preorder_allocated",
+    title: "Preorder stock allocated",
+    body: `Allocated ${result.allocated} preorder units to this order.`,
+    actorProfileId,
+    metadata: result,
+  });
+  return result;
 }
 
 export async function shipOrPickupOrder({
   orderId,
   mode,
+  actorProfileId,
 }: {
   orderId: string;
   mode: "shipped" | "picked_up";
+  actorProfileId?: string | null;
 }) {
   const supabase = getSupabaseAdminClient();
-  const order = await loadWorkflowOrder(supabase, orderId);
-  if (!order) throw new Error("Order not found.");
-  if (order.fulfilled_at) return { deducted: 0 };
-
-  const remainingPreorder = (order.order_items ?? []).reduce(
-    (sum, item) => sum + Number(item.preorder_qty ?? 0),
-    0,
-  );
-  if (remainingPreorder > 0) {
-    throw new Error("Allocate preorder stock before shipping or pickup.");
-  }
-
-  const skuMap = await getSkuIdMap(
+  const { data, error } = await supabase.rpc("ship_or_pickup_order", {
+    p_order_id: orderId,
+    p_mode: mode,
+  });
+  if (error) throw new Error(error.message);
+  const result = {
+    ...((data as Record<string, unknown> | null) ?? {}),
+    deducted: Number((data as { deducted?: number } | null)?.deducted ?? 0),
+  };
+  await tryRecordOrderEvent({
     supabase,
-    (order.order_items ?? []).map((item) => item.sku),
-  );
-  let deducted = 0;
-
-  for (const item of order.order_items ?? []) {
-    const qty = Number(item.stock_qty ?? item.quantity ?? 0);
-    if (qty <= 0) continue;
-    const skuId = skuMap.get(item.sku);
-    if (!skuId) continue;
-    const inventory = await loadMainInventory(supabase, skuId);
-    if (!inventory) throw new Error(`Inventory row missing for SKU ${item.sku}.`);
-    if (Number(inventory.stock_on_hand ?? 0) < qty) {
-      throw new Error(`SKU ${item.sku} has insufficient physical stock to ship.`);
-    }
-
-    const { error } = await supabase
-      .from("inventory")
-      .update({
-        stock_on_hand: Math.max(Number(inventory.stock_on_hand ?? 0) - qty, 0),
-        stock_reserved: Math.max(Number(inventory.stock_reserved ?? 0) - qty, 0),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", inventory.id);
-
-    if (error) throw new Error(error.message);
-
-    await insertInventoryMovement(supabase, {
-      skuId,
-      orderId,
-      movementType: "ship_stock",
-      quantity: qty,
-      stockDelta: -qty,
-      reservedDelta: -qty,
-      note: mode === "shipped" ? "Order shipped" : "Order picked up",
-    });
-    deducted += qty;
-  }
-
-  const now = new Date().toISOString();
-  const { error } = await supabase
-    .from("orders")
-    .update({
-      status: mode === "shipped" ? "shipped" : "completed",
-      fulfillment_status: mode,
-      fulfilled_at: now,
-      updated_at: now,
-    })
-    .eq("id", orderId);
-
-  if (error) throw new Error(error.message);
-  return { deducted };
+    orderId,
+    eventType: mode === "shipped" ? "order_shipped" : "order_picked_up",
+    title: mode === "shipped" ? "Order shipped" : "Order picked up",
+    body: `Deducted ${result.deducted} physical stock units.`,
+    actorProfileId,
+    metadata: result,
+  });
+  return result;
 }
 
-export async function completeOrder(orderId: string) {
+export async function completeOrder(orderId: string, actorProfileId?: string | null) {
   const supabase = getSupabaseAdminClient();
-  const now = new Date().toISOString();
-  const { error } = await supabase
-    .from("orders")
-    .update({
-      status: "completed",
-      fulfillment_status: "completed",
-      updated_at: now,
-    })
-    .eq("id", orderId);
+  const { error } = await supabase.rpc("complete_order_workflow", {
+    p_order_id: orderId,
+  });
   if (error) throw new Error(error.message);
+  await tryRecordOrderEvent({
+    supabase,
+    orderId,
+    eventType: "order_completed",
+    title: "Order completed",
+    body: "Admin marked the order as completed.",
+    actorProfileId,
+  });
 }
 
-export async function extendOrderReservation(orderId: string) {
+export async function extendOrderReservation(
+  orderId: string,
+  actorProfileId?: string | null,
+) {
   const supabase = getSupabaseAdminClient();
   const expiresAt = getReservationExpiry().toISOString();
   const { error } = await supabase
@@ -592,6 +592,17 @@ export async function extendOrderReservation(orderId: string) {
     .is("released_at", null);
 
   if (error) throw new Error(error.message);
+  await tryRecordOrderEvent({
+    supabase,
+    orderId,
+    eventType: "reservation_extended",
+    title: "Reservation extended",
+    body: `Reservation extended until ${expiresAt}.`,
+    actorProfileId,
+    metadata: {
+      reservationExpiresAt: expiresAt,
+    },
+  });
   return { reservationExpiresAt: expiresAt };
 }
 
@@ -625,44 +636,109 @@ export async function releaseExpiredReservations() {
   return { processed: data?.length ?? 0, released, demoMode: false };
 }
 
+export async function recordOrderEvent({
+  supabase,
+  orderId,
+  eventType,
+  title,
+  body,
+  actorProfileId,
+  metadata = {},
+}: {
+  supabase?: SupabaseClient;
+  orderId: string;
+  eventType: string;
+  title: string;
+  body?: string | null;
+  actorProfileId?: string | null;
+  metadata?: Record<string, unknown>;
+}) {
+  if (!hasSupabaseAdminConfig()) return;
+  const client = supabase ?? getSupabaseAdminClient();
+  const { error } = await client.from("order_timeline_events").insert({
+    order_id: orderId,
+    event_type: eventType,
+    title,
+    body: body ?? null,
+    actor_profile_id: actorProfileId ?? null,
+    metadata,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function recordOrderPaymentRecord({
+  supabase,
+  orderId,
+  paymentMethod,
+  paymentStatus,
+  amount,
+  currency = "EUR",
+  provider,
+  providerReference,
+  recordedBy,
+  note,
+  metadata = {},
+}: {
+  supabase?: SupabaseClient;
+  orderId: string;
+  paymentMethod: PaymentMethod;
+  paymentStatus: string;
+  amount: number;
+  currency?: string | null;
+  provider?: string | null;
+  providerReference?: string | null;
+  recordedBy?: string | null;
+  note?: string | null;
+  metadata?: Record<string, unknown>;
+}) {
+  if (!hasSupabaseAdminConfig()) return;
+  const client = supabase ?? getSupabaseAdminClient();
+  const { error } = await client.from("order_payment_records").insert({
+    order_id: orderId,
+    payment_method: paymentMethod,
+    payment_status: paymentStatus,
+    amount,
+    currency: currency ?? "EUR",
+    provider: provider ?? null,
+    provider_reference: providerReference ?? null,
+    recorded_by: recordedBy ?? null,
+    note: note ?? null,
+    metadata,
+  });
+  if (error) throw new Error(error.message);
+}
+
+async function tryRecordOrderEvent(
+  payload: Parameters<typeof recordOrderEvent>[0],
+) {
+  try {
+    await recordOrderEvent(payload);
+  } catch (error) {
+    console.error("Failed to record order event", error);
+  }
+}
+
+async function tryRecordOrderPaymentRecord(
+  payload: Parameters<typeof recordOrderPaymentRecord>[0],
+) {
+  try {
+    await recordOrderPaymentRecord(payload);
+  } catch (error) {
+    console.error("Failed to record order payment record", error);
+  }
+}
+
 async function loadWorkflowOrder(supabase: SupabaseClient, orderId: string) {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, status, payment_method, payment_status, fulfillment_status, released_at, fulfilled_at, order_items ( id, sku, quantity, stock_qty, preorder_qty, fulfillment_type )",
+      "id, status, payment_method, payment_status, fulfillment_status, total, currency, released_at, fulfilled_at, order_items ( id, sku, quantity, stock_qty, preorder_qty, fulfillment_type )",
     )
     .eq("id", orderId)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
   return data as WorkflowOrder | null;
-}
-
-async function getSkuIdMap(supabase: SupabaseClient, skus: string[]) {
-  const uniqueSkus = [...new Set(skus.filter(Boolean))];
-  const result = new Map<string, string>();
-  if (uniqueSkus.length === 0) return result;
-
-  const { data, error } = await supabase
-    .from("skus")
-    .select("id, sku")
-    .in("sku", uniqueSkus);
-
-  if (error) throw new Error(error.message);
-  (data ?? []).forEach((row) => result.set(row.sku, row.id));
-  return result;
-}
-
-async function loadMainInventory(supabase: SupabaseClient, skuId: string) {
-  const { data, error } = await supabase
-    .from("inventory")
-    .select("id, sku_id, stock_on_hand, stock_reserved, incoming_qty, incoming_reserved")
-    .eq("sku_id", skuId)
-    .eq("warehouse_code", "MAIN")
-    .maybeSingle();
-
-  if (error) throw new Error(error.message);
-  return data as InventoryRow | null;
 }
 
 async function insertInventoryMovement(

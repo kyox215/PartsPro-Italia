@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import { recordAdminActivity } from "@/lib/admin-audit";
+import {
+  getAdminBackUrl,
+  redirectOnInvalidAdminCsrf,
+} from "@/lib/admin-security";
 import { assertAdmin } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
 import {
@@ -13,13 +18,20 @@ export async function POST(request: Request) {
   const rawBody = await parseRequestBody(request);
   const parsed = adminProductStateSchema.safeParse(rawBody);
   const locale = rawBody.locale === "zh" ? "zh" : "it";
-  const returnTo = String(rawBody.returnTo || `/${locale}/admin/products`);
-  const backUrl = new URL(returnTo, request.url);
+  const backUrl = getAdminBackUrl(request, {
+    locale,
+    returnTo: rawBody.returnTo,
+    fallbackPath: "/admin/products",
+    allowedPrefixes: ["/admin/products"],
+  });
 
   if (!parsed.success) {
     backUrl.searchParams.set("error", parsed.error.issues.map((issue) => issue.message).join(", "));
     return NextResponse.redirect(backUrl, 303);
   }
+
+  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
+  if (csrfRedirect) return csrfRedirect;
 
   const admin = await assertAdmin();
   if (!admin.ok) {
@@ -53,6 +65,19 @@ export async function POST(request: Request) {
     backUrl.searchParams.set("error", skuError.message);
     return NextResponse.redirect(backUrl, 303);
   }
+
+  await recordAdminActivity({
+    request,
+    actor: admin.context,
+    action: "product.publish",
+    entityType: "sku",
+    entityId: parsed.data.skuId,
+    afterData: {
+      productId: parsed.data.productId,
+      skuId: parsed.data.skuId,
+      isActive: true,
+    },
+  });
 
   backUrl.searchParams.set("published", "1");
   return NextResponse.redirect(backUrl, 303);

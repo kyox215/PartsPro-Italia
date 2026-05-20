@@ -1,4 +1,5 @@
 import { Search } from "lucide-react";
+import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
 import {
   AdminActionRail,
   AdminButtonLink,
@@ -117,6 +118,7 @@ export default async function AdminProductsPage({
               summary={locale === "it" ? "Batch products/skus" : "批量导入 products/skus"}
             >
               <form action="/api/admin/catalog/import" method="post" className="flex flex-wrap gap-2">
+                <AdminCsrfField />
                 <input type="hidden" name="locale" value={locale} />
                 <AdminInput
                   className="w-28"
@@ -141,6 +143,7 @@ export default async function AdminProductsPage({
               summary={locale === "it" ? "Filtri dinamici" : "动态筛选字段"}
             >
               <form action="/api/admin/catalog/attributes" method="post" className="grid gap-2">
+                <AdminCsrfField />
                 <input type="hidden" name="locale" value={locale} />
                 <AdminInput name="key" label="Key" defaultValue="screen_technology" />
                 <AdminInput name="labelIt" label="Label IT" defaultValue="Tecnologia display" />
@@ -172,6 +175,7 @@ export default async function AdminProductsPage({
               summary={locale === "it" ? "Genera nomi ZH" : "批量生成中文名"}
             >
               <form action="/api/admin/catalog/translations" method="post" className="grid gap-2">
+                <AdminCsrfField />
                 <input type="hidden" name="locale" value={locale} />
                 <input type="hidden" name="mode" value="batch" />
                 <AdminInput name="limit" defaultValue="300" type="number" min="1" max="1000" label="Limit" />
@@ -190,6 +194,7 @@ export default async function AdminProductsPage({
               summary={locale === "it" ? "Prodotto + inventory" : "商品 + 库存"}
             >
               <form action="/api/admin/products" method="post" className="grid gap-2">
+                <AdminCsrfField />
                 <input type="hidden" name="locale" value={locale} />
                 <AdminInput name="slug" label="Slug" defaultValue="iphone-15-pro-soft-oled-display" />
                 <AdminInput name="sku" label="SKU" defaultValue="APL-IP15P-SCR-SO-BLK" />
@@ -233,6 +238,7 @@ export default async function AdminProductsPage({
               summary={locale === "it" ? "Filtro corrente" : "当前筛选结果"}
             >
               <form action="/api/admin/products/bulk" method="post" className="grid gap-2">
+                <AdminCsrfField />
                 <input type="hidden" name="locale" value={locale} />
                 <input type="hidden" name="ids" value={visibleRows.map((row) => row.skuId).join(",")} />
                 <AdminSelect name="action" label={locale === "it" ? "Azione" : "操作"} defaultValue="publish">
@@ -316,6 +322,7 @@ export default async function AdminProductsPage({
                         method="post"
                         className="grid min-w-[260px] gap-2"
                       >
+                        <AdminCsrfField />
                         <input type="hidden" name="locale" value={locale} />
                         <input type="hidden" name="mode" value="manual" />
                         <input type="hidden" name="productId" value={row.productId} />

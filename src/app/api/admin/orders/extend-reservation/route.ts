@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import { recordAdminActivity } from "@/lib/admin-audit";
+import {
+  getAdminBackUrl,
+  redirectOnInvalidAdminCsrf,
+} from "@/lib/admin-security";
 import { assertAdmin } from "@/lib/auth";
 import { extendOrderReservation } from "@/lib/order-workflow";
 import { parseRequestBody } from "@/lib/request";
@@ -11,7 +16,12 @@ export async function POST(request: Request) {
   const rawBody = await parseRequestBody(request);
   const parsed = adminOrderWorkflowSchema.safeParse(rawBody);
   const locale = String(rawBody.locale ?? "it");
-  const backUrl = getBackUrl(request, locale, rawBody.returnTo, rawBody.id);
+  const backUrl = getAdminBackUrl(request, {
+    locale,
+    returnTo: rawBody.returnTo,
+    fallbackPath: `/admin/orders/${String(rawBody.id ?? "")}`,
+    allowedPrefixes: ["/admin/orders"],
+  });
 
   if (!parsed.success) {
     backUrl.searchParams.set(
@@ -20,6 +30,9 @@ export async function POST(request: Request) {
     );
     return NextResponse.redirect(backUrl, 303);
   }
+
+  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
+  if (csrfRedirect) return csrfRedirect;
 
   const admin = await assertAdmin();
   if (!admin.ok) {
@@ -33,7 +46,17 @@ export async function POST(request: Request) {
   }
 
   try {
-    await extendOrderReservation(parsed.data.id);
+    await extendOrderReservation(parsed.data.id, admin.context.user?.id);
+    await recordAdminActivity({
+      request,
+      actor: admin.context,
+      action: "order.extend_reservation",
+      entityType: "order",
+      entityId: parsed.data.id,
+      afterData: {
+        extendedHours: 24,
+      },
+    });
     backUrl.searchParams.set("saved", "extended");
   } catch (error) {
     backUrl.searchParams.set(
@@ -43,20 +66,4 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.redirect(backUrl, 303);
-}
-
-function getBackUrl(
-  request: Request,
-  locale: string,
-  returnTo: unknown,
-  id: unknown,
-) {
-  if (
-    typeof returnTo === "string" &&
-    returnTo.startsWith(`/${locale}/admin/orders`)
-  ) {
-    return new URL(returnTo, request.url);
-  }
-
-  return new URL(`/${locale}/admin/orders/${String(id ?? "")}`, request.url);
 }

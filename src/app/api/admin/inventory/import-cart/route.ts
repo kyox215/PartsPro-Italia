@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
+import { recordAdminActivity } from "@/lib/admin-audit";
+import { redirectOnInvalidAdminCsrf } from "@/lib/admin-security";
 import { assertAdmin } from "@/lib/auth";
 import {
   parseSupplierCartWorkbook,
@@ -20,6 +22,9 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const locale = String(formData.get("locale") ?? "zh");
   const backUrl = new URL(`/${locale}/admin/inventory`, request.url);
+  const csrfRedirect = redirectOnInvalidAdminCsrf(request, formData, backUrl);
+  if (csrfRedirect) return csrfRedirect;
+
   const admin = await assertAdmin();
 
   if (!admin.ok) {
@@ -46,6 +51,20 @@ export async function POST(request: Request) {
     await syncSupplierCartTranslations(supabase, payload);
 
     const result = Array.isArray(data) ? data[0] : data;
+    await recordAdminActivity({
+      request,
+      actor: admin.context,
+      action: "inventory.import_supplier_cart",
+      entityType: "supplier_purchase_order",
+      entityId: result?.purchase_order_id ?? null,
+      afterData: {
+        filename,
+        imported: result?.imported ?? 0,
+        processed: result?.processed ?? rows.length,
+        skipped: result?.skipped ?? 0,
+        orderedQty: result?.ordered_qty ?? 0,
+      },
+    });
     backUrl.searchParams.set("imported", String(result?.imported ?? 0));
     backUrl.searchParams.set("processed", String(result?.processed ?? rows.length));
     backUrl.searchParams.set("skipped", String(result?.skipped ?? 0));

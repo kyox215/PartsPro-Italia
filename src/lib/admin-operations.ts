@@ -41,6 +41,26 @@ export type AdminOrderRow = {
     preorderLeadTimeMinDays?: number | null;
     preorderLeadTimeMaxDays?: number | null;
   }>;
+  paymentRecords: Array<{
+    id: string;
+    paymentMethod: string;
+    paymentStatus: string;
+    amount: number;
+    currency: string;
+    provider?: string | null;
+    providerReference?: string | null;
+    recordedBy?: string | null;
+    note?: string | null;
+    createdAt: string;
+  }>;
+  timelineEvents: Array<{
+    id: string;
+    eventType: string;
+    title: string;
+    body?: string | null;
+    actorProfileId?: string | null;
+    createdAt: string;
+  }>;
 };
 
 export type AdminB2BApplicationRow = {
@@ -54,6 +74,7 @@ export type AdminB2BApplicationRow = {
 
 export type AdminRmaRow = {
   id: string;
+  rmaNumber?: string | null;
   orderId?: string | null;
   profileId?: string | null;
   status: string;
@@ -64,7 +85,20 @@ export type AdminRmaRow = {
   description: string | null;
   installationTested?: boolean | null;
   installed?: boolean | null;
+  resolutionType?: string | null;
+  resolutionNote?: string | null;
+  refundAmount?: number | null;
+  replacementSku?: string | null;
+  closedAt?: string | null;
   createdAt: string;
+  events: Array<{
+    id: string;
+    eventType: string;
+    title: string;
+    body?: string | null;
+    actorProfileId?: string | null;
+    createdAt: string;
+  }>;
 };
 
 export async function getAdminOrderRows(): Promise<AdminOrderRow[]> {
@@ -115,6 +149,17 @@ export async function getAdminOrderRows(): Promise<AdminOrderRow[]> {
             preorderLeadTimeMaxDays: 14,
           },
         ],
+        paymentRecords: [],
+        timelineEvents: [
+          {
+            id: "demo-event-1",
+            eventType: "order_created",
+            title: "Demo order created",
+            body: "Timeline events will appear here after real order actions.",
+            actorProfileId: null,
+            createdAt: new Date().toISOString(),
+          },
+        ],
       },
     ];
   }
@@ -145,7 +190,7 @@ export async function getAdminOrderById(
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("orders")
-    .select("*, order_items (*)")
+    .select("*, order_items (*), order_payment_records (*), order_timeline_events (*)")
     .eq("id", orderId)
     .maybeSingle();
 
@@ -206,6 +251,7 @@ export async function getAdminRmaRows(): Promise<AdminRmaRow[]> {
     return [
       {
         id: "demo-rma-1",
+        rmaNumber: "RMA-DEMO-001",
         orderId: "demo-order-1001",
         profileId: null,
         status: "submitted",
@@ -216,7 +262,22 @@ export async function getAdminRmaRows(): Promise<AdminRmaRow[]> {
         description: "Touch intermittente prima dell'installazione.",
         installationTested: true,
         installed: false,
+        resolutionType: null,
+        resolutionNote: null,
+        refundAmount: null,
+        replacementSku: null,
+        closedAt: null,
         createdAt: new Date().toISOString(),
+        events: [
+          {
+            id: "demo-rma-event-1",
+            eventType: "rma_submitted",
+            title: "Demo RMA submitted",
+            body: "RMA processing events will appear here.",
+            actorProfileId: null,
+            createdAt: new Date().toISOString(),
+          },
+        ],
       },
     ];
   }
@@ -225,7 +286,7 @@ export async function getAdminRmaRows(): Promise<AdminRmaRow[]> {
   const { data, error } = await supabase
     .from("rmas")
     .select(
-      "id, order_id, profile_id, status, order_number, sku, quantity, issue_type, description, installation_tested, installed, created_at",
+      "id, rma_number, order_id, profile_id, status, order_number, sku, quantity, issue_type, description, installation_tested, installed, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, created_at",
     )
     .order("created_at", { ascending: false })
     .limit(100);
@@ -248,7 +309,7 @@ export async function getAdminRmaById(rmaId: string): Promise<AdminRmaRow | null
   const { data, error } = await supabase
     .from("rmas")
     .select(
-      "id, order_id, profile_id, status, order_number, sku, quantity, issue_type, description, installation_tested, installed, created_at",
+      "id, rma_number, order_id, profile_id, status, order_number, sku, quantity, issue_type, description, installation_tested, installed, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, created_at, rma_events (*)",
     )
     .eq("id", rmaId)
     .maybeSingle();
@@ -364,6 +425,26 @@ function mapAdminOrder(order: {
     preorder_lead_time_min_days?: number | null;
     preorder_lead_time_max_days?: number | null;
   }> | null;
+  order_payment_records?: Array<{
+    id: string;
+    payment_method: string;
+    payment_status: string;
+    amount: number | string;
+    currency: string | null;
+    provider?: string | null;
+    provider_reference?: string | null;
+    recorded_by?: string | null;
+    note?: string | null;
+    created_at: string;
+  }> | null;
+  order_timeline_events?: Array<{
+    id: string;
+    event_type: string;
+    title: string;
+    body?: string | null;
+    actor_profile_id?: string | null;
+    created_at: string;
+  }> | null;
 }): AdminOrderRow {
   return {
     id: order.id,
@@ -402,11 +483,36 @@ function mapAdminOrder(order: {
       preorderLeadTimeMinDays: item.preorder_lead_time_min_days ?? null,
       preorderLeadTimeMaxDays: item.preorder_lead_time_max_days ?? null,
     })),
+    paymentRecords: (order.order_payment_records ?? [])
+      .map((record) => ({
+        id: record.id,
+        paymentMethod: record.payment_method,
+        paymentStatus: record.payment_status,
+        amount: Number(record.amount ?? 0),
+        currency: record.currency ?? "EUR",
+        provider: record.provider ?? null,
+        providerReference: record.provider_reference ?? null,
+        recordedBy: record.recorded_by ?? null,
+        note: record.note ?? null,
+        createdAt: record.created_at,
+      }))
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
+    timelineEvents: (order.order_timeline_events ?? [])
+      .map((event) => ({
+        id: event.id,
+        eventType: event.event_type,
+        title: event.title,
+        body: event.body ?? null,
+        actorProfileId: event.actor_profile_id ?? null,
+        createdAt: event.created_at,
+      }))
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
   };
 }
 
 function mapAdminRma(row: {
   id: string;
+  rma_number?: string | null;
   order_id?: string | null;
   profile_id?: string | null;
   status: string;
@@ -417,10 +523,24 @@ function mapAdminRma(row: {
   description: string | null;
   installation_tested?: boolean | null;
   installed?: boolean | null;
+  resolution_type?: string | null;
+  resolution_note?: string | null;
+  refund_amount?: number | string | null;
+  replacement_sku?: string | null;
+  closed_at?: string | null;
   created_at: string;
+  rma_events?: Array<{
+    id: string;
+    event_type: string;
+    title: string;
+    body?: string | null;
+    actor_profile_id?: string | null;
+    created_at: string;
+  }> | null;
 }): AdminRmaRow {
   return {
     id: row.id,
+    rmaNumber: row.rma_number ?? null,
     orderId: row.order_id,
     profileId: row.profile_id,
     status: row.status,
@@ -431,6 +551,24 @@ function mapAdminRma(row: {
     description: row.description,
     installationTested: row.installation_tested,
     installed: row.installed,
+    resolutionType: row.resolution_type ?? null,
+    resolutionNote: row.resolution_note ?? null,
+    refundAmount:
+      row.refund_amount === null || row.refund_amount === undefined
+        ? null
+        : Number(row.refund_amount),
+    replacementSku: row.replacement_sku ?? null,
+    closedAt: row.closed_at ?? null,
     createdAt: row.created_at,
+    events: (row.rma_events ?? [])
+      .map((event) => ({
+        id: event.id,
+        eventType: event.event_type,
+        title: event.title,
+        body: event.body ?? null,
+        actorProfileId: event.actor_profile_id ?? null,
+        createdAt: event.created_at,
+      }))
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
   };
 }

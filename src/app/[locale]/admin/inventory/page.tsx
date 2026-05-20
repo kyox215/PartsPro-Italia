@@ -4,6 +4,7 @@ import {
   PackageCheck,
   Truck,
 } from "lucide-react";
+import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
 import {
   AdminActionRail,
   AdminButtonLink,
@@ -121,6 +122,7 @@ export default async function AdminInventoryPage({
               summary={locale === "it" ? "Excel / path fallback" : "Excel / 本地路径"}
             >
               <form action="/api/admin/inventory/import-cart" encType="multipart/form-data" method="post" className="grid gap-2">
+                <AdminCsrfField />
                 <input type="hidden" name="locale" value={locale} />
                 <label className="block">
                   <span className="text-xs font-black uppercase tracking-wide text-stone-500">Excel</span>
@@ -138,6 +140,7 @@ export default async function AdminInventoryPage({
               summary={locale === "it" ? "Markup e lead time" : "加价和交期"}
             >
               <form action="/api/admin/inventory/settings" method="post" className="grid gap-2">
+                <AdminCsrfField />
                 <input type="hidden" name="locale" value={locale} />
                 <AdminInput name="b2bMarkup" label="B2B x" defaultValue={String(settings.b2bMarkup)} step="0.001" type="number" />
                 <AdminInput name="retailMarkup" label="Retail x" defaultValue={String(settings.retailMarkup)} step="0.001" type="number" />
@@ -154,6 +157,7 @@ export default async function AdminInventoryPage({
               summary={locale === "it" ? "Scrive movement" : "同步写入流水"}
             >
               <form action="/api/admin/inventory/adjust" method="post" className="grid gap-2">
+                <AdminCsrfField />
                 <input type="hidden" name="locale" value={locale} />
                 <AdminSelect name="skuId" label="SKU">
                   {productRows.map((row) => (
@@ -182,6 +186,7 @@ export default async function AdminInventoryPage({
               summary={locale === "it" ? "Alert, non acquisto auto" : "只预警不自动下单"}
             >
               <form action="/api/admin/inventory/reorder-settings" method="post" className="grid gap-2">
+                <AdminCsrfField />
                 <input type="hidden" name="locale" value={locale} />
                 <AdminSelect name="inventoryId" label="SKU">
                   {productRows.filter((row) => row.inventoryId).map((row) => (
@@ -241,6 +246,7 @@ export default async function AdminInventoryPage({
       >
         {openItems.length > 0 ? (
           <form action="/api/admin/inventory/receive" method="post">
+            <AdminCsrfField />
             <input type="hidden" name="locale" value={locale} />
             <input type="hidden" name="itemIds" value={openItemIds} />
             <AdminDataTable minWidth={1040}>

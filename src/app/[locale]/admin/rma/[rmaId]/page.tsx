@@ -53,7 +53,7 @@ export default async function AdminRmaDetailPage({
     <div className="space-y-3">
       <AdminPageHeader
         eyebrow={locale === "it" ? "RMA detail" : "RMA 详情"}
-        title={<span className="break-all font-mono">{rma.id}</span>}
+        title={<span className="break-all font-mono">{rma.rmaNumber ?? rma.id}</span>}
         description={
           locale === "it"
             ? "Dettaglio post-vendita per verifica tecnica, stato e collegamento ordine."
@@ -121,6 +121,8 @@ export default async function AdminRmaDetailPage({
       >
         <AdminPanel title={locale === "it" ? "Problema segnalato" : "客户反馈问题"}>
           <dl className="grid gap-3 text-sm">
+            <InfoRow label={locale === "it" ? "Numero RMA" : "RMA 编号"} value={rma.rmaNumber ?? "-"} />
+            <InfoRow label="ID" value={rma.id} />
             <InfoRow label="Issue" value={rma.issueType} />
             <InfoRow
               label={locale === "it" ? "Test pre-installazione" : "安装前测试"}
@@ -141,6 +143,80 @@ export default async function AdminRmaDetailPage({
             {rma.description || (locale === "it" ? "Nessuna descrizione." : "无描述。")}
           </p>
         </AdminPanel>
+
+        <div className="grid gap-3 xl:grid-cols-2">
+          <AdminPanel
+            title={locale === "it" ? "Esito pratica" : "处理结果"}
+            description={
+              locale === "it"
+                ? "Risultato operativo, rimborso o sostituzione."
+                : "记录退款、换货、拒绝或维修处理结果。"
+            }
+          >
+            <dl className="grid gap-3 text-sm">
+              <InfoRow label={locale === "it" ? "Tipo esito" : "处理类型"} value={rma.resolutionType ?? "-"} />
+              <InfoRow label={locale === "it" ? "SKU sostitutivo" : "换货 SKU"} value={rma.replacementSku ?? "-"} />
+              <InfoRow
+                label={locale === "it" ? "Rimborso" : "退款金额"}
+                value={
+                  rma.refundAmount === null || rma.refundAmount === undefined
+                    ? "-"
+                    : `${rma.refundAmount.toFixed(2)} EUR`
+                }
+              />
+              <InfoRow
+                label={locale === "it" ? "Chiuso" : "关闭时间"}
+                value={rma.closedAt ? formatDateTime(rma.closedAt, locale) : "-"}
+              />
+            </dl>
+            {rma.resolutionNote ? (
+              <p className="mt-4 whitespace-pre-wrap rounded-lg bg-stone-50 p-3 text-sm font-medium leading-6 text-stone-700">
+                {rma.resolutionNote}
+              </p>
+            ) : null}
+          </AdminPanel>
+
+          <AdminPanel
+            title={locale === "it" ? "Timeline RMA" : "售后时间线"}
+            description={
+              locale === "it"
+                ? "Storico delle azioni sulla pratica."
+                : "记录售后提交、状态流转和处理动作。"
+            }
+          >
+            {rma.events.length > 0 ? (
+              <ol className="grid gap-2">
+                {rma.events.map((event) => (
+                  <li
+                    key={event.id}
+                    className="rounded-lg border border-black/5 bg-white p-3 text-sm"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-black text-stone-950">{event.title}</p>
+                      <span className="rounded-full bg-stone-100 px-2 py-1 text-xs font-black text-stone-500">
+                        {event.eventType}
+                      </span>
+                    </div>
+                    {event.body ? (
+                      <p className="mt-2 text-xs font-semibold leading-5 text-stone-600">
+                        {event.body}
+                      </p>
+                    ) : null}
+                    <p className="mt-2 text-xs font-semibold text-stone-400">
+                      {formatDateTime(event.createdAt, locale)}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="rounded-lg bg-stone-50 p-3 text-sm font-semibold text-stone-500">
+                {locale === "it"
+                  ? "La timeline si popola con le prossime azioni."
+                  : "后续售后操作会自动写入这里。"}
+              </p>
+            )}
+          </AdminPanel>
+        </div>
       </AdminWorkspaceGrid>
     </div>
   );
@@ -187,4 +263,8 @@ function formatBoolean(value: boolean | null | undefined, locale: Locale) {
 
 function valueOf(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function formatDateTime(value: string, locale: Locale) {
+  return new Date(value).toLocaleString(locale === "it" ? "it-IT" : "zh-CN");
 }

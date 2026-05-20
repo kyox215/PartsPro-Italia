@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
 
 export function StatusSelectForm({
   action,
@@ -17,6 +18,7 @@ export function StatusSelectForm({
 }>) {
   return (
     <form action={action} method="post" className="flex flex-wrap items-center gap-2">
+      <AdminCsrfField />
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="locale" value={locale} />
       {extraFields}

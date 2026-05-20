@@ -4,6 +4,8 @@ import {
   isCatalogChineseTranslationStale,
   translateCatalogProductName,
 } from "@/lib/catalog-translation";
+import { recordAdminActivity } from "@/lib/admin-audit";
+import { redirectOnInvalidAdminCsrf } from "@/lib/admin-security";
 import { assertAdmin } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
 import {
@@ -40,6 +42,9 @@ export async function POST(request: Request) {
     return NextResponse.redirect(backUrl, 303);
   }
 
+  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
+  if (csrfRedirect) return csrfRedirect;
+
   const admin = await assertAdmin();
 
   if (!admin.ok) {
@@ -65,6 +70,24 @@ export async function POST(request: Request) {
     backUrl.searchParams.set("translations", parsed.data.mode);
     backUrl.searchParams.set("updated", String(result.updated));
     backUrl.searchParams.set("skipped", String(result.skipped));
+    await recordAdminActivity({
+      request,
+      actor: admin.context,
+      action:
+        parsed.data.mode === "batch"
+          ? "catalog.translations.batch"
+          : "catalog.translations.manual",
+      entityType: "product",
+      entityId:
+        parsed.data.mode === "manual" ? parsed.data.productId : "batch",
+      afterData: {
+        mode: parsed.data.mode,
+        updated: result.updated,
+        skipped: result.skipped,
+        overwrite:
+          parsed.data.mode === "batch" ? parsed.data.overwrite : undefined,
+      },
+    });
     return NextResponse.redirect(backUrl, 303);
   } catch (error) {
     backUrl.searchParams.set(

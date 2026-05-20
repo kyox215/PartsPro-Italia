@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { recordAdminActivity } from "@/lib/admin-audit";
+import { redirectOnInvalidAdminCsrf } from "@/lib/admin-security";
 import { assertAdmin } from "@/lib/auth";
 import {
   getSupabaseAdminClient,
@@ -24,6 +26,9 @@ export async function POST(request: Request) {
     );
     return NextResponse.redirect(backUrl, 303);
   }
+
+  const csrfRedirect = redirectOnInvalidAdminCsrf(request, formData, backUrl);
+  if (csrfRedirect) return csrfRedirect;
 
   const admin = await assertAdmin();
   if (!admin.ok) {
@@ -63,6 +68,18 @@ export async function POST(request: Request) {
   }
 
   const result = Array.isArray(data) ? data[0] : data;
+  await recordAdminActivity({
+    request,
+    actor: admin.context,
+    action: "inventory.receive_purchase_items",
+    entityType: "supplier_purchase_order_items",
+    afterData: {
+      requestedItems: payload.length,
+      receivedQty: result?.received_qty ?? 0,
+      missingQty: result?.missing_qty ?? 0,
+      processed: result?.processed ?? payload.length,
+    },
+  });
   backUrl.searchParams.set("received", String(result?.received_qty ?? 0));
   backUrl.searchParams.set("missing", String(result?.missing_qty ?? 0));
   backUrl.searchParams.set("processed", String(result?.processed ?? payload.length));

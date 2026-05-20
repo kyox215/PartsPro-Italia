@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { recordAdminActivity } from "@/lib/admin-audit";
+import { redirectOnInvalidAdminCsrf } from "@/lib/admin-security";
 import { assertAdmin } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
 import {
@@ -23,6 +25,9 @@ export async function POST(request: Request) {
     return NextResponse.redirect(backUrl, 303);
   }
 
+  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
+  if (csrfRedirect) return csrfRedirect;
+
   const admin = await assertAdmin();
   if (!admin.ok) {
     backUrl.searchParams.set("error", admin.error);
@@ -45,6 +50,19 @@ export async function POST(request: Request) {
   }
 
   const result = Array.isArray(data) ? data[0] : data;
+  await recordAdminActivity({
+    request,
+    actor: admin.context,
+    action: "catalog.import_price_batch",
+    entityType: "catalog_import",
+    entityId: "price_catalog",
+    afterData: {
+      batchSize: parsed.data.batchSize,
+      skusUpserted: result?.skus_upserted ?? 0,
+      processed: result?.processed ?? 0,
+      message: result?.message ?? "ok",
+    },
+  });
   backUrl.searchParams.set("imported", String(result?.skus_upserted ?? 0));
   backUrl.searchParams.set("processed", String(result?.processed ?? 0));
   backUrl.searchParams.set("message", String(result?.message ?? "ok"));

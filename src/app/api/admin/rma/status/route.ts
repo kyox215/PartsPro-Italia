@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import { recordAdminActivity } from "@/lib/admin-audit";
+import {
+  getAdminBackUrl,
+  redirectOnInvalidAdminCsrf,
+} from "@/lib/admin-security";
 import { assertAdmin } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
-import {
-  getSupabaseAdminClient,
-  hasSupabaseAdminConfig,
-} from "@/lib/supabase/admin";
+import { updateRmaStatus } from "@/lib/rma-workflow";
+import { hasSupabaseAdminConfig } from "@/lib/supabase/admin";
 import { adminRmaStatusSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
@@ -12,7 +15,12 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const rawBody = await parseRequestBody(request);
   const locale = String(rawBody.locale ?? "it");
-  const backUrl = getBackUrl(request, locale, rawBody.returnTo, "/admin/rma");
+  const backUrl = getAdminBackUrl(request, {
+    locale,
+    returnTo: rawBody.returnTo,
+    fallbackPath: "/admin/rma",
+    allowedPrefixes: ["/admin/rma"],
+  });
   const parsed = adminRmaStatusSchema.safeParse(rawBody);
 
   if (!parsed.success) {
@@ -22,6 +30,9 @@ export async function POST(request: Request) {
     );
     return NextResponse.redirect(backUrl, 303);
   }
+
+  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
+  if (csrfRedirect) return csrfRedirect;
 
   const admin = await assertAdmin();
 
@@ -35,33 +46,31 @@ export async function POST(request: Request) {
     return NextResponse.redirect(backUrl, 303);
   }
 
-  const supabase = getSupabaseAdminClient();
-  const { error } = await supabase
-    .from("rmas")
-    .update({
+  try {
+    await updateRmaStatus({
+      rmaId: parsed.data.id,
       status: parsed.data.status,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", parsed.data.id);
-
-  if (error) {
-    backUrl.searchParams.set("error", error.message);
+      actorProfileId: admin.context.user?.id,
+    });
+  } catch (error) {
+    backUrl.searchParams.set(
+      "error",
+      error instanceof Error ? error.message : "RMA update failed",
+    );
     return NextResponse.redirect(backUrl, 303);
   }
 
+  await recordAdminActivity({
+    request,
+    actor: admin.context,
+    action: "rma.status.update",
+    entityType: "rma",
+    entityId: parsed.data.id,
+    afterData: {
+      status: parsed.data.status,
+    },
+  });
+
   backUrl.searchParams.set("saved", "1");
   return NextResponse.redirect(backUrl, 303);
-}
-
-function getBackUrl(
-  request: Request,
-  locale: string,
-  returnTo: unknown,
-  fallbackPath: string,
-) {
-  if (typeof returnTo === "string" && returnTo.startsWith(`/${locale}/admin/rma`)) {
-    return new URL(returnTo, request.url);
-  }
-
-  return new URL(`/${locale}${fallbackPath}`, request.url);
 }

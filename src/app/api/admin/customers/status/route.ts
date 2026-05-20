@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import { recordAdminActivity } from "@/lib/admin-audit";
+import {
+  getAdminBackUrl,
+  redirectOnInvalidAdminCsrf,
+} from "@/lib/admin-security";
 import { assertAdmin } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
 import {
@@ -14,12 +19,20 @@ export async function POST(request: Request) {
   const parsed = adminCustomerStatusSchema.safeParse(rawBody);
   const locale = rawBody.locale === "zh" ? "zh" : "it";
   const companyId = String(rawBody.id ?? "");
-  const backUrl = new URL(`/${locale}/admin/customers/${companyId || ""}`, request.url);
+  const backUrl = getAdminBackUrl(request, {
+    locale,
+    returnTo: null,
+    fallbackPath: `/admin/customers/${companyId || ""}`,
+    allowedPrefixes: ["/admin/customers"],
+  });
 
   if (!parsed.success) {
     backUrl.searchParams.set("error", parsed.error.issues.map((issue) => issue.message).join(", "));
     return NextResponse.redirect(backUrl, 303);
   }
+
+  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
+  if (csrfRedirect) return csrfRedirect;
 
   const admin = await assertAdmin();
   if (!admin.ok) {
@@ -48,6 +61,18 @@ export async function POST(request: Request) {
     backUrl.searchParams.set("error", error.message);
     return NextResponse.redirect(backUrl, 303);
   }
+
+  await recordAdminActivity({
+    request,
+    actor: admin.context,
+    action: "customer.status.update",
+    entityType: "company",
+    entityId: parsed.data.id,
+    afterData: {
+      status: parsed.data.status,
+      nextFollowUpAt: parsed.data.nextFollowUpAt || null,
+    },
+  });
 
   backUrl.searchParams.set("saved", "status");
   return NextResponse.redirect(backUrl, 303);

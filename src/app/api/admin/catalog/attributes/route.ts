@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { recordAdminActivity } from "@/lib/admin-audit";
+import { redirectOnInvalidAdminCsrf } from "@/lib/admin-security";
 import { assertAdmin } from "@/lib/auth";
 import { normalizeAttributeKey } from "@/lib/admin-catalog";
 import { parseRequestBody } from "@/lib/request";
@@ -23,6 +25,9 @@ export async function POST(request: Request) {
     );
     return NextResponse.redirect(backUrl, 303);
   }
+
+  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
+  if (csrfRedirect) return csrfRedirect;
 
   const admin = await assertAdmin();
   if (!admin.ok) {
@@ -79,6 +84,22 @@ export async function POST(request: Request) {
       return NextResponse.redirect(backUrl, 303);
     }
   }
+
+  await recordAdminActivity({
+    request,
+    actor: admin.context,
+    action: "catalog.attribute.upsert",
+    entityType: "catalog_attribute_definition",
+    entityId: definition.id,
+    afterData: {
+      key,
+      labelIt: payload.labelIt,
+      labelZh: payload.labelZh,
+      inputType: payload.inputType,
+      isFilterable: payload.isFilterable,
+      optionCount: options.length,
+    },
+  });
 
   backUrl.searchParams.set("attribute", "saved");
   return NextResponse.redirect(backUrl, 303);

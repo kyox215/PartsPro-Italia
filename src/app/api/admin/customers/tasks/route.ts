@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { redirectOnInvalidAdminCsrf } from "@/lib/admin-security";
 import { assertAdmin } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
 import {
@@ -17,6 +18,9 @@ export async function POST(request: Request) {
   const locale = rawBody.locale === "zh" ? "zh" : "it";
   const companyId = String(rawBody.companyId ?? "");
   const backUrl = new URL(`/${locale}/admin/customers/${companyId || ""}`, request.url);
+  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
+  if (csrfRedirect) return csrfRedirect;
+
   const admin = await assertAdmin();
 
   if (!admin.ok) {

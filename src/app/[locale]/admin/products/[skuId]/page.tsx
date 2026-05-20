@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { Archive, CheckCircle2, PackageCheck, Save } from "lucide-react";
+import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
 import {
   AdminActionRail,
   AdminButtonLink,
@@ -73,6 +74,7 @@ export default async function AdminProductDetailPage({
               <div className="grid gap-2">
                 <StatusPill status={product.isActive ? "Published" : "Archived"} tone={product.isActive ? "green" : "slate"} />
                 <form action="/api/admin/products/publish" method="post">
+                  <AdminCsrfField />
                   <input type="hidden" name="locale" value={locale} />
                   <input type="hidden" name="productId" value={product.productId} />
                   <input type="hidden" name="skuId" value={product.skuId} />
@@ -83,6 +85,7 @@ export default async function AdminProductDetailPage({
                   </button>
                 </form>
                 <form action="/api/admin/products/archive" method="post">
+                  <AdminCsrfField />
                   <input type="hidden" name="locale" value={locale} />
                   <input type="hidden" name="productId" value={product.productId} />
                   <input type="hidden" name="skuId" value={product.skuId} />
@@ -131,6 +134,7 @@ export default async function AdminProductDetailPage({
           }
         >
           <form action="/api/admin/products/update" method="post" className="grid gap-3">
+            <AdminCsrfField />
             <input type="hidden" name="locale" value={locale} />
             <input type="hidden" name="productId" value={product.productId} />
             <input type="hidden" name="skuId" value={product.skuId} />

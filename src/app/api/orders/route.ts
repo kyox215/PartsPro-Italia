@@ -3,13 +3,13 @@ import { canViewB2BPrice, getAuthContext } from "@/lib/auth";
 import { checkoutCartCookieName } from "@/lib/checkout-cart-cookie";
 import { getSiteUrl } from "@/lib/env";
 import {
+  createSupabaseOrderWithReservations,
   getInitialFulfillmentStatus,
   getInitialOrderStatus,
   getPaymentStatus,
   getReservationExpiry,
   loadSupabaseOrderLines,
   releaseOrderReservations,
-  reserveSupabaseInventory,
   type PaymentMethod,
 } from "@/lib/order-workflow";
 import { parseRequestBody } from "@/lib/request";
@@ -70,6 +70,7 @@ export async function POST(request: Request) {
   const useB2BPrice = canViewB2BPrice(auth);
   const supabase = getSupabaseAdminClient();
   const now = new Date();
+  const reservationExpiresAt = getReservationExpiry(now);
 
   let lines;
   try {
@@ -87,63 +88,33 @@ export async function POST(request: Request) {
   const vat = lines.reduce((sum, line) => sum + line.totals.vat, 0);
   const total = subtotal + vat;
 
-  const { error: insertOrderError } = await supabase.from("orders").insert({
-    id: orderId,
-    profile_id: auth.user.id,
-    status: getInitialOrderStatus(paymentMethod),
-    payment_status: getPaymentStatus(paymentMethod),
-    fulfillment_status: getInitialFulfillmentStatus(lines),
-    reservation_expires_at: getReservationExpiry(now).toISOString(),
-    reserved_at: now.toISOString(),
-    payment_method: paymentMethod,
-    email: parsed.data.email || auth.user.email || null,
-    customer_name: parsed.data.name || null,
-    company_name: parsed.data.companyName || null,
-    vat_number: parsed.data.vatNumber || null,
-    fiscal_code: parsed.data.fiscalCode || null,
-    sdi: parsed.data.sdi || null,
-    pec: parsed.data.pec || null,
-    shipping_address: parsed.data.shippingAddress || null,
-    subtotal,
-    vat,
-    total,
-    currency: "EUR",
-    metadata: parsed.data,
-  });
-
-  if (insertOrderError) {
-    return NextResponse.json({ error: insertOrderError.message }, { status: 500 });
-  }
-
-  const { error: itemsError } = await supabase.from("order_items").insert(
-    lines.map((line) => ({
-      order_id: orderId,
-      sku: line.sku,
-      name: line.name,
-      quantity: line.quantity,
-      unit_price: line.totals.unitPrice,
-      vat_rate: line.vatRate,
-      fulfillment_type: line.fulfillmentType,
-      stock_qty: line.stockQty,
-      preorder_qty: line.preorderQty,
-      preorder_lead_time_min_days: line.preorderLeadTimeMinDays,
-      preorder_lead_time_max_days: line.preorderLeadTimeMaxDays,
-    })),
-  );
-
-  if (itemsError) {
-    await supabase.from("orders").delete().eq("id", orderId);
-    return NextResponse.json({ error: itemsError.message }, { status: 500 });
-  }
-
   try {
-    await reserveSupabaseInventory(supabase, orderId, lines);
+    await createSupabaseOrderWithReservations({
+      supabase,
+      orderId,
+      profileId: auth.user.id,
+      status: getInitialOrderStatus(paymentMethod),
+      paymentStatus: getPaymentStatus(paymentMethod),
+      fulfillmentStatus: getInitialFulfillmentStatus(lines),
+      reservationExpiresAt: reservationExpiresAt.toISOString(),
+      reservedAt: now.toISOString(),
+      paymentMethod,
+      email: parsed.data.email || auth.user.email || null,
+      customerName: parsed.data.name || null,
+      companyName: parsed.data.companyName || null,
+      vatNumber: parsed.data.vatNumber || null,
+      fiscalCode: parsed.data.fiscalCode || null,
+      sdi: parsed.data.sdi || null,
+      pec: parsed.data.pec || null,
+      shippingAddress: parsed.data.shippingAddress || null,
+      metadata: parsed.data,
+      lines,
+    });
   } catch (error) {
-    await supabase.from("orders").delete().eq("id", orderId);
     return orderError(
       request,
       parsed.data.locale,
-      error instanceof Error ? error.message : "Inventory reservation failed",
+      error instanceof Error ? error.message : "Unable to create order reservation",
       409,
     );
   }
@@ -169,7 +140,7 @@ export async function POST(request: Request) {
           },
         })),
         metadata: { orderId },
-        expires_at: Math.floor(getReservationExpiry(now).getTime() / 1000),
+        expires_at: Math.floor(reservationExpiresAt.getTime() / 1000),
       });
 
       await supabase

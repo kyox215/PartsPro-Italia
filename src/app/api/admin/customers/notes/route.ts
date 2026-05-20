@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { redirectOnInvalidAdminCsrf } from "@/lib/admin-security";
 import { assertAdmin } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
 import {
@@ -20,6 +21,9 @@ export async function POST(request: Request) {
     backUrl.searchParams.set("error", parsed.error.issues.map((issue) => issue.message).join(", "));
     return NextResponse.redirect(backUrl, 303);
   }
+
+  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
+  if (csrfRedirect) return csrfRedirect;
 
   const admin = await assertAdmin();
   if (!admin.ok) {

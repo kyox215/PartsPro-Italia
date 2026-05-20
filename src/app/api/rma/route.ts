@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
+import { generateRmaNumber, recordRmaEvent } from "@/lib/rma-workflow";
 import { getSupabaseAdminClient, hasSupabaseAdminConfig } from "@/lib/supabase/admin";
 import { rmaSchema } from "@/lib/validations";
 
@@ -25,12 +26,14 @@ export async function POST(request: Request) {
   }
 
   const rmaId = crypto.randomUUID();
+  const rmaNumber = generateRmaNumber(rmaId);
   const auth = await getAuthContext();
 
   if (hasSupabaseAdminConfig()) {
     const supabase = getSupabaseAdminClient();
     const { error } = await supabase.from("rmas").insert({
       id: rmaId,
+      rma_number: rmaNumber,
       profile_id: auth.user?.id ?? null,
       status: "submitted",
       order_number: parsed.data.orderNumber,
@@ -49,6 +52,25 @@ export async function POST(request: Request) {
 
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    try {
+      await recordRmaEvent({
+        supabase,
+        rmaId,
+        eventType: "rma_submitted",
+        title: "RMA submitted",
+        body: "Customer submitted a return request.",
+        actorProfileId: auth.user?.id,
+        metadata: {
+          rmaNumber,
+          sku: parsed.data.sku,
+          quantity: parsed.data.quantity,
+          issueType: parsed.data.issueType,
+        },
+      });
+    } catch (eventError) {
+      console.error("Failed to record RMA submission event", eventError);
+    }
   }
 
   if (wantsRedirect(request)) {
@@ -60,6 +82,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     rmaId,
+    rmaNumber,
     status: "submitted",
   });
 }

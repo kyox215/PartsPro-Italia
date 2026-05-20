@@ -4,6 +4,11 @@ import {
   parseSkuAttributes,
   upsertSkuAttributeValues,
 } from "@/lib/admin-catalog";
+import { recordAdminActivity } from "@/lib/admin-audit";
+import {
+  getAdminBackUrl,
+  redirectOnInvalidAdminCsrf,
+} from "@/lib/admin-security";
 import { assertAdmin } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
 import {
@@ -47,7 +52,11 @@ export async function POST(request: Request) {
   const rawBody = await parseRequestBody(request);
   const locale = String(rawBody.locale ?? "it");
   const parsed = adminProductSchema.safeParse(rawBody);
-  const backUrl = new URL(`/${locale}/admin/products`, request.url);
+  const backUrl = getAdminBackUrl(request, {
+    locale,
+    returnTo: null,
+    fallbackPath: "/admin/products",
+  });
 
   if (!parsed.success) {
     backUrl.searchParams.set(
@@ -56,6 +65,9 @@ export async function POST(request: Request) {
     );
     return NextResponse.redirect(backUrl, 303);
   }
+
+  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
+  if (csrfRedirect) return csrfRedirect;
 
   const admin = await assertAdmin();
 
@@ -156,6 +168,27 @@ export async function POST(request: Request) {
     );
     return NextResponse.redirect(backUrl, 303);
   }
+
+  await recordAdminActivity({
+    request,
+    actor: admin.context,
+    action: "product.create",
+    entityType: "sku",
+    entityId: sku.id,
+    afterData: {
+      productId: product.id,
+      skuId: sku.id,
+      sku: payload.sku,
+      brand: payload.brand,
+      model: payload.model,
+      category: payload.category,
+      qualityGrade: payload.qualityGrade,
+      retailPrice: payload.retailPrice,
+      b2bPrice: payload.b2bPrice,
+      stockOnHand: payload.stockOnHand,
+      incomingQty: payload.incomingQty,
+    },
+  });
 
   backUrl.searchParams.set("saved", "1");
   return NextResponse.redirect(backUrl, 303);

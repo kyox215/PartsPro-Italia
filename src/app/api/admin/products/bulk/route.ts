@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { recordAdminActivity } from "@/lib/admin-audit";
+import { redirectOnInvalidAdminCsrf } from "@/lib/admin-security";
 import { assertAdmin } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
 import {
@@ -19,6 +21,9 @@ export async function POST(request: Request) {
     backUrl.searchParams.set("error", parsed.error.issues.map((issue) => issue.message).join(", "));
     return NextResponse.redirect(backUrl, 303);
   }
+
+  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
+  if (csrfRedirect) return csrfRedirect;
 
   const admin = await assertAdmin();
   if (!admin.ok) {
@@ -75,6 +80,20 @@ export async function POST(request: Request) {
       return NextResponse.redirect(backUrl, 303);
     }
   }
+
+  await recordAdminActivity({
+    request,
+    actor: admin.context,
+    action: `product.bulk.${parsed.data.action}`,
+    entityType: "sku",
+    entityId: "bulk",
+    afterData: {
+      action: parsed.data.action,
+      skuIds: ids,
+      productIds,
+      isActive: active,
+    },
+  });
 
   backUrl.searchParams.set("bulk", parsed.data.action);
   backUrl.searchParams.set("count", String(ids.length));

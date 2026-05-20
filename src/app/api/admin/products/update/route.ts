@@ -4,6 +4,11 @@ import {
   parseSkuAttributes,
   upsertSkuAttributeValues,
 } from "@/lib/admin-catalog";
+import { recordAdminActivity } from "@/lib/admin-audit";
+import {
+  getAdminBackUrl,
+  redirectOnInvalidAdminCsrf,
+} from "@/lib/admin-security";
 import { assertAdmin } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
 import {
@@ -18,8 +23,12 @@ export async function POST(request: Request) {
   const rawBody = await parseRequestBody(request);
   const parsed = adminProductUpdateSchema.safeParse(rawBody);
   const locale = rawBody.locale === "zh" ? "zh" : "it";
-  const returnTo = String(rawBody.returnTo || `/${locale}/admin/products`);
-  const backUrl = new URL(returnTo, request.url);
+  const backUrl = getAdminBackUrl(request, {
+    locale,
+    returnTo: rawBody.returnTo,
+    fallbackPath: "/admin/products",
+    allowedPrefixes: ["/admin/products"],
+  });
 
   if (!parsed.success) {
     backUrl.searchParams.set(
@@ -28,6 +37,9 @@ export async function POST(request: Request) {
     );
     return NextResponse.redirect(backUrl, 303);
   }
+
+  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
+  if (csrfRedirect) return csrfRedirect;
 
   const admin = await assertAdmin();
   if (!admin.ok) {
@@ -111,6 +123,26 @@ export async function POST(request: Request) {
     );
     return NextResponse.redirect(backUrl, 303);
   }
+
+  await recordAdminActivity({
+    request,
+    actor: admin.context,
+    action: "product.update",
+    entityType: "sku",
+    entityId: payload.skuId,
+    afterData: {
+      productId: payload.productId,
+      skuId: payload.skuId,
+      sku: payload.sku,
+      brand: payload.brand,
+      model: payload.model,
+      category: payload.category,
+      qualityGrade: payload.qualityGrade,
+      retailPrice: payload.retailPrice,
+      b2bPrice: payload.b2bPrice,
+      costPrice: payload.costPrice ?? null,
+    },
+  });
 
   backUrl.searchParams.set("saved", "1");
   return NextResponse.redirect(backUrl, 303);

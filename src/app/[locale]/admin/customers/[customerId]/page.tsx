@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { BadgeCheck, ClipboardList, MessageSquareText, UserRound } from "lucide-react";
+import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
 import {
   AdminActionRail,
   AdminButtonLink,
@@ -69,6 +70,7 @@ export default async function AdminCustomerDetailPage({
           >
             <AdminPanel title={locale === "it" ? "Stato cliente" : "客户状态"}>
               <form action="/api/admin/customers/status" method="post" className="grid gap-2">
+                <AdminCsrfField />
                 <input type="hidden" name="locale" value={locale} />
                 <input type="hidden" name="id" value={customer.id} />
                 <AdminSelect name="status" label="CRM" defaultValue={customer.crmStatus}>
@@ -87,6 +89,7 @@ export default async function AdminCustomerDetailPage({
 
             <AdminPanel title={locale === "it" ? "Price group" : "价格组"}>
               <form action="/api/admin/customers/price-group" method="post" className="grid gap-2">
+                <AdminCsrfField />
                 <input type="hidden" name="locale" value={locale} />
                 <input type="hidden" name="id" value={customer.id} />
                 <AdminSelect name="priceGroup" label="Group" defaultValue={customer.priceGroup}>
@@ -104,6 +107,7 @@ export default async function AdminCustomerDetailPage({
 
             <AdminPanel title={locale === "it" ? "Nuova nota" : "新增备注"}>
               <form action="/api/admin/customers/notes" method="post" className="grid gap-2">
+                <AdminCsrfField />
                 <input type="hidden" name="locale" value={locale} />
                 <input type="hidden" name="companyId" value={customer.id} />
                 <AdminTextarea name="body" label={locale === "it" ? "Nota" : "备注"} />
@@ -115,6 +119,7 @@ export default async function AdminCustomerDetailPage({
 
             <AdminPanel title={locale === "it" ? "Task follow-up" : "跟进任务"}>
               <form action="/api/admin/customers/tasks" method="post" className="grid gap-2">
+                <AdminCsrfField />
                 <input type="hidden" name="locale" value={locale} />
                 <input type="hidden" name="companyId" value={customer.id} />
                 <AdminInput name="title" label={locale === "it" ? "Task" : "任务"} defaultValue="" />
@@ -127,6 +132,7 @@ export default async function AdminCustomerDetailPage({
 
             <AdminPanel title={locale === "it" ? "Tag" : "标签"}>
               <form action="/api/admin/customers/tags" method="post" className="grid gap-2">
+                <AdminCsrfField />
                 <input type="hidden" name="locale" value={locale} />
                 <input type="hidden" name="companyId" value={customer.id} />
                 <AdminInput name="tagName" label="Tag" defaultValue="" />
@@ -179,6 +185,7 @@ export default async function AdminCustomerDetailPage({
                   <p className="mt-1 text-xs text-stone-500">{task.dueAt ? new Date(task.dueAt).toLocaleDateString(locale === "it" ? "it-IT" : "zh-CN") : "-"}</p>
                   {task.status !== "completed" ? (
                     <form action="/api/admin/customers/tasks" method="post" className="mt-2">
+                      <AdminCsrfField />
                       <input type="hidden" name="locale" value={locale} />
                       <input type="hidden" name="companyId" value={customer.id} />
                       <input type="hidden" name="id" value={task.id} />

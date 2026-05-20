@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { recordAdminActivity } from "@/lib/admin-audit";
+import { redirectOnInvalidAdminCsrf } from "@/lib/admin-security";
 import { assertAdmin } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
 import {
@@ -22,6 +24,9 @@ export async function POST(request: Request) {
     );
     return NextResponse.redirect(backUrl, 303);
   }
+
+  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
+  if (csrfRedirect) return csrfRedirect;
 
   const admin = await assertAdmin();
 
@@ -101,6 +106,19 @@ export async function POST(request: Request) {
       return NextResponse.redirect(backUrl, 303);
     }
   }
+
+  await recordAdminActivity({
+    request,
+    actor: admin.context,
+    action: "b2b_application.status.update",
+    entityType: "b2b_application",
+    entityId: parsed.data.id,
+    afterData: {
+      status: parsed.data.status,
+      priceGroup: parsed.data.priceGroup || null,
+      syncedCustomer: Boolean(application && parsed.data.status === "approved"),
+    },
+  });
 
   backUrl.searchParams.set("saved", "1");
   return NextResponse.redirect(backUrl, 303);

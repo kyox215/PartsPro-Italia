@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { Boxes, ClipboardList, CreditCard, PackageCheck, TimerReset } from "lucide-react";
+import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
 import { StatusSelectForm } from "@/components/admin/status-select-form";
 import {
   AdminActionRail,
@@ -201,6 +202,97 @@ export default async function AdminOrderDetailPage({
           </dl>
         </AdminPanel>
 
+        <div className="grid gap-3 xl:grid-cols-2">
+          <AdminPanel
+            title={locale === "it" ? "Registri pagamento" : "付款记录"}
+            description={
+              locale === "it"
+                ? "Conferme manuali e callback Stripe."
+                : "现金/转账确认和 Stripe 回调记录。"
+            }
+          >
+            {order.paymentRecords.length > 0 ? (
+              <div className="grid gap-2">
+                {order.paymentRecords.map((record) => (
+                  <div
+                    key={record.id}
+                    className="rounded-lg border border-black/5 bg-stone-50 p-3 text-sm"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="font-black text-stone-950">
+                        {formatMoney(record.amount, locale)}
+                      </div>
+                      <StatusPill status={record.paymentStatus} />
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-stone-500">
+                      <span>{record.paymentMethod}</span>
+                      {record.provider ? <span>{record.provider}</span> : null}
+                      {record.providerReference ? (
+                        <span className="font-mono">{record.providerReference}</span>
+                      ) : null}
+                    </div>
+                    {record.note ? (
+                      <p className="mt-2 text-xs font-semibold text-stone-700">
+                        {record.note}
+                      </p>
+                    ) : null}
+                    <p className="mt-2 text-xs font-semibold text-stone-400">
+                      {formatDateTime(record.createdAt, locale)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-lg bg-stone-50 p-3 text-sm font-semibold text-stone-500">
+                {locale === "it"
+                  ? "Nessuna conferma pagamento registrata."
+                  : "暂无付款确认记录。"}
+              </p>
+            )}
+          </AdminPanel>
+
+          <AdminPanel
+            title={locale === "it" ? "Timeline ordine" : "订单时间线"}
+            description={
+              locale === "it"
+                ? "Traccia operativa delle azioni admin."
+                : "记录后台处理、收款、释放和履约动作。"
+            }
+          >
+            {order.timelineEvents.length > 0 ? (
+              <ol className="grid gap-2">
+                {order.timelineEvents.map((event) => (
+                  <li
+                    key={event.id}
+                    className="rounded-lg border border-black/5 bg-white p-3 text-sm"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-black text-stone-950">{event.title}</p>
+                      <span className="rounded-full bg-stone-100 px-2 py-1 text-xs font-black text-stone-500">
+                        {event.eventType}
+                      </span>
+                    </div>
+                    {event.body ? (
+                      <p className="mt-2 text-xs font-semibold leading-5 text-stone-600">
+                        {event.body}
+                      </p>
+                    ) : null}
+                    <p className="mt-2 text-xs font-semibold text-stone-400">
+                      {formatDateTime(event.createdAt, locale)}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="rounded-lg bg-stone-50 p-3 text-sm font-semibold text-stone-500">
+                {locale === "it"
+                  ? "La timeline si popola con le prossime azioni."
+                  : "后续后台操作会自动写入这里。"}
+              </p>
+            )}
+          </AdminPanel>
+        </div>
+
         <AdminPanel
           title={locale === "it" ? "Righe e fulfilment" : "商品与履约"}
           description={new Date(order.createdAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN")}
@@ -285,6 +377,7 @@ function ActionForm({
 
   return (
     <form action={action} method="post">
+      <AdminCsrfField />
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="returnTo" value={returnTo} />
@@ -325,4 +418,8 @@ function Feedback({
 
 function valueOf(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function formatDateTime(value: string, locale: Locale) {
+  return new Date(value).toLocaleString(locale === "it" ? "it-IT" : "zh-CN");
 }

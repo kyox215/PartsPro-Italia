@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import { recordAdminActivity } from "@/lib/admin-audit";
+import {
+  getAdminBackUrl,
+  redirectOnInvalidAdminCsrf,
+} from "@/lib/admin-security";
 import { assertAdmin } from "@/lib/auth";
 import { confirmManualPayment } from "@/lib/order-workflow";
 import { parseRequestBody } from "@/lib/request";
@@ -11,7 +16,12 @@ export async function POST(request: Request) {
   const rawBody = await parseRequestBody(request);
   const parsed = adminOrderPaymentSchema.safeParse(rawBody);
   const locale = String(rawBody.locale ?? "it");
-  const backUrl = getBackUrl(request, locale, rawBody.returnTo, rawBody.id);
+  const backUrl = getAdminBackUrl(request, {
+    locale,
+    returnTo: rawBody.returnTo,
+    fallbackPath: `/admin/orders/${String(rawBody.id ?? "")}`,
+    allowedPrefixes: ["/admin/orders"],
+  });
 
   if (!parsed.success) {
     backUrl.searchParams.set(
@@ -20,6 +30,9 @@ export async function POST(request: Request) {
     );
     return NextResponse.redirect(backUrl, 303);
   }
+
+  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
+  if (csrfRedirect) return csrfRedirect;
 
   const admin = await assertAdmin();
   if (!admin.ok) {
@@ -37,6 +50,22 @@ export async function POST(request: Request) {
       orderId: parsed.data.id,
       expectedMethod:
         parsed.data.action === "confirm_cash" ? "cash" : "bank_transfer",
+      actorProfileId: admin.context.user?.id,
+    });
+    await recordAdminActivity({
+      request,
+      actor: admin.context,
+      action:
+        parsed.data.action === "confirm_cash"
+          ? "order.payment.confirm_cash"
+          : "order.payment.confirm_bank_transfer",
+      entityType: "order",
+      entityId: parsed.data.id,
+      afterData: {
+        paymentMethod:
+          parsed.data.action === "confirm_cash" ? "cash" : "bank_transfer",
+        paymentStatus: "paid",
+      },
     });
     backUrl.searchParams.set("saved", "payment");
   } catch (error) {
@@ -47,20 +76,4 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.redirect(backUrl, 303);
-}
-
-function getBackUrl(
-  request: Request,
-  locale: string,
-  returnTo: unknown,
-  id: unknown,
-) {
-  if (
-    typeof returnTo === "string" &&
-    returnTo.startsWith(`/${locale}/admin/orders`)
-  ) {
-    return new URL(returnTo, request.url);
-  }
-
-  return new URL(`/${locale}/admin/orders/${String(id ?? "")}`, request.url);
 }
