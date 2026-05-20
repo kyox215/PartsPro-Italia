@@ -4,23 +4,23 @@ import { AccountManagementTabs } from "@/components/admin/account-management-nav
 import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
 import {
   AdminActionRail,
-  AdminDataTable,
   AdminInput,
   AdminMetricCard,
   AdminNotice,
   AdminPageHeader,
   AdminPanel,
+  AdminRecordList,
   AdminSelect,
   AdminWorkspaceGrid,
   StatusPill,
 } from "@/components/admin/admin-ui";
+import { formatAdminStatus, formatPermissionLabel, staffStatusOptions } from "@/lib/admin-display";
 import { getAdminStaffRows, getStaffRoleSummaries } from "@/lib/admin-accounts";
 import { hasAdminPermission, staffRoleLabels, type StaffRole } from "@/lib/admin-permissions";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
 
 const staffRoles: StaffRole[] = ["owner", "sales", "catalog", "warehouse", "finance", "support"];
-const staffStatuses = ["active", "suspended", "archived"];
 
 export default async function AdminAccountPermissionsPage({
   params,
@@ -43,7 +43,7 @@ export default async function AdminAccountPermissionsPage({
   return (
     <div className="space-y-3">
       <AdminPageHeader
-        eyebrow={locale === "it" ? "Account workspace" : "账号管理"}
+        eyebrow={locale === "it" ? "Area account" : "账号管理"}
         title={locale === "it" ? "Permessi staff" : "权限管理"}
         description={
           locale === "it"
@@ -75,11 +75,14 @@ export default async function AdminAccountPermissionsPage({
                   ))}
                 </AdminSelect>
                 <AdminSelect name="status" label={locale === "it" ? "Stato" : "状态"} defaultValue="active">
-                  {staffStatuses.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
+                  {staffStatusOptions.map((status) => {
+                    const option = formatAdminStatus("account", status, locale);
+                    return (
+                      <option key={status} value={status}>
+                        {option.label}
+                      </option>
+                    );
+                  })}
                 </AdminSelect>
                 <button className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white" type="submit">
                   {locale === "it" ? "Salva staff" : "保存员工权限"}
@@ -101,12 +104,12 @@ export default async function AdminAccountPermissionsPage({
               <article key={summary.role} className="rounded-lg border border-black/5 bg-stone-50 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-sm font-black text-stone-950">{summary.label}</h3>
-                  <StatusPill status={summary.role} tone={summary.role === "owner" ? "violet" : "blue"} />
+                  <StatusPill status={summary.label} tone={summary.role === "owner" ? "violet" : "blue"} />
                 </div>
                 <p className="mt-2 text-xs font-semibold leading-5 text-stone-500">{summary.description}</p>
                 <div className="mt-3 flex flex-wrap gap-1">
                   {summary.permissions.map((permission) => (
-                    <StatusPill key={permission} status={permission} tone="slate" />
+                    <StatusPill key={permission} status={formatPermissionLabel(permission, locale)} tone="slate" />
                   ))}
                 </div>
               </article>
@@ -115,33 +118,34 @@ export default async function AdminAccountPermissionsPage({
         </AdminPanel>
 
         <AdminPanel title={locale === "it" ? "Staff configurato" : "已配置员工"}>
-          <AdminDataTable minWidth={860}>
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-stone-400">
-                <tr className="border-b border-black/5">
-                  <th className="px-2.5 py-2">Staff</th>
-                  <th className="px-2.5 py-2">Role</th>
-                  <th className="px-2.5 py-2">Status</th>
-                  <th className="px-2.5 py-2">Profile</th>
-                  <th className="px-2.5 py-2">Updated</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/5">
-                {staff.map((member) => (
-                  <tr key={member.id} className="hover:bg-stone-50">
-                    <td className="px-2.5 py-2.5">
-                      <p className="font-black text-stone-950">{member.fullName ?? member.email}</p>
-                      <p className="mt-1 text-xs text-stone-500">{member.email}</p>
-                    </td>
-                    <td className="px-2.5 py-2.5"><StatusPill status={staffRoleLabels[member.role][locale]} tone={member.role === "owner" ? "violet" : "blue"} /></td>
-                    <td className="px-2.5 py-2.5"><StatusPill status={member.status} /></td>
-                    <td className="px-2.5 py-2.5 text-xs text-stone-500">{member.profileRole ?? "-"}</td>
-                    <td className="px-2.5 py-2.5 text-xs text-stone-500">{member.updatedAt ? new Date(member.updatedAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN") : "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </AdminDataTable>
+          <AdminRecordList>
+            {staff.map((member) => {
+              const status = formatAdminStatus("account", member.status, locale);
+              const profileRole = member.profileRole
+                ? formatAdminStatus("staffRole", member.profileRole, locale)
+                : null;
+              return (
+                <article
+                  key={member.id}
+                  className="grid min-w-0 gap-3 rounded-lg bg-stone-50 p-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
+                >
+                  <div className="min-w-0">
+                    <p className="break-words font-black text-stone-950">{member.fullName ?? member.email}</p>
+                    <p className="mt-1 break-words text-xs font-semibold text-stone-500">{member.email}</p>
+                    <p className="mt-1 text-xs font-semibold text-stone-400">
+                      {locale === "it" ? "Aggiornato" : "更新时间"}:{" "}
+                      {member.updatedAt ? new Date(member.updatedAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN") : "-"}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-1 md:justify-end">
+                    <StatusPill status={staffRoleLabels[member.role][locale]} tone={member.role === "owner" ? "violet" : "blue"} />
+                    <StatusPill status={status.label} tone={status.tone} />
+                    {profileRole ? <StatusPill status={profileRole.label} tone={profileRole.tone} /> : null}
+                  </div>
+                </article>
+              );
+            })}
+          </AdminRecordList>
         </AdminPanel>
       </AdminWorkspaceGrid>
     </div>

@@ -321,7 +321,7 @@ export const adminOrderShipmentSchema = z.object({
 export const adminB2BStatusSchema = z.object({
   id: z.string().min(1),
   status: z.enum(["pending", "approved", "rejected"]),
-  priceGroup: z.string().optional().or(z.literal("")),
+  priceGroup: z.enum(["b2b_basic", "b2b_silver", "b2b_gold", "distributor"]).optional().or(z.literal("")),
   locale: z.enum(["it", "zh"]).default("it"),
 });
 
@@ -345,7 +345,20 @@ export const adminAccountCustomerAccessSchema = z.object({
   returnTo: z.string().optional().or(z.literal("")),
   priceGroup: z.enum(["retail", "b2b_pending", "b2b_basic", "b2b_silver", "b2b_gold", "distributor"]),
   accountStatus: z.enum(["active", "suspended", "archived"]).default("active"),
-  crmStatus: z.enum(["lead", "pending", "active", "paused", "rejected", "archived"]).default("active"),
+  crmStatus: z.enum([
+    "lead",
+    "registered",
+    "pending",
+    "b2b_pending",
+    "approved",
+    "b2b_approved",
+    "approved_pending_signup",
+    "active",
+    "paused",
+    "rejected",
+    "b2b_rejected",
+    "archived",
+  ]).default("active"),
   nextFollowUpAt: z.string().optional().or(z.literal("")),
 });
 

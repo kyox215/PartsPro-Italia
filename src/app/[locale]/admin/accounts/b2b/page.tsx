@@ -3,6 +3,11 @@ import { redirect } from "next/navigation";
 import { AccountManagementTabs } from "@/components/admin/account-management-nav";
 import { StatusSelectForm } from "@/components/admin/status-select-form";
 import {
+  approvedB2BPriceGroupOptions,
+  b2bStatusOptions,
+  formatAdminStatus,
+} from "@/lib/admin-display";
+import {
   AdminActionRail,
   AdminButtonLink,
   AdminEmptyState,
@@ -18,8 +23,6 @@ import { hasAdminPermission } from "@/lib/admin-permissions";
 import { getAdminB2BApplicationRows } from "@/lib/admin-operations";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
-
-const b2bStatuses = ["pending", "approved", "rejected"];
 
 export default async function AdminAccountsB2BPage({
   params,
@@ -56,11 +59,11 @@ export default async function AdminAccountsB2BPage({
   return (
     <div className="space-y-3">
       <AdminPageHeader
-        eyebrow={locale === "it" ? "Account workspace" : "账号管理"}
+        eyebrow={locale === "it" ? "Area account" : "账号管理"}
         title={locale === "it" ? "Revisioni account B2B" : "B2B 开户审核"}
         description={
           locale === "it"
-            ? "Approva o rifiuta richieste wholesale, sincronizzando cliente, azienda e price group."
+            ? "Approva o rifiuta richieste wholesale, sincronizzando cliente, azienda e gruppo prezzi."
             : "审核批发申请，并同步客户账号、公司档案和价格组。"
         }
         actions={
@@ -69,7 +72,7 @@ export default async function AdminAccountsB2BPage({
               {locale === "it" ? "Clienti" : "客户管理"}
             </AdminButtonLink>
             <AdminButtonLink href={localizePath(locale, "/admin/accounts")} variant="secondary">
-              {locale === "it" ? "Account" : "账号总览"}
+              {locale === "it" ? "Panoramica" : "账号总览"}
             </AdminButtonLink>
           </>
         }
@@ -85,9 +88,9 @@ export default async function AdminAccountsB2BPage({
             description={locale === "it" ? "Code e decisioni" : "审核队列与结果"}
           >
             <section className="grid gap-2">
-              <AdminMetricCard icon={Clock3} label={locale === "it" ? "Pending" : "待审核"} value={counts.pending} tone="amber" />
-              <AdminMetricCard icon={CheckCircle2} label={locale === "it" ? "Approved" : "已通过"} value={counts.approved} tone="green" />
-              <AdminMetricCard icon={XCircle} label={locale === "it" ? "Rejected" : "已拒绝"} value={counts.rejected} tone="red" />
+              <AdminMetricCard icon={Clock3} label={formatAdminStatus("b2bApplication", "pending", locale).label} value={counts.pending} tone="amber" />
+              <AdminMetricCard icon={CheckCircle2} label={formatAdminStatus("b2bApplication", "approved", locale).label} value={counts.approved} tone="green" />
+              <AdminMetricCard icon={XCircle} label={formatAdminStatus("b2bApplication", "rejected", locale).label} value={counts.rejected} tone="red" />
             </section>
             <AdminPanel contentClassName="grid gap-2 p-2">
               <p className="text-xs font-semibold leading-5 text-stone-500">
@@ -105,9 +108,9 @@ export default async function AdminAccountsB2BPage({
         <AdminTabs
           items={[
             ["all", locale === "it" ? "Tutte" : "全部"],
-            ["pending", locale === "it" ? "Pending" : "待审核"],
-            ["approved", locale === "it" ? "Approved" : "已通过"],
-            ["rejected", locale === "it" ? "Rejected" : "已拒绝"],
+            ["pending", formatAdminStatus("b2bApplication", "pending", locale).label],
+            ["approved", formatAdminStatus("b2bApplication", "approved", locale).label],
+            ["rejected", formatAdminStatus("b2bApplication", "rejected", locale).label],
           ].map(([value, label]) => ({
             href: `${localizePath(locale, "/admin/accounts/b2b")}${value === "all" ? "" : `?filter=${value}`}`,
             label,
@@ -136,7 +139,10 @@ export default async function AdminAccountsB2BPage({
                       <p className="truncate text-base font-black text-stone-950">
                         {application.companyName}
                       </p>
-                      <StatusPill status={application.status} />
+                      <StatusPill
+                        status={formatAdminStatus("b2bApplication", application.status, locale).label}
+                        tone={formatAdminStatus("b2bApplication", application.status, locale).tone}
+                      />
                       {(application.duplicateCount ?? 1) > 1 ? (
                         <StatusPill status={`x${application.duplicateCount}`} tone="amber" />
                       ) : null}
@@ -153,15 +159,28 @@ export default async function AdminAccountsB2BPage({
                     action="/api/admin/accounts/b2b/status"
                     currentStatus={application.status}
                     extraFields={
-                      <input
-                        className="h-9 w-36 rounded-lg border border-black/10 bg-white px-2 text-xs font-black text-stone-700 outline-none transition focus:border-stone-950 focus:ring-2 focus:ring-stone-950/10"
+                      <select
+                        className="h-9 w-40 rounded-lg border border-black/10 bg-white px-2 text-xs font-black text-stone-700 outline-none transition focus:border-stone-950 focus:ring-2 focus:ring-stone-950/10"
                         name="priceGroup"
-                        placeholder="b2b_basic"
-                      />
+                        defaultValue="b2b_basic"
+                      >
+                        {approvedB2BPriceGroupOptions.map((group) => (
+                          <option key={group} value={group}>
+                            {formatAdminStatus("priceGroup", group, locale).label}
+                          </option>
+                        ))}
+                      </select>
                     }
                     id={application.id}
                     locale={locale}
-                    statuses={b2bStatuses}
+                    statuses={[...b2bStatusOptions]}
+                    statusLabels={Object.fromEntries(
+                      b2bStatusOptions.map((status) => [
+                        status,
+                        formatAdminStatus("b2bApplication", status, locale).label,
+                      ]),
+                    )}
+                    submitLabel={locale === "it" ? "Salva" : "保存"}
                   />
                 </article>
               ))}

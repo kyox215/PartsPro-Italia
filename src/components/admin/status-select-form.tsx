@@ -7,14 +7,18 @@ export function StatusSelectForm({
   locale,
   currentStatus,
   statuses,
+  statusLabels,
   extraFields,
+  submitLabel,
 }: Readonly<{
   action: string;
   id: string;
   locale: string;
   currentStatus: string;
   statuses: string[];
+  statusLabels?: Record<string, string>;
   extraFields?: ReactNode;
+  submitLabel?: string;
 }>) {
   return (
     <form action={action} method="post" className="flex flex-wrap items-center gap-2">
@@ -29,7 +33,7 @@ export function StatusSelectForm({
       >
         {statuses.map((status) => (
           <option key={status} value={status}>
-            {status}
+            {statusLabels?.[status] ?? status}
           </option>
         ))}
       </select>
@@ -37,7 +41,7 @@ export function StatusSelectForm({
         className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white transition hover:bg-stone-800"
         type="submit"
       >
-        Save
+        {submitLabel ?? "Save"}
       </button>
     </form>
   );

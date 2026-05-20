@@ -61,6 +61,7 @@ export function AccountManagementTabs({
 
   return (
     <AdminTabs
+      wrap
       items={tabs
         .filter((tab) => hasAdminPermission(auth, tab.permission))
         .map((tab) => ({

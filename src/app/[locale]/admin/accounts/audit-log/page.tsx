@@ -2,14 +2,15 @@ import { redirect } from "next/navigation";
 import { Activity, ShieldCheck } from "lucide-react";
 import { AccountManagementTabs } from "@/components/admin/account-management-nav";
 import {
-  AdminDataTable,
   AdminMetricCard,
   AdminPageHeader,
   AdminPanel,
+  AdminRecordList,
   AdminWorkspaceGrid,
   StatusPill,
 } from "@/components/admin/admin-ui";
 import { getCustomerAuditEvents } from "@/lib/admin-accounts";
+import { formatAdminStatus, formatAuditDataSummary } from "@/lib/admin-display";
 import { hasAdminPermission } from "@/lib/admin-permissions";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
@@ -31,7 +32,7 @@ export default async function AdminAccountAuditLogPage({
   return (
     <div className="space-y-3">
       <AdminPageHeader
-        eyebrow={locale === "it" ? "Account workspace" : "账号管理"}
+        eyebrow={locale === "it" ? "Area account" : "账号管理"}
         title={locale === "it" ? "Audit account" : "账号操作日志"}
         description={
           locale === "it"
@@ -51,36 +52,33 @@ export default async function AdminAccountAuditLogPage({
         }
       >
         <AdminPanel title={locale === "it" ? "Log recenti" : "最近账号日志"}>
-          <AdminDataTable minWidth={1040}>
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-stone-400">
-                <tr className="border-b border-black/5">
-                  <th className="px-2.5 py-2">Action</th>
-                  <th className="px-2.5 py-2">Actor</th>
-                  <th className="px-2.5 py-2">Customer</th>
-                  <th className="px-2.5 py-2">Company</th>
-                  <th className="px-2.5 py-2">Application</th>
-                  <th className="px-2.5 py-2">After</th>
-                  <th className="px-2.5 py-2">Time</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/5">
-                {events.map((event) => (
-                  <tr key={event.id} className="hover:bg-stone-50">
-                    <td className="px-2.5 py-2.5"><StatusPill status={event.action} tone="blue" /></td>
-                    <td className="px-2.5 py-2.5 text-stone-700">{event.actorEmail ?? "-"}</td>
-                    <td className="px-2.5 py-2.5 font-mono text-xs text-stone-500">{event.customerProfileId ?? "-"}</td>
-                    <td className="px-2.5 py-2.5 font-mono text-xs text-stone-500">{event.companyId ?? "-"}</td>
-                    <td className="px-2.5 py-2.5 font-mono text-xs text-stone-500">{event.applicationId ?? "-"}</td>
-                    <td className="max-w-[280px] px-2.5 py-2.5 text-xs text-stone-500">
-                      <span className="line-clamp-2">{event.afterData ? JSON.stringify(event.afterData) : "-"}</span>
-                    </td>
-                    <td className="px-2.5 py-2.5 text-xs text-stone-500">{new Date(event.createdAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </AdminDataTable>
+          <AdminRecordList>
+            {events.map((event) => {
+              const action = formatAdminStatus("auditAction", event.action, locale);
+              const target = event.companyId ?? event.customerProfileId ?? event.applicationId ?? "-";
+              return (
+                <article key={event.id} className="grid min-w-0 gap-3 rounded-lg bg-stone-50 p-3 lg:grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)_auto] lg:items-center">
+                  <div className="min-w-0">
+                    <StatusPill status={action.label} tone={action.tone} />
+                    <p className="mt-2 break-words text-xs font-semibold text-stone-500">
+                      {locale === "it" ? "Operatore" : "操作人"}: {event.actorEmail ?? "-"}
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="break-words font-mono text-xs font-semibold text-stone-500">
+                      {locale === "it" ? "Oggetto" : "对象"}: {target}
+                    </p>
+                    <p className="mt-1 line-clamp-2 break-words text-xs font-semibold text-stone-600">
+                      {formatAuditDataSummary(event.afterData, locale)}
+                    </p>
+                  </div>
+                  <p className="text-xs font-semibold text-stone-500 lg:text-right">
+                    {new Date(event.createdAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN")}
+                  </p>
+                </article>
+              );
+            })}
+          </AdminRecordList>
         </AdminPanel>
       </AdminWorkspaceGrid>
     </div>

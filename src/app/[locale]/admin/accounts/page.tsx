@@ -9,13 +9,14 @@ import {
 import { AccountManagementTabs } from "@/components/admin/account-management-nav";
 import {
   AdminButtonLink,
-  AdminDataTable,
   AdminMetricCard,
   AdminPageHeader,
   AdminPanel,
+  AdminRecordList,
   AdminWorkspaceGrid,
   StatusPill,
 } from "@/components/admin/admin-ui";
+import { formatAdminCount, formatAdminStatus, isApprovedB2BPriceGroup } from "@/lib/admin-display";
 import { getCustomerAuditEvents, getAdminStaffRows } from "@/lib/admin-accounts";
 import { hasAdminPermission } from "@/lib/admin-permissions";
 import { getAdminCustomerRows } from "@/lib/admin-customers";
@@ -43,7 +44,7 @@ export default async function AdminAccountsPage({
         ])
       : [[], [], [], []];
 
-  const b2bCustomers = customers.filter((customer) => customer.priceGroup !== "retail");
+  const b2bCustomers = customers.filter((customer) => isApprovedB2BPriceGroup(customer.priceGroup) || customer.crmStatus.includes("approved"));
   const suspendedCustomers = customers.filter((customer) => customer.accountStatus !== "active");
   const pendingB2B = applications.filter((application) => application.status === "pending");
   const totalSpent = customers.reduce((sum, customer) => sum + customer.totalSpent, 0);
@@ -51,7 +52,7 @@ export default async function AdminAccountsPage({
   return (
     <div className="space-y-3">
       <AdminPageHeader
-        eyebrow={locale === "it" ? "Account workspace" : "账号管理板块"}
+        eyebrow={locale === "it" ? "Area account" : "账号管理板块"}
         title={locale === "it" ? "Gestione account" : "账号管理"}
         description={
           locale === "it"
@@ -95,14 +96,14 @@ export default async function AdminAccountsPage({
         <section className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
           <AdminMetricCard
             icon={ClipboardList}
-            label={locale === "it" ? "B2B pending" : "待审核 B2B"}
+            label={locale === "it" ? "B2B da revisionare" : "待审核 B2B"}
             value={pendingB2B.length}
             tone="amber"
             caption={locale === "it" ? "Richieste da gestire" : "需要集中处理"}
           />
           <AdminMetricCard
             icon={UsersRound}
-            label={locale === "it" ? "Retail" : "零售客户"}
+            label={locale === "it" ? "Clienti retail" : "零售客户"}
             value={customers.filter((customer) => customer.priceGroup === "retail").length}
             tone="slate"
           />
@@ -148,30 +149,26 @@ export default async function AdminAccountsPage({
 
         <AdminPanel
           title={locale === "it" ? "Audit account recente" : "最近账号操作"}
-          toolbar={<StatusPill status={`${auditEvents.length} rows`} tone="blue" />}
+          toolbar={<StatusPill status={formatAdminCount(auditEvents.length, "events", locale)} tone="blue" />}
         >
-          <AdminDataTable minWidth={760}>
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-stone-400">
-                <tr className="border-b border-black/5">
-                  <th className="px-2.5 py-2">Action</th>
-                  <th className="px-2.5 py-2">Actor</th>
-                  <th className="px-2.5 py-2">Target</th>
-                  <th className="px-2.5 py-2">Time</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/5">
-                {auditEvents.map((event) => (
-                  <tr key={event.id} className="hover:bg-stone-50">
-                    <td className="px-2.5 py-2.5 font-black text-stone-950">{event.action}</td>
-                    <td className="px-2.5 py-2.5 text-stone-600">{event.actorEmail ?? "-"}</td>
-                    <td className="px-2.5 py-2.5 text-xs text-stone-500">{event.companyId ?? event.customerProfileId ?? event.applicationId ?? "-"}</td>
-                    <td className="px-2.5 py-2.5 text-xs text-stone-500">{new Date(event.createdAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </AdminDataTable>
+          <AdminRecordList>
+            {auditEvents.map((event) => {
+              const action = formatAdminStatus("auditAction", event.action, locale);
+              return (
+                <article key={event.id} className="grid min-w-0 gap-2 rounded-lg bg-stone-50 p-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                  <div className="min-w-0">
+                    <StatusPill status={action.label} tone={action.tone} />
+                    <p className="mt-2 break-words text-xs font-semibold text-stone-500">
+                      {event.actorEmail ?? "-"} · {event.companyId ?? event.customerProfileId ?? event.applicationId ?? "-"}
+                    </p>
+                  </div>
+                  <p className="text-xs font-semibold text-stone-500 md:text-right">
+                    {new Date(event.createdAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN")}
+                  </p>
+                </article>
+              );
+            })}
+          </AdminRecordList>
         </AdminPanel>
       </AdminWorkspaceGrid>
     </div>

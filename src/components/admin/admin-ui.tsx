@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Tone = "default" | "blue" | "green" | "amber" | "red" | "violet" | "slate";
+export type Tone = "default" | "blue" | "green" | "amber" | "red" | "violet" | "slate";
 
 const toneClasses: Record<Tone, string> = {
   default: "bg-stone-100 text-stone-700 ring-stone-200",
@@ -170,12 +170,20 @@ export function AdminTrendBadge({
 export function AdminTabs({
   items,
   className,
+  wrap = false,
 }: Readonly<{
   items: Array<{ href: string; label: ReactNode; active?: boolean; count?: number | string }>;
   className?: string;
+  wrap?: boolean;
 }>) {
   return (
-    <div className={cn("flex gap-1 overflow-x-auto rounded-lg bg-white p-1 shadow-sm", className)}>
+    <div
+      className={cn(
+        "flex gap-1 rounded-lg bg-white p-1 shadow-sm",
+        wrap ? "flex-wrap" : "overflow-x-auto",
+        className,
+      )}
+    >
       {items.map((item) => (
         <Link
           key={item.href}
@@ -202,6 +210,16 @@ export function AdminTabs({
       ))}
     </div>
   );
+}
+
+export function AdminRecordList({
+  children,
+  className,
+}: Readonly<{
+  children: ReactNode;
+  className?: string;
+}>) {
+  return <div className={cn("grid min-w-0 gap-2", className)}>{children}</div>;
 }
 
 export function AdminDataTable({
