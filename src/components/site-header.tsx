@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Menu, Search, ShoppingCart } from "lucide-react";
+import { Search, ShoppingCart } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { SiteMobileMenu } from "@/components/site-mobile-menu";
 import type { AuthContext } from "@/lib/auth";
 import type { Locale, Dictionary } from "@/lib/i18n";
 import { localizePath } from "@/lib/i18n";
@@ -65,13 +66,14 @@ export function SiteHeader({
             <ShoppingCart className="h-4 w-4" />
             <span className="hidden sm:inline">{dictionary.nav.cart as string}</span>
           </ButtonLink>
-          <button
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 md:hidden"
-            aria-label="Menu"
-            type="button"
-          >
-            <Menu className="h-4 w-4" />
-          </button>
+          <SiteMobileMenu
+            locale={locale}
+            navItems={navItems.map(([path, label]) => ({
+              href: localizePath(locale, `/${path}`),
+              label,
+            }))}
+            searchLabel={dictionary.common.search as string}
+          />
         </div>
       </div>
     </header>

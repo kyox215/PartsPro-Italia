@@ -2,11 +2,14 @@ import { FileText, RotateCcw, ShoppingBag, type LucideIcon } from "lucide-react"
 import {
   AccountFeedback,
   AccountMetricCards,
+  AccountNotificationsPanel,
   AccountProfileCta,
+  AccountTodoPanel,
 } from "@/components/account/account-activity-blocks";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { getAccountActivity } from "@/lib/account-activity";
+import { getAccountCompany } from "@/lib/account-company";
 import { getAuthContext } from "@/lib/auth";
 import { getDictionary, isLocale, type Locale, localizePath } from "@/lib/i18n";
 
@@ -23,6 +26,7 @@ export default async function AccountPage({
   const dictionary = getDictionary(locale);
   const auth = await getAuthContext();
   const activity = await getAccountActivity(auth);
+  const { company } = await getAccountCompany(auth);
 
   return (
     <div className="space-y-6">
@@ -48,6 +52,37 @@ export default async function AccountPage({
       </section>
 
       <AccountMetricCards activity={activity} auth={auth} locale={locale} />
+
+      <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <section className="rounded-lg border border-slate-200 bg-white p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-bold text-slate-950">
+              {locale === "it" ? "Azioni aperte" : "待处理事项"}
+            </h2>
+            <Badge className="border-blue-200 bg-blue-50 text-blue-700">
+              {locale === "it" ? "Workspace" : "工作台"}
+            </Badge>
+          </div>
+          <AccountTodoPanel activity={activity} company={company} locale={locale} />
+        </section>
+
+        <section className="rounded-lg border border-slate-200 bg-slate-50 p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-bold text-slate-950">
+              {locale === "it" ? "Notifiche" : "通知中心"}
+            </h2>
+            {activity.unreadNotificationCount ? (
+              <Badge className="border-blue-200 bg-blue-50 text-blue-700">
+                {activity.unreadNotificationCount}
+              </Badge>
+            ) : null}
+          </div>
+          <AccountNotificationsPanel
+            notifications={activity.notifications}
+            locale={locale}
+          />
+        </section>
+      </section>
 
       <section className="grid gap-4 lg:grid-cols-3">
         <ActionCard

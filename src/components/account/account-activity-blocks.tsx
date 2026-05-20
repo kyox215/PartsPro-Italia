@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import {
   Building2,
   FileText,
+  Inbox,
   PackageCheck,
   RotateCcw,
   UserRound,
@@ -10,9 +11,24 @@ import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import type {
   AccountActivity,
+  AccountNotificationRow,
   AccountOrderRow,
   AccountRmaRow,
 } from "@/lib/account-activity";
+import type { AccountCompany } from "@/lib/account-company";
+import {
+  formatAccountRole,
+  formatFulfillmentStatus,
+  formatFulfillmentType,
+  formatOrderStatus,
+  formatPaymentMethod,
+  formatPaymentStatus,
+  formatResolutionType,
+  formatRmaIssueType,
+  formatRmaStatus,
+  getCompanyCompletion,
+  statusBadgeClass,
+} from "@/lib/account-display";
 import type { AuthContext } from "@/lib/auth";
 import type { Locale } from "@/lib/i18n";
 import { localizePath } from "@/lib/i18n";
@@ -46,7 +62,7 @@ export function AccountMetricCards({
     {
       Icon: Building2,
       label: locale === "it" ? "Profilo" : "账户类型",
-      value: auth.role ?? (auth.configured ? "retail" : "demo"),
+      value: formatAccountRole(auth, locale),
     },
   ];
 
@@ -57,6 +73,208 @@ export function AccountMetricCards({
           <Icon className="h-6 w-6 text-blue-600" />
           <h2 className="mt-4 text-sm font-medium text-slate-500">{label}</h2>
           <p className="mt-1 break-words text-2xl font-bold text-slate-950">{value}</p>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+export function AccountTodoPanel({
+  activity,
+  company,
+  locale,
+}: Readonly<{
+  activity: AccountActivity;
+  company: AccountCompany | null;
+  locale: Locale;
+}>) {
+  const completion = getCompanyCompletion(company);
+  const pendingPayments = activity.orders.filter(
+    (order) =>
+      order.paymentStatus !== "paid" &&
+      order.paymentStatus !== "refunded" &&
+      order.status !== "cancelled",
+  );
+  const expiringReservations = pendingPayments.filter((order) => {
+    if (!order.reservationExpiresAt) return false;
+    return Date.parse(order.reservationExpiresAt) - Date.now() < 6 * 60 * 60 * 1000;
+  });
+  const preorderOrders = activity.orders.filter(
+    (order) => order.fulfillmentStatus === "awaiting_preorder",
+  );
+  const shippedOrders = activity.orders.filter((order) => order.status === "shipped");
+  const waitingRmas = activity.rmas.filter((rma) => rma.status === "waiting_information");
+  const todos = [
+    ...pendingPayments.slice(0, 3).map((order) => ({
+      key: `payment-${order.id}`,
+      title: locale === "it" ? "Pagamento da completare" : "订单等待付款",
+      description:
+        locale === "it"
+          ? `${formatPaymentMethod(order.paymentMethod, locale)} / ${formatMoney(order.total, locale)}`
+          : `${formatPaymentMethod(order.paymentMethod, locale)} / ${formatMoney(order.total, locale)}`,
+      href: localizePath(locale, `/account/orders/${order.id}`),
+      tone: "amber" as const,
+    })),
+    ...expiringReservations.slice(0, 2).map((order) => ({
+      key: `expiry-${order.id}`,
+      title: locale === "it" ? "Prenotazione in scadenza" : "库存锁定即将过期",
+      description: order.reservationExpiresAt
+        ? formatDateTime(order.reservationExpiresAt, locale)
+        : "-",
+      href: localizePath(locale, `/account/orders/${order.id}`),
+      tone: "orange" as const,
+    })),
+    ...preorderOrders.slice(0, 2).map((order) => ({
+      key: `preorder-${order.id}`,
+      title: locale === "it" ? "Preorder in attesa" : "预购等待到货",
+      description: formatFulfillmentStatus(order.fulfillmentStatus, locale).description,
+      href: localizePath(locale, `/account/orders/${order.id}`),
+      tone: "blue" as const,
+    })),
+    ...shippedOrders.slice(0, 2).map((order) => ({
+      key: `shipment-${order.id}`,
+      title: locale === "it" ? "Tracking disponibile" : "物流可查看",
+      description: order.trackingNumber ?? order.shippingCarrier ?? order.id,
+      href: localizePath(locale, `/account/orders/${order.id}`),
+      tone: "blue" as const,
+    })),
+    ...waitingRmas.slice(0, 2).map((rma) => ({
+      key: `rma-${rma.id}`,
+      title: locale === "it" ? "RMA richiede informazioni" : "售后等待补充",
+      description: `${rma.rmaNumber ?? rma.id} / ${rma.sku}`,
+      href: localizePath(locale, `/account/rma/${rma.id}`),
+      tone: "orange" as const,
+    })),
+  ];
+
+  if (completion.percent < 100) {
+    todos.push({
+      key: "company-profile",
+      title: locale === "it" ? "Profilo aziendale incompleto" : "公司资料待完善",
+      description:
+        locale === "it"
+          ? `${completion.completed}/${completion.total} campi completati`
+          : `${completion.completed}/${completion.total} 个关键字段已完成`,
+      href: localizePath(locale, "/account/company"),
+      tone: "amber",
+    });
+  }
+
+  if (!todos.length) {
+    return (
+      <AccountEmptyState
+        icon={<PackageCheck className="h-6 w-6 text-emerald-600" />}
+        title={locale === "it" ? "Nessuna azione urgente" : "暂无待处理事项"}
+        description={
+          locale === "it"
+            ? "Pagamenti, preorder, RMA e profilo aziendale sono sotto controllo."
+            : "付款、预购、售后和公司资料目前没有紧急处理项。"
+        }
+      />
+    );
+  }
+
+  return (
+    <div className="grid gap-3">
+      {todos.map((todo) => (
+        <a
+          key={todo.key}
+          className="grid gap-2 rounded-lg border border-slate-200 bg-white p-4 transition hover:border-blue-200 hover:bg-blue-50/40"
+          href={todo.href}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <strong className="text-sm text-slate-950">{todo.title}</strong>
+            <Badge className={statusBadgeClass(todo.tone)}>
+              {locale === "it" ? "Azione" : "待办"}
+            </Badge>
+          </div>
+          <p className="break-words text-sm leading-6 text-slate-600">
+            {todo.description}
+          </p>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+export function AccountNotificationsPanel({
+  notifications,
+  locale,
+}: Readonly<{
+  notifications: AccountNotificationRow[];
+  locale: Locale;
+}>) {
+  if (!notifications.length) {
+    return (
+      <AccountEmptyState
+        icon={<Inbox className="h-6 w-6 text-blue-600" />}
+        title={locale === "it" ? "Nessuna notifica" : "暂无通知"}
+        description={
+          locale === "it"
+            ? "Aggiornamenti su pagamenti, spedizioni, rimborsi e RMA appariranno qui."
+            : "付款、物流、退款和售后的更新会显示在这里。"
+        }
+      />
+    );
+  }
+
+  return (
+    <div className="grid gap-3">
+      <form action="/api/account/notifications/read" method="post" className="flex justify-end">
+        <input type="hidden" name="locale" value={locale} />
+        <button
+          className="h-9 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700"
+          type="submit"
+        >
+          {locale === "it" ? "Segna lette" : "全部标记已读"}
+        </button>
+      </form>
+      {notifications.map((notification) => (
+        <article
+          key={notification.id}
+          className="rounded-lg border border-slate-200 bg-white p-4"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-bold text-slate-950">{notification.subject}</h3>
+            <Badge
+              className={
+                notification.readAt
+                  ? "border-slate-300 bg-slate-100 text-slate-700"
+                  : "border-blue-200 bg-blue-50 text-blue-700"
+              }
+            >
+              {notification.readAt
+                ? locale === "it"
+                  ? "Letta"
+                  : "已读"
+                : locale === "it"
+                  ? "Nuova"
+                  : "新通知"}
+            </Badge>
+          </div>
+          <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-slate-600">
+            {notification.body}
+          </p>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+            <span>{formatDateTime(notification.createdAt, locale)}</span>
+            {notification.orderId ? (
+              <ButtonLink
+                href={localizePath(locale, `/account/orders/${notification.orderId}`)}
+                variant="secondary"
+                className="h-8 px-2 text-xs"
+              >
+                {locale === "it" ? "Ordine" : "查看订单"}
+              </ButtonLink>
+            ) : notification.rmaId ? (
+              <ButtonLink
+                href={localizePath(locale, `/account/rma/${notification.rmaId}`)}
+                variant="secondary"
+                className="h-8 px-2 text-xs"
+              >
+                RMA
+              </ButtonLink>
+            ) : null}
+          </div>
         </article>
       ))}
     </div>
@@ -117,7 +335,7 @@ export function AccountOrdersTable({
                       {item.quantity}
                       {item.fulfillmentType ? (
                         <Badge className="ml-2 border-blue-200 bg-blue-50 text-blue-700">
-                          {item.fulfillmentType}
+                          {formatFulfillmentType(item.fulfillmentType, locale)}
                         </Badge>
                       ) : null}
                     </li>
@@ -125,21 +343,23 @@ export function AccountOrdersTable({
                 </ul>
               </td>
               <td className="px-4 py-3 text-slate-700">
-                <p className="font-semibold">{order.paymentMethod}</p>
+                <p className="font-semibold">
+                  {formatPaymentMethod(order.paymentMethod, locale)}
+                </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  {order.paymentStatus ?? "-"}
+                  {formatPaymentStatus(order.paymentStatus, locale).label}
                 </p>
               </td>
               <td className="px-4 py-3 font-bold text-slate-950">
                 {formatMoney(order.total, locale)}
               </td>
               <td className="px-4 py-3">
-                <Badge className="border-slate-300 bg-slate-100 text-slate-800">
-                  {order.status}
+                <Badge className={statusBadgeClass(formatOrderStatus(order.status, locale).tone)}>
+                  {formatOrderStatus(order.status, locale).label}
                 </Badge>
                 {order.fulfillmentStatus ? (
                   <p className="mt-2 text-xs font-semibold text-slate-500">
-                    {order.fulfillmentStatus}
+                    {formatFulfillmentStatus(order.fulfillmentStatus, locale).label}
                   </p>
                 ) : null}
               </td>
@@ -187,22 +407,23 @@ export function AccountRmaGrid({
             <p className="font-mono text-xs font-bold text-slate-900">
               {rma.rmaNumber ?? rma.id}
             </p>
-            <Badge className="border-orange-200 bg-orange-50 text-orange-700">
-              {rma.status}
+            <Badge className={statusBadgeClass(formatRmaStatus(rma.status, locale).tone)}>
+              {formatRmaStatus(rma.status, locale).label}
             </Badge>
           </div>
           <h3 className="mt-4 font-bold text-slate-950">
             {rma.orderNumber} / {rma.sku}
           </h3>
           <p className="mt-1 text-sm text-slate-600">
-            {rma.issueType} x {rma.quantity}
+            {formatRmaIssueType(rma.issueType, locale)} x {rma.quantity}
           </p>
           <p className="mt-3 text-sm leading-6 text-slate-600">
             {rma.description || (locale === "it" ? "Nessuna descrizione." : "无描述。")}
           </p>
           {rma.resolutionType ? (
             <p className="mt-3 rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700">
-              {locale === "it" ? "Esito" : "处理结果"}: {rma.resolutionType}
+              {locale === "it" ? "Esito" : "处理结果"}:{" "}
+              {formatResolutionType(rma.resolutionType, locale)}
             </p>
           ) : null}
           <p className="mt-3 text-xs text-slate-500">
@@ -289,8 +510,8 @@ export function AccountFeedback({
     <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
       {orderId
         ? locale === "it"
-          ? `Ordine ${orderId} creato. Stato: ${status ?? "pending"}.`
-          : `订单 ${orderId} 已创建。状态：${status ?? "pending"}。`
+          ? `Ordine ${orderId} creato. Stato: ${formatPaymentStatus(status, locale).label}.`
+          : `订单 ${orderId} 已创建。状态：${formatPaymentStatus(status, locale).label}。`
         : null}
       {rmaId
         ? locale === "it"
@@ -299,4 +520,8 @@ export function AccountFeedback({
         : null}
     </div>
   );
+}
+
+function formatDateTime(value: string, locale: Locale) {
+  return new Date(value).toLocaleString(locale === "it" ? "it-IT" : "zh-CN");
 }

@@ -66,6 +66,50 @@ export const rmaSchema = z.object({
   description: z.string().optional().or(z.literal("")),
 });
 
+export const accountOrderActionSchema = z.object({
+  id: z.string().min(1),
+  locale: z.enum(["it", "zh"]).default("it"),
+  returnTo: z.string().optional().or(z.literal("")),
+});
+
+export const accountOrderPaymentProofSchema = accountOrderActionSchema.extend({
+  providerReference: z.string().optional().or(z.literal("")),
+  proofUrl: z.string().url().optional().or(z.literal("")),
+  proofLabel: z.string().optional().or(z.literal("")),
+  note: z.string().optional().or(z.literal("")),
+});
+
+export const accountMessageSchema = z.object({
+  id: z.string().min(1),
+  locale: z.enum(["it", "zh"]).default("it"),
+  returnTo: z.string().optional().or(z.literal("")),
+  message: z.string().min(2, "message is required"),
+});
+
+export const accountRmaCreateSchema = z.object({
+  locale: z.enum(["it", "zh"]).default("it"),
+  orderId: z.string().min(1, "orderId is required"),
+  sku: z.string().min(1, "sku is required"),
+  quantity: z.coerce.number().int().positive(),
+  issueType: z.string().min(1, "issueType is required"),
+  description: z.string().optional().or(z.literal("")),
+});
+
+export const accountRmaAttachmentSchema = z.object({
+  id: z.string().min(1),
+  locale: z.enum(["it", "zh"]).default("it"),
+  returnTo: z.string().optional().or(z.literal("")),
+  label: z.string().min(1),
+  url: z.string().min(1),
+  note: z.string().optional().or(z.literal("")),
+});
+
+export const accountNotificationReadSchema = z.object({
+  id: z.string().optional().or(z.literal("")),
+  locale: z.enum(["it", "zh"]).default("it"),
+  returnTo: z.string().optional().or(z.literal("")),
+});
+
 export const adminProductSchema = z.object({
   slug: z.string().min(1),
   brand: z.string().min(1),
@@ -291,6 +335,34 @@ export const adminCustomerPriceGroupSchema = z.object({
   id: z.string().min(1),
   locale: z.enum(["it", "zh"]).default("it"),
   priceGroup: z.enum(["retail", "b2b_basic", "b2b_silver", "b2b_gold", "distributor"]),
+});
+
+export const adminAccountCustomerAccessSchema = z.object({
+  id: z.string().min(1),
+  source: z.enum(["company", "profile"]).default("company"),
+  locale: z.enum(["it", "zh"]).default("it"),
+  returnTo: z.string().optional().or(z.literal("")),
+  priceGroup: z.enum(["retail", "b2b_pending", "b2b_basic", "b2b_silver", "b2b_gold", "distributor"]),
+  accountStatus: z.enum(["active", "suspended", "archived"]).default("active"),
+  crmStatus: z.enum(["lead", "pending", "active", "paused", "rejected", "archived"]).default("active"),
+  nextFollowUpAt: z.string().optional().or(z.literal("")),
+});
+
+export const adminAccountLinkCompanySchema = z.object({
+  profileId: z.string().min(1),
+  locale: z.enum(["it", "zh"]).default("it"),
+  returnTo: z.string().optional().or(z.literal("")),
+  companyName: z.string().min(1),
+  vatNumber: z.string().optional().or(z.literal("")),
+  contactEmail: z.string().email().optional().or(z.literal("")),
+});
+
+export const adminStaffMemberSchema = z.object({
+  locale: z.enum(["it", "zh"]).default("it"),
+  returnTo: z.string().optional().or(z.literal("")),
+  email: z.string().email(),
+  role: z.enum(["owner", "sales", "catalog", "warehouse", "finance", "support"]),
+  status: z.enum(["active", "suspended", "archived"]).default("active"),
 });
 
 export const adminCustomerNoteSchema = z.object({

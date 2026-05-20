@@ -103,6 +103,7 @@ export type AdminB2BApplicationRow = {
   vatNumber: string | null;
   email: string | null;
   createdAt: string;
+  duplicateCount?: number;
 };
 
 export type AdminRmaRow = {
@@ -238,6 +239,78 @@ export async function getAdminOrderRows(): Promise<AdminOrderRow[]> {
   return (data ?? []).map(mapAdminOrder);
 }
 
+export async function getAdminOrderRowsForCustomer({
+  profileId,
+  email,
+  companyName,
+}: Readonly<{
+  profileId?: string | null;
+  email?: string | null;
+  companyName?: string | null;
+}>): Promise<AdminOrderRow[]> {
+  if (!hasSupabaseAdminConfig()) {
+    const orders = await getAdminOrderRows();
+    const normalizedEmail = email?.toLowerCase();
+    const normalizedCompanyName = companyName?.toLowerCase();
+    return orders.filter((order) => {
+      if (profileId && order.profileId === profileId) return true;
+      if (normalizedEmail && order.email?.toLowerCase() === normalizedEmail) return true;
+      return Boolean(
+        normalizedCompanyName &&
+          order.companyName?.toLowerCase() === normalizedCompanyName,
+      );
+    });
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const queries = [];
+  if (profileId) {
+    queries.push(
+      supabase
+        .from("orders")
+        .select("*, order_items (*)")
+        .eq("profile_id", profileId)
+        .limit(100),
+    );
+  }
+  if (email) {
+    queries.push(
+      supabase
+        .from("orders")
+        .select("*, order_items (*)")
+        .eq("email", email)
+        .limit(100),
+    );
+  }
+  if (companyName) {
+    queries.push(
+      supabase
+        .from("orders")
+        .select("*, order_items (*)")
+        .eq("company_name", companyName)
+        .limit(100),
+    );
+  }
+
+  if (queries.length === 0) return [];
+
+  const results = await Promise.all(queries);
+  const rowsById = new Map<string, AdminOrderRow>();
+  results.forEach((result) => {
+    if (result.error) {
+      console.error("Failed to load customer orders", result.error);
+      return;
+    }
+    (result.data ?? []).forEach((order) => {
+      rowsById.set(order.id, mapAdminOrder(order));
+    });
+  });
+
+  return [...rowsById.values()].sort(
+    (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+  );
+}
+
 export async function getAdminOrderById(
   orderId: string,
 ): Promise<AdminOrderRow | null> {
@@ -295,7 +368,7 @@ export async function getAdminB2BApplicationRows(): Promise<AdminB2BApplicationR
     return [];
   }
 
-  return (data ?? []).map((row) => ({
+  const rows = (data ?? []).map((row) => ({
     id: row.id,
     status: row.status,
     companyName: row.company_name,
@@ -303,6 +376,31 @@ export async function getAdminB2BApplicationRows(): Promise<AdminB2BApplicationR
     email: row.email,
     createdAt: row.created_at,
   }));
+  return dedupeB2BApplications(rows);
+}
+
+function dedupeB2BApplications(rows: AdminB2BApplicationRow[]) {
+  const byKey = new Map<string, AdminB2BApplicationRow>();
+
+  rows.forEach((row) => {
+    const key = [
+      row.email?.trim().toLowerCase() || row.companyName.trim().toLowerCase(),
+      row.vatNumber?.trim().toLowerCase() || "no-vat",
+    ].join("::");
+    const current = byKey.get(key);
+    if (!current) {
+      byKey.set(key, { ...row, duplicateCount: 1 });
+      return;
+    }
+    const keepNewRow = new Date(row.createdAt).getTime() > new Date(current.createdAt).getTime();
+    const next = keepNewRow ? { ...row } : { ...current };
+    next.duplicateCount = (current.duplicateCount ?? 1) + 1;
+    byKey.set(key, next);
+  });
+
+  return Array.from(byKey.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
 }
 
 export async function getAdminRmaRows(): Promise<AdminRmaRow[]> {
@@ -360,6 +458,66 @@ export async function getAdminRmaRows(): Promise<AdminRmaRow[]> {
   return (data ?? []).map(mapAdminRma);
 }
 
+export async function getAdminRmaRowsForCustomer({
+  profileId,
+  orderIds,
+}: Readonly<{
+  profileId?: string | null;
+  orderIds?: string[];
+}>): Promise<AdminRmaRow[]> {
+  if (!hasSupabaseAdminConfig()) {
+    const rmas = await getAdminRmaRows();
+    const orderIdSet = new Set(orderIds ?? []);
+    return rmas.filter((rma) => {
+      if (profileId && rma.profileId === profileId) return true;
+      return Boolean(rma.orderId && orderIdSet.has(rma.orderId));
+    });
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const queries = [];
+  if (profileId) {
+    queries.push(
+      supabase
+        .from("rmas")
+        .select(
+          "id, rma_number, order_id, profile_id, status, order_number, sku, quantity, issue_type, description, installation_tested, installed, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, attachments, created_at",
+        )
+        .eq("profile_id", profileId)
+        .limit(100),
+    );
+  }
+  if (orderIds?.length) {
+    queries.push(
+      supabase
+        .from("rmas")
+        .select(
+          "id, rma_number, order_id, profile_id, status, order_number, sku, quantity, issue_type, description, installation_tested, installed, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, attachments, created_at",
+        )
+        .in("order_id", orderIds)
+        .limit(100),
+    );
+  }
+
+  if (queries.length === 0) return [];
+
+  const results = await Promise.all(queries);
+  const rowsById = new Map<string, AdminRmaRow>();
+  results.forEach((result) => {
+    if (result.error) {
+      console.error("Failed to load customer RMAs", result.error);
+      return;
+    }
+    (result.data ?? []).forEach((rma) => {
+      rowsById.set(rma.id, mapAdminRma(rma));
+    });
+  });
+
+  return [...rowsById.values()].sort(
+    (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+  );
+}
+
 export async function getAdminRmaById(rmaId: string): Promise<AdminRmaRow | null> {
   if (!hasSupabaseAdminConfig()) {
     const rows = await getAdminRmaRows();
@@ -384,13 +542,59 @@ export async function getAdminRmaById(rmaId: string): Promise<AdminRmaRow | null
 }
 
 export async function getAdminDashboardMetrics() {
-  const [orders, b2bApplications, rmas, preorderIncomingTotal] = await Promise.all([
-    getAdminOrderRows(),
-    getAdminB2BApplicationRows(),
-    getAdminRmaRows(),
-    getPreorderIncomingTotal(),
-  ]);
+  if (!hasSupabaseAdminConfig()) {
+    const [orders, b2bApplications, rmas, preorderIncomingTotal] = await Promise.all([
+      getAdminOrderRows(),
+      getAdminB2BApplicationRows(),
+      getAdminRmaRows(),
+      getPreorderIncomingTotal(),
+    ]);
 
+    return summarizeDashboardMetrics({
+      orders,
+      b2bApplications,
+      rmas,
+      preorderIncomingTotal,
+    });
+  }
+
+  const [orderSummary, pendingB2BCount, openRmaCount, preorderIncomingTotal] =
+    await Promise.all([
+      getAdminOrderMetricRows(),
+      getAdminPendingB2BCount(),
+      getAdminOpenRmaCount(),
+      getPreorderIncomingTotal(),
+    ]);
+
+  return {
+    orders: [],
+    b2bApplications: [],
+    rmas: [],
+    orderCount: orderSummary.orderCount,
+    pendingPaymentCount: orderSummary.pendingPaymentCount,
+    pendingCashCount: orderSummary.pendingCashCount,
+    pendingBankTransferCount: orderSummary.pendingBankTransferCount,
+    pendingCardCount: orderSummary.pendingCardCount,
+    expiringReservationCount: orderSummary.expiringReservationCount,
+    preorderAllocationCount: orderSummary.preorderAllocationCount,
+    pendingB2BCount,
+    openRmaCount,
+    preorderIncomingTotal,
+    revenueTotal: orderSummary.revenueTotal,
+  };
+}
+
+function summarizeDashboardMetrics({
+  orders,
+  b2bApplications,
+  rmas,
+  preorderIncomingTotal,
+}: Readonly<{
+  orders: AdminOrderRow[];
+  b2bApplications: AdminB2BApplicationRow[];
+  rmas: AdminRmaRow[];
+  preorderIncomingTotal: number;
+}>) {
   return {
     orders,
     b2bApplications,
@@ -405,13 +609,7 @@ export async function getAdminDashboardMetrics() {
     ).length,
     pendingCardCount: orders.filter((order) => order.paymentStatus === "pending_card")
       .length,
-    expiringReservationCount: orders.filter((order) => {
-      if (!order.reservationExpiresAt || order.releasedAt || order.paymentStatus === "paid") {
-        return false;
-      }
-      const expiresAt = new Date(order.reservationExpiresAt).getTime();
-      return expiresAt <= Date.now() + 6 * 60 * 60 * 1000;
-    }).length,
+    expiringReservationCount: orders.filter(isAdminReservationExpiringSoon).length,
     preorderAllocationCount: orders.filter(
       (order) => order.fulfillmentStatus === "awaiting_preorder",
     ).length,
@@ -424,6 +622,107 @@ export async function getAdminDashboardMetrics() {
       0,
     ),
   };
+}
+
+async function getAdminOrderMetricRows() {
+  const supabase = getSupabaseAdminClient();
+  const { data, error, count } = await supabase
+    .from("orders")
+    .select(
+      "status, payment_status, fulfillment_status, total, refund_total, reservation_expires_at, released_at",
+      { count: "exact" },
+    )
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  if (error) {
+    console.error("Failed to load admin dashboard order metrics", error);
+    return {
+      orderCount: 0,
+      pendingPaymentCount: 0,
+      pendingCashCount: 0,
+      pendingBankTransferCount: 0,
+      pendingCardCount: 0,
+      expiringReservationCount: 0,
+      preorderAllocationCount: 0,
+      revenueTotal: 0,
+    };
+  }
+
+  const summary = {
+    orderCount: count ?? data?.length ?? 0,
+    pendingPaymentCount: 0,
+    pendingCashCount: 0,
+    pendingBankTransferCount: 0,
+    pendingCardCount: 0,
+    expiringReservationCount: 0,
+    preorderAllocationCount: 0,
+    revenueTotal: 0,
+  };
+
+  (data ?? []).forEach((order) => {
+    const paymentStatus = order.payment_status ?? "";
+    if (paymentStatus === "pending_cash") summary.pendingCashCount += 1;
+    if (paymentStatus === "pending_bank_transfer") {
+      summary.pendingBankTransferCount += 1;
+    }
+    if (paymentStatus === "pending_card") summary.pendingCardCount += 1;
+    if (["pending_cash", "pending_bank_transfer", "pending_card"].includes(paymentStatus)) {
+      summary.pendingPaymentCount += 1;
+    }
+    if (order.fulfillment_status === "awaiting_preorder") {
+      summary.preorderAllocationCount += 1;
+    }
+    if (
+      order.reservation_expires_at &&
+      !order.released_at &&
+      paymentStatus !== "paid" &&
+      new Date(order.reservation_expires_at).getTime() <= Date.now() + 6 * 60 * 60 * 1000
+    ) {
+      summary.expiringReservationCount += 1;
+    }
+    summary.revenueTotal += Number(order.total ?? 0) - Number(order.refund_total ?? 0);
+  });
+
+  return summary;
+}
+
+async function getAdminPendingB2BCount() {
+  const supabase = getSupabaseAdminClient();
+  const { count, error } = await supabase
+    .from("b2b_applications")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pending");
+
+  if (error) {
+    console.error("Failed to load pending B2B count", error);
+    return 0;
+  }
+
+  return count ?? 0;
+}
+
+async function getAdminOpenRmaCount() {
+  const supabase = getSupabaseAdminClient();
+  const { count, error } = await supabase
+    .from("rmas")
+    .select("id", { count: "exact", head: true })
+    .neq("status", "completed");
+
+  if (error) {
+    console.error("Failed to load open RMA count", error);
+    return 0;
+  }
+
+  return count ?? 0;
+}
+
+function isAdminReservationExpiringSoon(order: AdminOrderRow) {
+  if (!order.reservationExpiresAt || order.releasedAt || order.paymentStatus === "paid") {
+    return false;
+  }
+  const expiresAt = new Date(order.reservationExpiresAt).getTime();
+  return expiresAt <= Date.now() + 6 * 60 * 60 * 1000;
 }
 
 async function getPreorderIncomingTotal() {

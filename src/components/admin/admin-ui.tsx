@@ -73,7 +73,12 @@ export function AdminPanel({
   contentClassName?: string;
 }>) {
   return (
-    <section className={cn("rounded-lg border border-black/5 bg-white shadow-sm", className)}>
+    <section
+      className={cn(
+        "content-visibility-auto rounded-lg border border-black/5 bg-white shadow-sm",
+        className,
+      )}
+    >
       {(title || description || toolbar) ? (
         <div className="flex flex-col gap-2 border-b border-black/5 px-3 py-2.5 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
@@ -203,19 +208,42 @@ export function AdminDataTable({
   children,
   emptyState,
   minWidth = 900,
+  mobileCards,
+  mobileBreakpoint = "md",
 }: Readonly<{
   children?: ReactNode;
   emptyState?: ReactNode;
   minWidth?: number;
+  mobileCards?: ReactNode;
+  mobileBreakpoint?: "sm" | "md" | "lg";
 }>) {
   if (!children) {
     return emptyState ? <>{emptyState}</> : null;
   }
 
+  const desktopVisibility = {
+    sm: "hidden sm:block",
+    md: "hidden md:block",
+    lg: "hidden lg:block",
+  }[mobileBreakpoint];
+  const mobileVisibility = {
+    sm: "sm:hidden",
+    md: "md:hidden",
+    lg: "lg:hidden",
+  }[mobileBreakpoint];
+
   return (
-    <div className="max-w-full overflow-x-auto">
-      <div style={{ minWidth }}>{children}</div>
-    </div>
+    <>
+      {mobileCards ? <div className={mobileVisibility}>{mobileCards}</div> : null}
+      <div
+        className={cn(
+          "max-w-full overflow-x-auto",
+          mobileCards ? desktopVisibility : "block",
+        )}
+      >
+        <div style={{ minWidth }}>{children}</div>
+      </div>
+    </>
   );
 }
 

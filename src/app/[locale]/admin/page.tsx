@@ -161,7 +161,7 @@ export default async function AdminPage({
         locale === "it"
           ? "Schede cliente, price group, note e follow-up."
           : "客户档案、价格组、备注、任务和跟进。",
-      href: localizePath(locale, "/admin/customers"),
+      href: localizePath(locale, "/admin/accounts"),
       tone: "bg-indigo-50 text-indigo-700",
     },
     {
@@ -171,7 +171,7 @@ export default async function AdminPage({
         locale === "it"
           ? "Approva richieste wholesale e collega lead CRM."
           : "审核批发申请并同步到客户档案。",
-      href: localizePath(locale, "/admin/b2b"),
+      href: localizePath(locale, "/admin/accounts/b2b"),
       tone: "bg-violet-50 text-violet-700",
     },
     {
@@ -219,15 +219,15 @@ export default async function AdminPage({
         }
       />
 
-      {!auth.configured || !auth.isAdmin ? (
+      {!auth.configured || !auth.canAccessAdmin ? (
         <AdminNotice
-          tone={auth.configured && !auth.isAdmin ? "danger" : "warning"}
+          tone={auth.configured && !auth.canAccessAdmin ? "danger" : "warning"}
           title={locale === "it" ? "Accesso operativo" : "运营访问"}
         >
-          {auth.configured && !auth.isAdmin
+          {auth.configured && !auth.canAccessAdmin
             ? locale === "it"
-              ? "Accesso reale limitato agli admin. In locale puoi vedere la shell, ma le API admin richiedono ruolo admin."
-              : "真实后台仅管理员可访问。本地可查看界面，但后台 API 需要 admin 角色。"
+              ? "Accesso reale limitato agli admin e agli staff autorizzati."
+              : "真实后台仅管理员和已授权员工可以访问。"
             : dictionary.admin.warning}
         </AdminNotice>
       ) : null}
@@ -269,7 +269,7 @@ export default async function AdminPage({
                   icon={UsersRound}
                   label={locale === "it" ? "B2B review" : "待审核 B2B"}
                   value={dashboard.pendingB2BCount}
-                  href={localizePath(locale, "/admin/b2b")}
+                  href={localizePath(locale, "/admin/accounts/b2b")}
                 />
                 <QueueRow
                   icon={TicketCheck}
@@ -287,7 +287,7 @@ export default async function AdminPage({
               <AdminButtonLink href={localizePath(locale, "/admin/inventory")} variant="secondary">
                 {locale === "it" ? "Inventario" : "库存"}
               </AdminButtonLink>
-              <AdminButtonLink href={localizePath(locale, "/admin/customers")} variant="secondary">
+              <AdminButtonLink href={localizePath(locale, "/admin/accounts/customers")} variant="secondary">
                 {locale === "it" ? "Clienti CRM" : "客户管理"}
               </AdminButtonLink>
               <AdminButtonLink href="/api/admin/health" variant="secondary">

@@ -12,10 +12,15 @@
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
+html {
+  text-size-adjust: 100%;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Inter, Roboto, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow-x: clip;
 }
 
 button,
@@ -25,7 +30,36 @@ textarea {
   font: inherit;
 }
 
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
 ::selection {
   background: #dbeafe;
   color: #0f172a;
+}
+
+.content-visibility-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 680px;
+}
+
+@media (max-width: 767px) {
+  .mobile-no-blur {
+    backdrop-filter: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

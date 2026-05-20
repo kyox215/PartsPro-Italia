@@ -1,6 +1,8 @@
 import {
   getAdminOrderRows,
+  getAdminOrderRowsForCustomer,
   getAdminRmaRows,
+  getAdminRmaRowsForCustomer,
   type AdminOrderRow,
   type AdminRmaRow,
 } from "@/lib/admin-operations";
@@ -11,10 +13,14 @@ import {
 
 export type AdminCustomerRow = {
   id: string;
-  source: "company" | "application";
+  source: "company" | "application" | "profile";
+  companyId: string | null;
+  applicationId: string | null;
   companyName: string;
   email: string | null;
   profileId: string | null;
+  profileRole: string | null;
+  accountStatus: string;
   contactName: string | null;
   phone: string | null;
   whatsapp: string | null;
@@ -82,8 +88,9 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
 
   const ownerIds = [...new Set((companies ?? []).map((row) => row.owner_id).filter(Boolean))];
   const companyIds = (companies ?? []).map((row) => row.id);
-  const [profiles, notesAndTasks, tagMap, orders, rmas, applications] = await Promise.all([
+  const [profiles, allProfiles, notesAndTasks, tagMap, orders, rmas, applications] = await Promise.all([
     loadProfiles(ownerIds),
+    loadAllProfiles(),
     loadCustomerActivityCounts(companyIds),
     loadCustomerTags(companyIds),
     getAdminOrderRows(),
@@ -101,9 +108,13 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
     return {
       id: company.id,
       source: "company",
+      companyId: company.id,
+      applicationId: null,
       companyName: company.company_name,
       email,
       profileId: company.owner_id ?? null,
+      profileRole: profile?.role ?? null,
+      accountStatus: profile?.accountStatus ?? "active",
       contactName: company.contact_name ?? null,
       phone: company.phone ?? null,
       whatsapp: company.whatsapp ?? null,
@@ -123,19 +134,75 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
     };
   });
 
-  const existingApplicationEmails = new Set(
-    rows.map((row) => row.email?.toLowerCase()).filter(Boolean),
-  );
+  const representedProfileIds = new Set(rows.map((row) => row.profileId).filter(Boolean));
+  const representedEmails = new Set(rows.map((row) => normalizeEmail(row.email)).filter(Boolean));
+  const applicationByEmail = new Map<string, (typeof applications)[number]>();
+
   applications.forEach((application) => {
-    if (application.email && existingApplicationEmails.has(application.email.toLowerCase())) {
+    const emailKey = normalizeEmail(application.email);
+    if (emailKey && !applicationByEmail.has(emailKey)) {
+      applicationByEmail.set(emailKey, application);
+    }
+  });
+
+  allProfiles.forEach((profile) => {
+    const emailKey = normalizeEmail(profile.email);
+    if (representedProfileIds.has(profile.id) || (emailKey && representedEmails.has(emailKey))) {
       return;
     }
+
+    const application = emailKey ? applicationByEmail.get(emailKey) : undefined;
+    const customerOrders = matchCustomerOrders(orders, profile.id, null, profile.email);
+    const customerRmas = matchCustomerRmas(rmas, profile.id, customerOrders);
+
+    rows.push({
+      id: profile.id,
+      source: "profile",
+      companyId: null,
+      applicationId: application?.id ?? null,
+      companyName: application?.companyName ?? profile.fullName ?? profile.email,
+      email: profile.email,
+      profileId: profile.id,
+      profileRole: profile.role,
+      accountStatus: profile.accountStatus,
+      contactName: profile.fullName,
+      phone: null,
+      whatsapp: null,
+      vatNumber: application?.vatNumber ?? null,
+      status: profile.accountStatus,
+      crmStatus: application ? `b2b_${application.status}` : "registered",
+      priceGroup: profile.role,
+      orderCount: customerOrders.length,
+      totalSpent: customerOrders.reduce((sum, order) => sum + order.total, 0),
+      rmaCount: customerRmas.length,
+      pendingTaskCount: 0,
+      tags: application ? ["B2B application"] : ["registered"],
+      nextFollowUpAt: null,
+      lastContactedAt: null,
+      updatedAt: profile.updatedAt,
+      createdAt: profile.createdAt,
+    });
+
+    representedProfileIds.add(profile.id);
+    if (emailKey) representedEmails.add(emailKey);
+  });
+
+  applications.forEach((application) => {
+    const emailKey = normalizeEmail(application.email);
+    if (emailKey && representedEmails.has(emailKey)) {
+      return;
+    }
+
     rows.push({
       id: application.id,
       source: "application",
+      companyId: null,
+      applicationId: application.id,
       companyName: application.companyName,
       email: application.email,
       profileId: null,
+      profileRole: null,
+      accountStatus: "active",
       contactName: null,
       phone: null,
       whatsapp: null,
@@ -153,16 +220,17 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
       updatedAt: null,
       createdAt: application.createdAt,
     });
+    if (emailKey) representedEmails.add(emailKey);
   });
 
   return rows;
 }
 
 export async function getAdminCustomerDetail(
-  companyId: string,
+  customerId: string,
 ): Promise<AdminCustomerDetail | null> {
   if (!hasSupabaseAdminConfig()) {
-    return demoCustomerDetail(companyId);
+    return demoCustomerDetail(customerId);
   }
 
   const supabase = getSupabaseAdminClient();
@@ -171,34 +239,43 @@ export async function getAdminCustomerDetail(
     .select(
       "id, owner_id, company_name, contact_email, vat_number, fiscal_code, sdi, pec, billing_address, shipping_address, contact_name, phone, whatsapp, company_type, monthly_volume, interested_categories, status, crm_status, price_group, next_follow_up_at, last_contacted_at, updated_at, created_at",
     )
-    .eq("id", companyId)
+    .eq("id", customerId)
     .maybeSingle();
 
   if (error) {
     console.error("Failed to load customer detail", error);
     return null;
   }
-  if (!company) return null;
+  if (!company) return getAdminProfileCustomerDetail(customerId);
 
-  const [profileMap, notes, tasks, tagMap, orders, rmas] = await Promise.all([
+  const [profileMap, notes, tasks, tagMap] = await Promise.all([
     loadProfiles(company.owner_id ? [company.owner_id] : []),
     loadCustomerNotes(company.id),
     loadCustomerTasks(company.id),
     loadCustomerTags([company.id]),
-    getAdminOrderRows(),
-    getAdminRmaRows(),
   ]);
   const profile = company.owner_id ? profileMap.get(company.owner_id) : undefined;
   const email = company.contact_email ?? profile?.email ?? null;
-  const customerOrders = matchCustomerOrders(orders, company.owner_id, company.company_name, email);
-  const customerRmas = matchCustomerRmas(rmas, company.owner_id, customerOrders);
+  const customerOrders = await getAdminOrderRowsForCustomer({
+    profileId: company.owner_id,
+    email,
+    companyName: company.company_name,
+  });
+  const customerRmas = await getAdminRmaRowsForCustomer({
+    profileId: company.owner_id,
+    orderIds: customerOrders.map((order) => order.id),
+  });
 
   return {
     id: company.id,
     source: "company",
+    companyId: company.id,
+    applicationId: null,
     companyName: company.company_name,
     email,
     profileId: company.owner_id ?? null,
+    profileRole: profile?.role ?? null,
+    accountStatus: profile?.accountStatus ?? "active",
     contactName: company.contact_name ?? null,
     phone: company.phone ?? null,
     whatsapp: company.whatsapp ?? null,
@@ -231,13 +308,24 @@ export async function getAdminCustomerDetail(
 }
 
 async function loadProfiles(ownerIds: string[]) {
-  const profiles = new Map<string, { id: string; email: string; role: string }>();
+  const profiles = new Map<
+    string,
+    {
+      id: string;
+      email: string;
+      fullName: string | null;
+      role: string;
+      accountStatus: string;
+      createdAt: string | null;
+      updatedAt: string | null;
+    }
+  >();
   if (!hasSupabaseAdminConfig() || ownerIds.length === 0) return profiles;
 
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, email, role")
+    .select("id, email, full_name, role, account_status, created_at, updated_at")
     .in("id", ownerIds);
 
   if (error) {
@@ -249,10 +337,111 @@ async function loadProfiles(ownerIds: string[]) {
     profiles.set(profile.id, {
       id: profile.id,
       email: profile.email,
+      fullName: profile.full_name ?? null,
       role: profile.role,
+      accountStatus: profile.account_status ?? "active",
+      createdAt: profile.created_at ?? null,
+      updatedAt: profile.updated_at ?? null,
     });
   });
   return profiles;
+}
+
+async function loadAllProfiles() {
+  if (!hasSupabaseAdminConfig()) return [];
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, email, full_name, role, account_status, created_at, updated_at")
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  if (error) {
+    console.error("Failed to load all profiles for customer directory", error);
+    return [];
+  }
+
+  return (data ?? []).map((profile) => ({
+    id: profile.id,
+    email: profile.email,
+    fullName: profile.full_name ?? null,
+    role: profile.role,
+    accountStatus: profile.account_status ?? "active",
+    createdAt: profile.created_at ?? null,
+    updatedAt: profile.updated_at ?? null,
+  }));
+}
+
+async function getAdminProfileCustomerDetail(
+  profileId: string,
+): Promise<AdminCustomerDetail | null> {
+  const supabase = getSupabaseAdminClient();
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("id, email, full_name, role, account_status, created_at, updated_at")
+    .eq("id", profileId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to load profile customer detail", error);
+    return null;
+  }
+  if (!profile) return null;
+
+  const applications = await loadOpenApplications();
+  const application = applications.find(
+    (item) => normalizeEmail(item.email) === normalizeEmail(profile.email),
+  );
+  const customerOrders = await getAdminOrderRowsForCustomer({
+    profileId: profile.id,
+    email: profile.email,
+    companyName: application?.companyName ?? profile.full_name ?? profile.email,
+  });
+  const customerRmas = await getAdminRmaRowsForCustomer({
+    profileId: profile.id,
+    orderIds: customerOrders.map((order) => order.id),
+  });
+
+  return {
+    id: profile.id,
+    source: "profile",
+    companyId: null,
+    applicationId: application?.id ?? null,
+    companyName: application?.companyName ?? profile.full_name ?? profile.email,
+    email: profile.email,
+    profileId: profile.id,
+    profileRole: profile.role,
+    accountStatus: profile.account_status ?? "active",
+    contactName: profile.full_name ?? null,
+    phone: null,
+    whatsapp: null,
+    vatNumber: application?.vatNumber ?? null,
+    status: profile.account_status ?? "active",
+    crmStatus: application ? `b2b_${application.status}` : "registered",
+    priceGroup: profile.role,
+    orderCount: customerOrders.length,
+    totalSpent: customerOrders.reduce((sum, order) => sum + order.total, 0),
+    rmaCount: customerRmas.length,
+    pendingTaskCount: 0,
+    tags: application ? ["B2B application"] : ["registered"],
+    nextFollowUpAt: null,
+    lastContactedAt: null,
+    updatedAt: profile.updated_at ?? null,
+    createdAt: profile.created_at ?? null,
+    billingAddress: null,
+    shippingAddress: null,
+    fiscalCode: null,
+    sdi: null,
+    pec: null,
+    companyType: null,
+    monthlyVolume: null,
+    interestedCategories: null,
+    notes: [],
+    tasks: [],
+    orders: customerOrders,
+    rmas: customerRmas,
+  };
 }
 
 async function loadCustomerActivityCounts(companyIds: string[]) {
@@ -410,9 +599,13 @@ function demoCustomers(): AdminCustomerRow[] {
     {
       id: "demo-company",
       source: "company",
+      companyId: "demo-company",
+      applicationId: null,
       companyName: "Centro Riparazioni Milano",
       email: "buyer@example.it",
       profileId: "demo-profile",
+      profileRole: "b2b_basic",
+      accountStatus: "active",
       contactName: "Marco Rossi",
       phone: "+39 02 123456",
       whatsapp: "+39 333 1234567",
@@ -469,4 +662,8 @@ async function demoCustomerDetail(companyId: string): Promise<AdminCustomerDetai
     orders,
     rmas,
   };
+}
+
+function normalizeEmail(value: string | null | undefined) {
+  return value?.trim().toLowerCase() || "";
 }

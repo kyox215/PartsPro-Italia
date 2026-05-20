@@ -72,6 +72,7 @@ export type AccountOrderRow = {
 export type AccountRmaRow = {
   id: string;
   rmaNumber?: string | null;
+  orderId?: string | null;
   status: string;
   orderNumber: string;
   sku: string;
@@ -100,12 +101,26 @@ export type AccountRmaRow = {
   }>;
 };
 
+export type AccountNotificationRow = {
+  id: string;
+  channel: string;
+  subject: string;
+  body: string;
+  status: string;
+  orderId?: string | null;
+  rmaId?: string | null;
+  readAt?: string | null;
+  createdAt: string;
+};
+
 export type AccountActivity = {
   orders: AccountOrderRow[];
   rmas: AccountRmaRow[];
+  notifications: AccountNotificationRow[];
   orderCount: number;
   openRmaCount: number;
   totalSpend: number;
+  unreadNotificationCount: number;
 };
 
 export async function getAccountActivity(
@@ -171,6 +186,7 @@ export async function getAccountActivity(
         {
           id: "demo-rma-1",
           rmaNumber: "RMA-DEMO-001",
+          orderId: "demo-order-1001",
           status: "submitted",
           orderNumber: "demo-order-1001",
           sku: products[0].sku,
@@ -195,6 +211,19 @@ export async function getAccountActivity(
           ],
         },
       ],
+      notifications: [
+        {
+          id: "demo-notification-1",
+          channel: "email",
+          subject: "PartsPro demo notification",
+          body: "Order and RMA updates will also appear in this workspace.",
+          status: "skipped",
+          orderId: "demo-order-1001",
+          rmaId: null,
+          readAt: null,
+          createdAt: new Date().toISOString(),
+        },
+      ],
     });
   }
 
@@ -203,7 +232,7 @@ export async function getAccountActivity(
   }
 
   const supabase = await getSupabaseServerClient();
-  const [ordersResult, rmasResult] = await Promise.all([
+  const [ordersResult, rmasResult, notificationsResult] = await Promise.all([
     supabase
       .from("orders")
       .select(
@@ -215,11 +244,17 @@ export async function getAccountActivity(
     supabase
       .from("rmas")
       .select(
-        "id, rma_number, status, order_number, sku, quantity, issue_type, description, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, attachments, created_at",
+        "id, rma_number, order_id, status, order_number, sku, quantity, issue_type, description, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, attachments, created_at",
       )
       .eq("profile_id", auth.user.id)
       .order("created_at", { ascending: false })
       .limit(100),
+    supabase
+      .from("notification_events")
+      .select("id, channel, subject, body, status, order_id, rma_id, read_at, created_at")
+      .eq("profile_id", auth.user.id)
+      .order("created_at", { ascending: false })
+      .limit(20),
   ]);
 
   if (ordersResult.error) {
@@ -230,9 +265,14 @@ export async function getAccountActivity(
     console.error("Failed to load account RMAs", rmasResult.error);
   }
 
+  if (notificationsResult.error) {
+    console.error("Failed to load account notifications", notificationsResult.error);
+  }
+
   return summarizeActivity({
     orders: (ordersResult.data ?? []).map(mapAccountOrder),
     rmas: (rmasResult.data ?? []).map(mapAccountRma),
+    notifications: (notificationsResult.data ?? []).map(mapAccountNotification),
   });
 }
 
@@ -282,7 +322,7 @@ export async function getAccountRmaById(
   const { data, error } = await supabase
     .from("rmas")
     .select(
-      "id, rma_number, status, order_number, sku, quantity, issue_type, description, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, attachments, created_at, rma_events (*)",
+      "id, rma_number, order_id, status, order_number, sku, quantity, issue_type, description, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, attachments, created_at, rma_events (*)",
     )
     .eq("profile_id", auth.user.id)
     .eq("id", rmaId)
@@ -433,6 +473,7 @@ function mapAccountOrder(order: {
 function mapAccountRma(rma: {
   id: string;
   rma_number?: string | null;
+  order_id?: string | null;
   status: string;
   order_number: string;
   sku: string;
@@ -457,6 +498,7 @@ function mapAccountRma(rma: {
   return {
     id: rma.id,
     rmaNumber: rma.rma_number ?? null,
+    orderId: rma.order_id ?? null,
     status: rma.status,
     orderNumber: rma.order_number,
     sku: rma.sku,
@@ -485,6 +527,30 @@ function mapAccountRma(rma: {
   };
 }
 
+function mapAccountNotification(notification: {
+  id: string;
+  channel: string;
+  subject: string;
+  body: string;
+  status: string;
+  order_id?: string | null;
+  rma_id?: string | null;
+  read_at?: string | null;
+  created_at: string;
+}): AccountNotificationRow {
+  return {
+    id: notification.id,
+    channel: notification.channel,
+    subject: notification.subject,
+    body: notification.body,
+    status: notification.status,
+    orderId: notification.order_id ?? null,
+    rmaId: notification.rma_id ?? null,
+    readAt: notification.read_at ?? null,
+    createdAt: notification.created_at,
+  };
+}
+
 function normalizeRmaAttachments(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value
@@ -502,18 +568,23 @@ function normalizeRmaAttachments(value: unknown) {
 function summarizeActivity({
   orders,
   rmas,
+  notifications = [],
 }: {
   orders: AccountOrderRow[];
   rmas: AccountRmaRow[];
+  notifications?: AccountNotificationRow[];
 }): AccountActivity {
   return {
     orders,
     rmas,
+    notifications,
     orderCount: orders.length,
     openRmaCount: rmas.filter((rma) => rma.status !== "completed").length,
     totalSpend: orders.reduce(
       (sum, order) => sum + order.total - (order.refundTotal ?? 0),
       0,
     ),
+    unreadNotificationCount: notifications.filter((notification) => !notification.readAt)
+      .length,
   };
 }

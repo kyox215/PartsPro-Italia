@@ -4,6 +4,7 @@ import {
   PackageCheck,
   Truck,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
 import {
   AdminActionRail,
@@ -249,7 +250,11 @@ export default async function AdminInventoryPage({
             <AdminCsrfField />
             <input type="hidden" name="locale" value={locale} />
             <input type="hidden" name="itemIds" value={openItemIds} />
-            <AdminDataTable minWidth={1040}>
+            <AdminDataTable
+              minWidth={1040}
+              mobileBreakpoint="lg"
+              mobileCards={<InventoryReceiveCards items={openItems} locale={locale} />}
+            >
               <table className="w-full text-left text-sm">
                 <thead className="text-xs uppercase text-stone-400">
                   <tr className="border-b border-black/5">
@@ -319,7 +324,10 @@ export default async function AdminInventoryPage({
 
       <AdminPanel title={locale === "it" ? "Batch importati" : "已导入批次"}>
         {orders.length ? (
-          <AdminDataTable minWidth={760}>
+          <AdminDataTable
+            minWidth={760}
+            mobileCards={<SupplierOrderCards orders={orders} locale={locale} />}
+          >
             <table className="w-full text-left text-sm">
               <thead className="text-xs uppercase text-stone-400">
                 <tr className="border-b border-black/5">
@@ -371,7 +379,10 @@ export default async function AdminInventoryPage({
 
       <AdminPanel title={locale === "it" ? "Movimenti inventario" : "库存流水"}>
         {movements.length ? (
-          <AdminDataTable minWidth={880}>
+          <AdminDataTable
+            minWidth={880}
+            mobileCards={<InventoryMovementCards movements={movements} locale={locale} />}
+          >
             <table className="w-full text-left text-sm">
               <thead className="text-xs uppercase text-stone-400">
                 <tr className="border-b border-black/5">
@@ -516,10 +527,143 @@ function Feedback({
   );
 }
 
+function InventoryReceiveCards({
+  items,
+  locale,
+}: Readonly<{
+  items: Awaited<ReturnType<typeof getOpenSupplierPurchaseItems>>;
+  locale: Locale;
+}>) {
+  return (
+    <div className="grid gap-2">
+      {items.map((item) => (
+        <article key={item.id} className="rounded-lg border border-black/5 bg-stone-50 p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="break-all font-mono text-xs font-black text-stone-900">
+                {item.sku}
+              </p>
+              <p className="mt-1 line-clamp-2 text-sm font-black leading-5 text-stone-950">
+                {item.originalName}
+              </p>
+              <p className="mt-1 truncate text-xs font-semibold text-stone-500">
+                {item.supplierName} / {item.status}
+              </p>
+            </div>
+            <StatusPill status={`${item.remainingQty} left`} tone="amber" />
+          </div>
+          <div className="mt-2 grid grid-cols-4 gap-2 text-xs">
+            <MetricMini label={locale === "it" ? "Ord." : "订购"} value={item.orderedQty} />
+            <MetricMini label={locale === "it" ? "Ric." : "实收"} value={item.receivedQty} />
+            <MetricMini label={locale === "it" ? "Miss" : "缺货"} value={item.missingQty} />
+            <MetricMini label={locale === "it" ? "Costo" : "成本"} value={formatMoney(item.costPrice, locale)} />
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <label className="text-xs font-black text-stone-500">
+              {locale === "it" ? "Ricevuto" : "本次实收"}
+              <SmallNumberInput name={`received_${item.id}`} max={item.remainingQty} />
+            </label>
+            <label className="text-xs font-black text-stone-500">
+              {locale === "it" ? "Mancante" : "本次缺货"}
+              <SmallNumberInput name={`missing_${item.id}`} max={item.remainingQty} />
+            </label>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function SupplierOrderCards({
+  orders,
+  locale,
+}: Readonly<{
+  orders: Awaited<ReturnType<typeof getSupplierPurchaseOrders>>;
+  locale: Locale;
+}>) {
+  return (
+    <div className="grid gap-2">
+      {orders.map((order) => (
+        <article key={order.id} className="rounded-lg border border-black/5 bg-stone-50 p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black text-stone-950">
+                {order.sourceFilename}
+              </p>
+              <p className="mt-1 break-all font-mono text-xs font-semibold text-stone-500">
+                {order.id}
+              </p>
+            </div>
+            <StatusPill status={order.status} />
+          </div>
+          <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+            <MetricMini label={locale === "it" ? "Ord." : "订购"} value={order.orderedTotal} />
+            <MetricMini label={locale === "it" ? "Ric." : "实收"} value={order.receivedTotal} />
+            <MetricMini label={locale === "it" ? "Miss" : "缺货"} value={order.missingTotal} />
+          </div>
+          <p className="mt-2 text-xs font-semibold text-stone-500">
+            {new Date(order.createdAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN")}
+          </p>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function InventoryMovementCards({
+  movements,
+  locale,
+}: Readonly<{
+  movements: Awaited<ReturnType<typeof getAdminInventoryMovements>>;
+  locale: Locale;
+}>) {
+  return (
+    <div className="grid gap-2">
+      {movements.map((movement) => (
+        <article key={movement.id} className="rounded-lg border border-black/5 bg-stone-50 p-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="break-all font-mono text-xs font-black text-stone-900">
+              {movement.sku}
+            </p>
+            <StatusPill status={movement.movementType} tone="slate" />
+          </div>
+          <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+            <MetricMini label="Qty" value={movement.quantity} />
+            <MetricMini label="Stock" value={movement.stockDelta} />
+            <MetricMini label="Incoming" value={movement.incomingDelta} />
+          </div>
+          {movement.note ? (
+            <p className="mt-2 break-words text-xs font-semibold text-stone-600">
+              {movement.note}
+            </p>
+          ) : null}
+          <p className="mt-2 text-xs font-semibold text-stone-500">
+            {new Date(movement.createdAt).toLocaleString(
+              locale === "it" ? "it-IT" : "zh-CN",
+            )}
+          </p>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function MetricMini({
+  label,
+  value,
+}: Readonly<{ label: string; value: ReactNode }>) {
+  return (
+    <div className="min-w-0 rounded-md bg-white px-2 py-1.5">
+      <p className="truncate text-[11px] font-black uppercase text-stone-400">{label}</p>
+      <p className="mt-0.5 truncate font-black text-stone-950">{value}</p>
+    </div>
+  );
+}
+
 function SmallNumberInput({ name, max }: Readonly<{ name: string; max: number }>) {
   return (
     <input
-      className="h-9 w-20 rounded-lg border border-black/10 bg-white px-2.5 text-sm font-semibold outline-none focus:border-stone-950 focus:ring-2 focus:ring-stone-950/10"
+      className="mt-1 h-9 w-full rounded-lg border border-black/10 bg-white px-2.5 text-sm font-semibold outline-none focus:border-stone-950 focus:ring-2 focus:ring-stone-950/10 sm:w-20"
       defaultValue="0"
       min="0"
       max={max}

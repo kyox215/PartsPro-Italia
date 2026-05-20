@@ -38,7 +38,7 @@ export function ProductCard({
   }[status] as string;
 
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition hover:border-blue-200 hover:shadow-lg hover:shadow-slate-200/70">
+    <article className="group flex h-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition-colors hover:border-blue-200 md:hover:shadow-lg md:hover:shadow-slate-200/70">
       <Link
         href={localizePath(locale, `/products/${product.slug}`)}
         className="relative block aspect-[4/3] overflow-hidden bg-slate-100"
@@ -48,7 +48,7 @@ export function ProductCard({
           alt={product.names[locale]}
           fill
           sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
-          className="object-cover transition duration-500 group-hover:scale-105"
+          className="object-cover md:transition-transform md:duration-300 md:group-hover:scale-[1.03]"
         />
         <div className="absolute left-3 top-3 flex flex-wrap gap-2">
           <Badge className={qualityStyles[product.quality]}>{product.quality}</Badge>

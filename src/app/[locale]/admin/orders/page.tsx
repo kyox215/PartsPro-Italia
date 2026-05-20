@@ -50,6 +50,7 @@ export default async function AdminOrdersPage({
   const orders = !auth.configured || auth.isAdmin ? await getAdminOrderRows() : [];
   const filter = valueOf(query.filter) ?? "all";
   const visibleOrders = filterAdminOrders(orders, filter);
+  const orderCounts = getOrderFilterCounts(orders);
   const saved = valueOf(query.saved);
   const error = valueOf(query.error);
 
@@ -67,7 +68,7 @@ export default async function AdminOrdersPage({
     href: `${localizePath(locale, "/admin/orders")}${value === "all" ? "" : `?filter=${value}`}`,
     label,
     active: filter === value,
-    count: filterAdminOrders(orders, value).length,
+    count: orderCounts[value] ?? 0,
   }));
 
   return (
@@ -100,37 +101,31 @@ export default async function AdminOrdersPage({
               <AdminMetricCard
                 icon={Banknote}
                 label={locale === "it" ? "Contanti" : "待收现金"}
-                value={orders.filter((order) => order.paymentStatus === "pending_cash").length}
+                value={orderCounts.pending_cash}
                 tone="amber"
               />
               <AdminMetricCard
                 icon={ReceiptText}
                 label={locale === "it" ? "Bonifici" : "待确认转账"}
-                value={
-                  orders.filter((order) => order.paymentStatus === "pending_bank_transfer")
-                    .length
-                }
+                value={orderCounts.pending_bank_transfer}
                 tone="blue"
               />
               <AdminMetricCard
                 icon={CreditCard}
                 label={locale === "it" ? "Stripe pending" : "Stripe 待支付"}
-                value={orders.filter((order) => order.paymentStatus === "pending_card").length}
+                value={orderCounts.pending_card}
                 tone="violet"
               />
               <AdminMetricCard
                 icon={PackageCheck}
                 label={locale === "it" ? "Preorder" : "待分配预购"}
-                value={
-                  orders.filter((order) => order.fulfillmentStatus === "awaiting_preorder")
-                    .length
-                }
+                value={orderCounts.preorder}
                 tone="green"
               />
               <AdminMetricCard
                 icon={TimerReset}
                 label={locale === "it" ? "Lock in scadenza" : "即将过期锁库"}
-                value={orders.filter(isReservationExpiringSoon).length}
+                value={orderCounts.expiring}
                 tone="red"
               />
             </section>
@@ -395,6 +390,51 @@ function filterAdminOrders(
     return orders.filter((order) => order.status === "cancelled");
   }
   return orders;
+}
+
+function getOrderFilterCounts(orders: Awaited<ReturnType<typeof getAdminOrderRows>>) {
+  const counts: Record<string, number> = {
+    all: orders.length,
+    pending_payment: 0,
+    paid: 0,
+    preorder: 0,
+    processing: 0,
+    shipped: 0,
+    completed: 0,
+    refunded: 0,
+    cancelled: 0,
+    pending_cash: 0,
+    pending_bank_transfer: 0,
+    pending_card: 0,
+    expiring: 0,
+  };
+
+  orders.forEach((order) => {
+    if (
+      ["pending_card", "pending_cash", "pending_bank_transfer"].includes(
+        order.paymentStatus ?? "",
+      )
+    ) {
+      counts.pending_payment += 1;
+    }
+    if (order.paymentStatus === "paid") counts.paid += 1;
+    if (order.fulfillmentStatus === "awaiting_preorder") counts.preorder += 1;
+    if (order.status === "processing") counts.processing += 1;
+    if (order.status === "shipped") counts.shipped += 1;
+    if (order.status === "completed") counts.completed += 1;
+    if (order.paymentStatus === "refunded" || (order.refundTotal ?? 0) > 0) {
+      counts.refunded += 1;
+    }
+    if (order.status === "cancelled") counts.cancelled += 1;
+    if (order.paymentStatus === "pending_cash") counts.pending_cash += 1;
+    if (order.paymentStatus === "pending_bank_transfer") {
+      counts.pending_bank_transfer += 1;
+    }
+    if (order.paymentStatus === "pending_card") counts.pending_card += 1;
+    if (isReservationExpiringSoon(order)) counts.expiring += 1;
+  });
+
+  return counts;
 }
 
 function isReservationExpiringSoon(

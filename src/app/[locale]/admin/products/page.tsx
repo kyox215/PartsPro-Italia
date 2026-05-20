@@ -52,6 +52,7 @@ export default async function AdminProductsPage({
   const bulk = valueOf(query.bulk);
   const statusFilter = valueOf(query.status) ?? "all";
   const visibleRows = filterProductRows(rows, statusFilter);
+  const filterCounts = getProductFilterCounts(rows);
   const filterItems = [
     ["all", locale === "it" ? "Tutti" : "全部"],
     ["needs", locale === "it" ? "Da completare" : "待完善"],
@@ -63,7 +64,7 @@ export default async function AdminProductsPage({
     href: `${localizePath(locale, "/admin/products")}${value === "all" ? "" : `?status=${value}`}`,
     label,
     active: statusFilter === value,
-    count: filterProductRows(rows, value).length,
+    count: filterCounts[value] ?? 0,
   }));
 
   return (
@@ -279,7 +280,11 @@ export default async function AdminProductsPage({
         toolbar={<StatusPill status={`${visibleRows.length} / ${rows.length} SKU`} tone="blue" />}
       >
         {visibleRows.length ? (
-          <AdminDataTable minWidth={1680}>
+          <AdminDataTable
+            minWidth={1680}
+            mobileBreakpoint="lg"
+            mobileCards={<ProductMobileCards rows={visibleRows} locale={locale} />}
+          >
             <table className="w-full text-left text-sm">
               <thead className="text-xs uppercase text-stone-400">
                 <tr className="border-b border-black/5">
@@ -552,6 +557,103 @@ function filterProductRows(rows: AdminProductRow[], filter: string) {
     return rows.filter((row) => row.completenessIssues.includes("stock_risk"));
   }
   return rows;
+}
+
+function getProductFilterCounts(rows: AdminProductRow[]) {
+  const counts: Record<string, number> = {
+    all: rows.length,
+    needs: 0,
+    published: 0,
+    archived: 0,
+    missing_zh: 0,
+    stock_risk: 0,
+  };
+
+  rows.forEach((row) => {
+    if (row.isActive) counts.published += 1;
+    if (!row.isActive) counts.archived += 1;
+    if (row.isActive && row.completenessIssues.some((issue) => issue !== "archived")) {
+      counts.needs += 1;
+    }
+    if (row.completenessIssues.some((issue) => issue.startsWith("missing_zh"))) {
+      counts.missing_zh += 1;
+    }
+    if (row.completenessIssues.includes("stock_risk")) {
+      counts.stock_risk += 1;
+    }
+  });
+
+  return counts;
+}
+
+function ProductMobileCards({
+  rows,
+  locale,
+}: Readonly<{ rows: AdminProductRow[]; locale: Locale }>) {
+  return (
+    <div className="grid gap-2">
+      {rows.map((row) => (
+        <article key={row.skuId} className="rounded-lg border border-black/5 bg-stone-50 p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="break-all font-mono text-xs font-black text-stone-900">
+                {row.sku}
+              </p>
+              <p className="mt-1 line-clamp-2 text-sm font-black leading-5 text-stone-950">
+                {locale === "it" ? row.nameIt : row.nameZh || row.nameIt}
+              </p>
+              <p className="mt-1 truncate text-xs font-semibold text-stone-500">
+                {row.brand} / {row.model}
+              </p>
+            </div>
+            <StatusPill
+              status={row.isActive ? "Published" : "Archived"}
+              tone={row.isActive ? "green" : "slate"}
+            />
+          </div>
+          <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+            <div>
+              <p className="font-black text-stone-400">Retail</p>
+              <p className="mt-0.5 font-black text-stone-950">
+                {formatMoney(row.retailPrice, locale)}
+              </p>
+            </div>
+            <div>
+              <p className="font-black text-stone-400">B2B</p>
+              <p className="mt-0.5 font-black text-sky-700">
+                {formatMoney(row.b2bPrice, locale)}
+              </p>
+            </div>
+            <div>
+              <p className="font-black text-stone-400">Stock</p>
+              <p className="mt-0.5 font-black text-stone-950">
+                {row.stockOnHand - row.stockReserved}
+                <span className="ml-1 text-stone-400">/ {row.incomingQty}</span>
+              </p>
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1">
+            <StatusPill status={row.qualityGrade} tone="slate" />
+            {row.completenessIssues.slice(0, 3).map((issue) => (
+              <StatusPill
+                key={issue}
+                status={issue}
+                tone={issue === "stock_risk" ? "amber" : "blue"}
+              />
+            ))}
+          </div>
+          <div className="mt-3">
+            <AdminButtonLink
+              href={localizePath(locale, `/admin/products/${row.skuId}`)}
+              variant="secondary"
+            >
+              {locale === "it" ? "Apri dettaglio" : "打开详情"}
+            </AdminButtonLink>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
 }
 
 function valueOf(value: string | string[] | undefined) {

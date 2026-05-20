@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
-import { redirectOnInvalidAdminCsrf } from "@/lib/admin-security";
-import { assertAdmin } from "@/lib/auth";
+import {
+  getAdminBackUrl,
+  redirectOnInvalidAdminCsrf,
+} from "@/lib/admin-security";
+import { assertAdminPermission } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
 import {
   getSupabaseAdminClient,
@@ -15,7 +18,12 @@ export async function POST(request: Request) {
   const parsed = adminCustomerNoteSchema.safeParse(rawBody);
   const locale = rawBody.locale === "zh" ? "zh" : "it";
   const companyId = String(rawBody.companyId ?? "");
-  const backUrl = new URL(`/${locale}/admin/customers/${companyId || ""}`, request.url);
+  const backUrl = getAdminBackUrl(request, {
+    locale,
+    returnTo: rawBody.returnTo,
+    fallbackPath: `/admin/accounts/customers/${companyId || ""}`,
+    allowedPrefixes: ["/admin/accounts/customers", "/admin/customers"],
+  });
 
   if (!parsed.success) {
     backUrl.searchParams.set("error", parsed.error.issues.map((issue) => issue.message).join(", "));
@@ -25,7 +33,7 @@ export async function POST(request: Request) {
   const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
   if (csrfRedirect) return csrfRedirect;
 
-  const admin = await assertAdmin();
+  const admin = await assertAdminPermission("accounts:write");
   if (!admin.ok) {
     backUrl.searchParams.set("error", admin.error);
     return NextResponse.redirect(backUrl, 303);

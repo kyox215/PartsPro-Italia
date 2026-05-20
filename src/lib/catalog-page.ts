@@ -344,9 +344,6 @@ async function loadSupabaseCatalogPage(
     attrSkuIds,
   );
   applySort(itemQuery, state.sort, isPriceVisible, priceColumn);
-  const { data, error, count } = await itemQuery.range(offset, offset + pageSize - 1);
-
-  if (error) throw error;
 
   const facetQuery = applyCatalogFilters(
     selectCatalogView(supabase, viewName),
@@ -356,12 +353,6 @@ async function loadSupabaseCatalogPage(
     attrSkuIds,
   );
   applySort(facetQuery, "brand_asc", isPriceVisible, priceColumn);
-  const { data: facetData, error: facetError } = await facetQuery.range(
-    0,
-    maxFacetRows - 1,
-  );
-
-  if (facetError) throw facetError;
 
   const deviceQuery = applyCatalogFilters(
     selectCatalogView(supabase, viewName),
@@ -372,18 +363,22 @@ async function loadSupabaseCatalogPage(
     { includeDevice: false },
   );
   applySort(deviceQuery, "brand_asc", isPriceVisible, priceColumn);
-  const { data: deviceData, error: deviceError } = await deviceQuery.range(
-    0,
-    maxFacetRows - 1,
-  );
 
-  if (deviceError) throw deviceError;
+  const [itemResult, facetResult, deviceResult] = await Promise.all([
+    itemQuery.range(offset, offset + pageSize - 1),
+    facetQuery.range(0, maxFacetRows - 1),
+    deviceQuery.range(0, maxFacetRows - 1),
+  ]);
 
-  const facetRows = (facetData ?? []) as CatalogRow[];
-  const deviceRows = (deviceData ?? []) as CatalogRow[];
-  const rows = (data ?? []) as CatalogRow[];
+  if (itemResult.error) throw itemResult.error;
+  if (facetResult.error) throw facetResult.error;
+  if (deviceResult.error) throw deviceResult.error;
+
+  const facetRows = (facetResult.data ?? []) as CatalogRow[];
+  const deviceRows = (deviceResult.data ?? []) as CatalogRow[];
+  const rows = (itemResult.data ?? []) as CatalogRow[];
   const attributeRows = await loadAttributeRows(facetRows.map((row) => row.sku_id));
-  const total = count ?? rows.length;
+  const total = itemResult.count ?? rows.length;
 
   return {
     items: rows.map((row) =>

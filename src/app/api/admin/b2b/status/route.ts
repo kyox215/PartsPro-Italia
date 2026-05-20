@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { recordAdminActivity } from "@/lib/admin-audit";
+import { recordCustomerAuditEvent } from "@/lib/admin-accounts";
 import { redirectOnInvalidAdminCsrf } from "@/lib/admin-security";
-import { assertAdmin } from "@/lib/auth";
+import { assertAdminPermission } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
 import {
   getSupabaseAdminClient,
@@ -14,7 +15,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const rawBody = await parseRequestBody(request);
   const locale = String(rawBody.locale ?? "it");
-  const backUrl = new URL(`/${locale}/admin/b2b`, request.url);
+  const backUrl = new URL(`/${locale}/admin/accounts/b2b`, request.url);
   const parsed = adminB2BStatusSchema.safeParse(rawBody);
 
   if (!parsed.success) {
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
   const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
   if (csrfRedirect) return csrfRedirect;
 
-  const admin = await assertAdmin();
+  const admin = await assertAdminPermission("b2b:review");
 
   if (!admin.ok) {
     backUrl.searchParams.set("error", admin.error);
@@ -120,6 +121,17 @@ export async function POST(request: Request) {
     },
   });
 
+  await recordCustomerAuditEvent({
+    actor: admin.context,
+    action: "b2b_application.status.update",
+    applicationId: parsed.data.id,
+    afterData: {
+      status: parsed.data.status,
+      priceGroup: parsed.data.priceGroup || null,
+      syncedCustomer: Boolean(application && parsed.data.status === "approved"),
+    },
+  });
+
   backUrl.searchParams.set("saved", "1");
   return NextResponse.redirect(backUrl, 303);
 }
@@ -152,7 +164,7 @@ async function syncApprovedCustomer({
     const { data, error } = await supabase
         .from("profiles")
         .select("id")
-        .eq("email", email)
+        .ilike("email", email.trim().toLowerCase())
         .maybeSingle();
     if (error) throw new Error(error.message);
     profile = data ?? null;
@@ -165,6 +177,19 @@ async function syncApprovedCustomer({
     .maybeSingle();
 
   if (appCompanyError) throw new Error(appCompanyError.message);
+
+  let existingByFallback: { id: string } | null = null;
+  if (!existingByApplication?.id && (email || application.vat_number)) {
+    let fallbackQuery = supabase.from("companies").select("id").limit(1);
+    if (email) {
+      fallbackQuery = fallbackQuery.ilike("contact_email", email.trim().toLowerCase());
+    } else if (application.vat_number) {
+      fallbackQuery = fallbackQuery.eq("vat_number", application.vat_number);
+    }
+    const { data, error } = await fallbackQuery.maybeSingle();
+    if (error) throw new Error(error.message);
+    existingByFallback = data ?? null;
+  }
 
   const companyPayload = {
     owner_id: profile?.id ?? null,
@@ -187,11 +212,13 @@ async function syncApprovedCustomer({
     updated_at: new Date().toISOString(),
   };
 
-  if (existingByApplication?.id) {
+  const existingCompanyId = existingByApplication?.id ?? existingByFallback?.id ?? null;
+
+  if (existingCompanyId) {
     const { error } = await supabase
       .from("companies")
       .update(companyPayload)
-      .eq("id", existingByApplication.id);
+      .eq("id", existingCompanyId);
     if (error) throw new Error(error.message);
   } else {
     const { error } = await supabase.from("companies").insert(companyPayload);

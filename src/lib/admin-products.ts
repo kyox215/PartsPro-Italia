@@ -51,6 +51,114 @@ export type AdminProductDetail = AdminProductRow & {
   }>;
 };
 
+type AdminProductQueryRow = {
+  id: string;
+  sku: string;
+  barcode_ean13?: string | null;
+  cost_price?: number | string | null;
+  retail_price?: number | string | null;
+  b2b_price?: number | string | null;
+  color?: string | null;
+  compatibility?: string[] | null;
+  moq?: number | string | null;
+  vat_rate?: number | string | null;
+  is_active?: boolean | null;
+  updated_at?: string | null;
+  products?:
+    | {
+        id?: string | null;
+        slug?: string | null;
+        brand?: string | null;
+        model?: string | null;
+        category?: string | null;
+        quality_grade?: string | null;
+        name_it?: string | null;
+        name_zh?: string | null;
+        description_it?: string | null;
+        description_zh?: string | null;
+        image_url?: string | null;
+        updated_at?: string | null;
+        is_active?: boolean | null;
+      }
+    | Array<{
+        id?: string | null;
+        slug?: string | null;
+        brand?: string | null;
+        model?: string | null;
+        category?: string | null;
+        quality_grade?: string | null;
+        name_it?: string | null;
+        name_zh?: string | null;
+        description_it?: string | null;
+        description_zh?: string | null;
+        image_url?: string | null;
+        updated_at?: string | null;
+        is_active?: boolean | null;
+      }>
+    | null;
+  inventory?:
+    | {
+        id?: string | null;
+        stock_on_hand?: number | null;
+        stock_reserved?: number | null;
+        incoming_reserved?: number | null;
+        incoming_qty?: number | null;
+        reorder_point?: number | null;
+        safety_stock?: number | null;
+      }
+    | Array<{
+        id?: string | null;
+        stock_on_hand?: number | null;
+        stock_reserved?: number | null;
+        incoming_reserved?: number | null;
+        incoming_qty?: number | null;
+        reorder_point?: number | null;
+        safety_stock?: number | null;
+      }>
+    | null;
+};
+
+const adminProductSelect = `
+  id,
+  sku,
+  barcode_ean13,
+  cost_price,
+  retail_price,
+  b2b_price,
+  color,
+  compatibility,
+  moq,
+  vat_rate,
+  preorder_lead_time_min_days,
+  preorder_lead_time_max_days,
+  is_active,
+  updated_at,
+  products (
+    id,
+    slug,
+    brand,
+    model,
+    category,
+    quality_grade,
+    name_it,
+    name_zh,
+    description_it,
+    description_zh,
+    image_url,
+    updated_at,
+    is_active
+  ),
+  inventory (
+    id,
+    stock_on_hand,
+    stock_reserved,
+    incoming_reserved,
+    incoming_qty,
+    reorder_point,
+    safety_stock
+  )
+`;
+
 export async function getAdminProductRows(): Promise<AdminProductRow[]> {
   if (!hasSupabaseAdminConfig()) {
     return products.map((product) => ({
@@ -95,48 +203,7 @@ export async function getAdminProductRows(): Promise<AdminProductRow[]> {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("skus")
-    .select(
-      `
-      id,
-      sku,
-      barcode_ean13,
-      cost_price,
-      retail_price,
-      b2b_price,
-      color,
-      compatibility,
-      moq,
-      vat_rate,
-      preorder_lead_time_min_days,
-      preorder_lead_time_max_days,
-      is_active,
-      updated_at,
-      products (
-        id,
-        slug,
-        brand,
-        model,
-        category,
-        quality_grade,
-        name_it,
-        name_zh,
-        description_it,
-        description_zh,
-        image_url,
-        updated_at,
-        is_active
-      ),
-      inventory (
-        id,
-        stock_on_hand,
-        stock_reserved,
-        incoming_reserved,
-        incoming_qty,
-        reorder_point,
-        safety_stock
-      )
-    `,
-    )
+    .select(adminProductSelect)
     .order("created_at", { ascending: false })
     .limit(300);
 
@@ -148,66 +215,21 @@ export async function getAdminProductRows(): Promise<AdminProductRow[]> {
   const skuIds = (data ?? []).map((row) => row.id).filter(Boolean);
   const attributeCounts = await loadAttributeCounts(skuIds);
 
-  return (data ?? []).map((row) => {
-    const product = Array.isArray(row.products) ? row.products[0] : row.products;
-    const inventory = Array.isArray(row.inventory) ? row.inventory[0] : row.inventory;
-    const productActive = Boolean(product?.is_active);
-    const skuActive = Boolean(row.is_active);
-    const attributeCount = attributeCounts.get(row.id) ?? 0;
-
-    const mapped: AdminProductRow = {
-      id: row.id,
-      productId: product?.id ?? "",
-      skuId: row.id,
-      inventoryId: inventory?.id ?? null,
-      slug: product?.slug ?? "",
-      sku: row.sku,
-      barcodeEan13: row.barcode_ean13 ?? null,
-      brand: product?.brand ?? "",
-      model: product?.model ?? "",
-      category: product?.category ?? "",
-      qualityGrade: product?.quality_grade ?? "",
-      nameIt: product?.name_it ?? "",
-      nameZh: product?.name_zh ?? "",
-      descriptionIt: product?.description_it ?? null,
-      descriptionZh: product?.description_zh ?? null,
-      imageUrl: product?.image_url ?? null,
-      costPrice: row.cost_price === null ? null : Number(row.cost_price ?? 0),
-      retailPrice: Number(row.retail_price ?? 0),
-      b2bPrice: Number(row.b2b_price ?? 0),
-      color: row.color ?? null,
-      compatibility: Array.isArray(row.compatibility) ? row.compatibility : [],
-      moq: Number(row.moq ?? 1),
-      vatRate: Number(row.vat_rate ?? 0.22),
-      stockOnHand: Number(inventory?.stock_on_hand ?? 0),
-      stockReserved: Number(inventory?.stock_reserved ?? 0),
-      incomingQty: Number(inventory?.incoming_qty ?? 0),
-      incomingReserved: Number(inventory?.incoming_reserved ?? 0),
-      reorderPoint: Number(inventory?.reorder_point ?? 0),
-      safetyStock: Number(inventory?.safety_stock ?? 0),
-      attributeCount,
-      productActive,
-      skuActive,
-      isActive: Boolean(skuActive && productActive),
-      completenessIssues: [],
-      updatedAt: row.updated_at ?? product?.updated_at ?? null,
-    };
-
-    mapped.completenessIssues = getProductCompletenessIssues(mapped);
-    return mapped;
-  });
+  return ((data ?? []) as AdminProductQueryRow[]).map((row) =>
+    mapAdminProductRow(row, attributeCounts.get(row.id) ?? 0),
+  );
 }
 
 export async function getAdminProductDetail(
   skuIdOrSku: string,
 ): Promise<AdminProductDetail | null> {
-  const rows = await getAdminProductRows();
-  const row = rows.find(
-    (item) => item.skuId === skuIdOrSku || item.sku === skuIdOrSku,
-  );
-  if (!row) return null;
-
   if (!hasSupabaseAdminConfig()) {
+    const rows = await getAdminProductRows();
+    const row = rows.find(
+      (item) => item.skuId === skuIdOrSku || item.sku === skuIdOrSku,
+    );
+    if (!row) return null;
+
     return {
       ...row,
       attributes: [
@@ -222,10 +244,39 @@ export async function getAdminProductDetail(
   }
 
   const supabase = getSupabaseAdminClient();
+  const { data: byId, error: byIdError } = await supabase
+    .from("skus")
+    .select(adminProductSelect)
+    .eq("id", skuIdOrSku)
+    .maybeSingle();
+
+  if (byIdError) {
+    console.error("Failed to load admin product by id", byIdError);
+  }
+
+  let skuRow = byId as AdminProductQueryRow | null;
+
+  if (!skuRow) {
+    const { data: bySku, error: bySkuError } = await supabase
+      .from("skus")
+      .select(adminProductSelect)
+      .eq("sku", skuIdOrSku)
+      .maybeSingle();
+
+    if (bySkuError) {
+      console.error("Failed to load admin product by SKU", bySkuError);
+      return null;
+    }
+
+    skuRow = bySku as AdminProductQueryRow | null;
+  }
+
+  if (!skuRow) return null;
+
   const { data, error } = await supabase
     .from("sku_attribute_values")
     .select("value, catalog_attribute_definitions ( key, label_it, label_zh )")
-    .eq("sku_id", row.skuId)
+    .eq("sku_id", skuRow.id)
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -245,7 +296,61 @@ export async function getAdminProductDetail(
     };
   });
 
-  return { ...row, attributes };
+  return {
+    ...mapAdminProductRow(skuRow, attributes.length),
+    attributes,
+  };
+}
+
+function mapAdminProductRow(
+  row: AdminProductQueryRow,
+  attributeCount: number,
+): AdminProductRow {
+  const product = Array.isArray(row.products) ? row.products[0] : row.products;
+  const inventory = Array.isArray(row.inventory) ? row.inventory[0] : row.inventory;
+  const productActive = Boolean(product?.is_active);
+  const skuActive = Boolean(row.is_active);
+
+  const mapped: AdminProductRow = {
+    id: row.id,
+    productId: product?.id ?? "",
+    skuId: row.id,
+    inventoryId: inventory?.id ?? null,
+    slug: product?.slug ?? "",
+    sku: row.sku,
+    barcodeEan13: row.barcode_ean13 ?? null,
+    brand: product?.brand ?? "",
+    model: product?.model ?? "",
+    category: product?.category ?? "",
+    qualityGrade: product?.quality_grade ?? "",
+    nameIt: product?.name_it ?? "",
+    nameZh: product?.name_zh ?? "",
+    descriptionIt: product?.description_it ?? null,
+    descriptionZh: product?.description_zh ?? null,
+    imageUrl: product?.image_url ?? null,
+    costPrice: row.cost_price === null ? null : Number(row.cost_price ?? 0),
+    retailPrice: Number(row.retail_price ?? 0),
+    b2bPrice: Number(row.b2b_price ?? 0),
+    color: row.color ?? null,
+    compatibility: Array.isArray(row.compatibility) ? row.compatibility : [],
+    moq: Number(row.moq ?? 1),
+    vatRate: Number(row.vat_rate ?? 0.22),
+    stockOnHand: Number(inventory?.stock_on_hand ?? 0),
+    stockReserved: Number(inventory?.stock_reserved ?? 0),
+    incomingQty: Number(inventory?.incoming_qty ?? 0),
+    incomingReserved: Number(inventory?.incoming_reserved ?? 0),
+    reorderPoint: Number(inventory?.reorder_point ?? 0),
+    safetyStock: Number(inventory?.safety_stock ?? 0),
+    attributeCount,
+    productActive,
+    skuActive,
+    isActive: Boolean(skuActive && productActive),
+    completenessIssues: [],
+    updatedAt: row.updated_at ?? product?.updated_at ?? null,
+  };
+
+  mapped.completenessIssues = getProductCompletenessIssues(mapped);
+  return mapped;
 }
 
 async function loadAttributeCounts(skuIds: string[]) {
