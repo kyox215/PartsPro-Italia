@@ -25,7 +25,7 @@ export default async function AccountRmaDetailPage({
         <div className="mt-4 grid gap-5 lg:grid-cols-[1fr_auto] lg:items-start">
           <div>
             <h1 className="break-all font-mono text-2xl font-bold text-slate-950">
-              {rma.id}
+              {rma.rmaNumber ?? rma.id}
             </h1>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               {locale === "it"
@@ -57,6 +57,68 @@ export default async function AccountRmaDetailPage({
         />
       </section>
 
+      <section className="grid gap-4 lg:grid-cols-2">
+        <article className="rounded-lg border border-slate-200 bg-white p-5">
+          <h2 className="text-lg font-bold text-slate-950">
+            {locale === "it" ? "Esito e prossima azione" : "处理结果与下一步"}
+          </h2>
+          <dl className="mt-4 grid gap-3 text-sm">
+            <InfoRow label={locale === "it" ? "Numero RMA" : "RMA 编号"} value={rma.rmaNumber ?? "-"} />
+            <InfoRow label={locale === "it" ? "Tipo esito" : "处理类型"} value={rma.resolutionType ?? "-"} />
+            <InfoRow label={locale === "it" ? "SKU sostitutivo" : "换货 SKU"} value={rma.replacementSku ?? "-"} />
+            <InfoRow
+              label={locale === "it" ? "Importo rimborso" : "退款金额"}
+              value={
+                rma.refundAmount === null || rma.refundAmount === undefined
+                  ? "-"
+                  : `${rma.refundAmount.toFixed(2)} EUR`
+              }
+            />
+            <InfoRow
+              label={locale === "it" ? "Chiuso" : "关闭时间"}
+              value={rma.closedAt ? formatDateTime(rma.closedAt, locale) : "-"}
+            />
+          </dl>
+          {rma.resolutionNote ? (
+            <p className="mt-4 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+              {rma.resolutionNote}
+            </p>
+          ) : null}
+        </article>
+
+        <article className="rounded-lg border border-slate-200 bg-white p-5">
+          <h2 className="text-lg font-bold text-slate-950">
+            {locale === "it" ? "Timeline" : "售后进度"}
+          </h2>
+          {rma.events.length ? (
+            <ol className="mt-4 grid gap-3">
+              {rma.events.map((event) => (
+                <li key={event.id} className="rounded-lg bg-slate-50 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-bold text-slate-950">{event.title}</p>
+                    <Badge className="border-slate-200 bg-white text-slate-600">
+                      {event.eventType}
+                    </Badge>
+                  </div>
+                  {event.body ? (
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{event.body}</p>
+                  ) : null}
+                  <p className="mt-2 text-xs text-slate-500">
+                    {formatDateTime(event.createdAt, locale)}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+              {locale === "it"
+                ? "Gli aggiornamenti della pratica appariranno qui."
+                : "售后团队更新后会显示在这里。"}
+            </p>
+          )}
+        </article>
+      </section>
+
       <section className="rounded-lg border border-slate-200 bg-white p-5">
         <h2 className="text-lg font-bold text-slate-950">
           {locale === "it" ? "Descrizione" : "问题描述"}
@@ -65,11 +127,24 @@ export default async function AccountRmaDetailPage({
           {rma.description || (locale === "it" ? "Nessuna descrizione." : "无描述。")}
         </p>
         <p className="mt-5 text-xs text-slate-500">
-          {new Date(rma.createdAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN")}
+          {formatDateTime(rma.createdAt, locale)}
         </p>
       </section>
     </div>
   );
+}
+
+function InfoRow({ label, value }: Readonly<{ label: string; value: string }>) {
+  return (
+    <div className="grid gap-1 rounded-lg bg-slate-50 p-2.5 sm:grid-cols-[128px_1fr]">
+      <dt className="font-semibold text-slate-500">{label}</dt>
+      <dd className="break-words font-bold text-slate-950">{value}</dd>
+    </div>
+  );
+}
+
+function formatDateTime(value: string, locale: Locale) {
+  return new Date(value).toLocaleString(locale === "it" ? "it-IT" : "zh-CN");
 }
 
 function MetricCard({

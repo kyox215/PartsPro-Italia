@@ -287,3 +287,43 @@ export const adminRmaStatusSchema = z.object({
   ]),
   locale: z.enum(["it", "zh"]).default("it"),
 });
+
+export const adminRmaResolutionSchema = z
+  .object({
+    id: z.string().min(1),
+    locale: z.enum(["it", "zh"]).default("it"),
+    returnTo: z.string().optional().or(z.literal("")),
+    resolutionType: z.enum([
+      "pending",
+      "repair",
+      "replace",
+      "refund",
+      "reject",
+      "credit_note",
+    ]),
+    resolutionNote: z.string().optional().or(z.literal("")),
+    refundAmount: z.coerce.number().nonnegative().optional().or(z.literal("")),
+    replacementSku: z.string().optional().or(z.literal("")),
+    closeCase: z.coerce.boolean().default(false),
+  })
+  .superRefine((value, ctx) => {
+    if (
+      (value.resolutionType === "refund" ||
+        value.resolutionType === "credit_note") &&
+      (!value.refundAmount || Number(value.refundAmount) <= 0)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "refundAmount is required for refund or credit note",
+        path: ["refundAmount"],
+      });
+    }
+
+    if (value.resolutionType === "replace" && !value.replacementSku) {
+      ctx.addIssue({
+        code: "custom",
+        message: "replacementSku is required for replacement",
+        path: ["replacementSku"],
+      });
+    }
+  });

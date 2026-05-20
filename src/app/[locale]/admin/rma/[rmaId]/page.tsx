@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { ClipboardList, PackageCheck, RotateCcw, Wrench } from "lucide-react";
+import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
 import { StatusSelectForm } from "@/components/admin/status-select-form";
 import {
   AdminActionRail,
@@ -12,7 +13,7 @@ import {
   AdminWorkspaceGrid,
   StatusPill,
 } from "@/components/admin/admin-ui";
-import { getAdminRmaById } from "@/lib/admin-operations";
+import { getAdminRmaById, type AdminRmaRow } from "@/lib/admin-operations";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
 
@@ -104,6 +105,16 @@ export default async function AdminRmaDetailPage({
                 locale={locale}
                 statuses={rmaStatuses}
               />
+            </AdminPanel>
+            <AdminPanel
+              title={locale === "it" ? "Esito" : "处理结论"}
+              description={
+                locale === "it"
+                  ? "Rimborso, sostituzione, riparazione o rifiuto."
+                  : "登记退款、换货、维修或拒绝处理。"
+              }
+            >
+              <ResolutionForm rma={rma} locale={locale} returnTo={returnTo} />
             </AdminPanel>
             <AdminPanel title={locale === "it" ? "Collegamenti" : "关联信息"} contentClassName="grid gap-2 p-2">
               <AdminButtonLink
@@ -228,6 +239,86 @@ function InfoRow({ label, value }: Readonly<{ label: string; value: string }>) {
       <dt className="font-black text-stone-500">{label}</dt>
       <dd className="break-words font-semibold text-stone-900">{value}</dd>
     </div>
+  );
+}
+
+function ResolutionForm({
+  rma,
+  locale,
+  returnTo,
+}: Readonly<{
+  rma: AdminRmaRow;
+  locale: Locale;
+  returnTo: string;
+}>) {
+  return (
+    <form action="/api/admin/rma/resolution" className="grid gap-3" method="post">
+      <AdminCsrfField />
+      <input type="hidden" name="id" value={rma.id} />
+      <input type="hidden" name="locale" value={locale} />
+      <input type="hidden" name="returnTo" value={returnTo} />
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Tipo esito" : "处理类型"}
+        <select
+          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          defaultValue={rma.resolutionType ?? "pending"}
+          name="resolutionType"
+        >
+          <option value="pending">{locale === "it" ? "In attesa" : "待处理"}</option>
+          <option value="repair">{locale === "it" ? "Riparazione" : "维修"}</option>
+          <option value="replace">{locale === "it" ? "Sostituzione" : "换货"}</option>
+          <option value="refund">{locale === "it" ? "Rimborso" : "退款"}</option>
+          <option value="credit_note">
+            {locale === "it" ? "Nota di credito" : "贷记/抵扣"}
+          </option>
+          <option value="reject">{locale === "it" ? "Rifiuto" : "拒绝"}</option>
+        </select>
+      </label>
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Importo rimborso" : "退款金额"}
+        <input
+          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          defaultValue={rma.refundAmount ?? ""}
+          min="0"
+          name="refundAmount"
+          placeholder="0.00"
+          step="0.01"
+          type="number"
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "SKU sostitutivo" : "换货 SKU"}
+        <input
+          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          defaultValue={rma.replacementSku ?? ""}
+          name="replacementSku"
+          placeholder="DCK-..."
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Nota interna/cliente" : "处理说明"}
+        <textarea
+          className="min-h-24 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          defaultValue={rma.resolutionNote ?? ""}
+          name="resolutionNote"
+          placeholder={
+            locale === "it"
+              ? "Esito test, motivo e prossima azione"
+              : "检测结果、处理原因和下一步"
+          }
+        />
+      </label>
+      <label className="flex items-center gap-2 rounded-lg bg-stone-50 p-2 text-xs font-bold text-stone-700">
+        <input className="h-4 w-4" name="closeCase" type="checkbox" value="true" />
+        {locale === "it" ? "Chiudi pratica come completata" : "同时关闭为已完成"}
+      </label>
+      <button
+        className="inline-flex h-10 items-center justify-center rounded-lg border border-stone-950 bg-stone-950 px-3 text-xs font-black text-white transition hover:bg-stone-800"
+        type="submit"
+      >
+        {locale === "it" ? "Salva esito" : "保存处理结论"}
+      </button>
+    </form>
   );
 }
 

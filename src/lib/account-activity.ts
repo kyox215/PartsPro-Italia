@@ -31,13 +31,26 @@ export type AccountOrderRow = {
 
 export type AccountRmaRow = {
   id: string;
+  rmaNumber?: string | null;
   status: string;
   orderNumber: string;
   sku: string;
   quantity: number;
   issueType: string;
   description: string | null;
+  resolutionType?: string | null;
+  resolutionNote?: string | null;
+  refundAmount?: number | null;
+  replacementSku?: string | null;
+  closedAt?: string | null;
   createdAt: string;
+  events: Array<{
+    id: string;
+    eventType: string;
+    title: string;
+    body?: string | null;
+    createdAt: string;
+  }>;
 };
 
 export type AccountActivity = {
@@ -92,13 +105,28 @@ export async function getAccountActivity(
       rmas: [
         {
           id: "demo-rma-1",
+          rmaNumber: "RMA-DEMO-001",
           status: "submitted",
           orderNumber: "demo-order-1001",
           sku: products[0].sku,
           quantity: 1,
           issueType: "touch_issue",
           description: "Touch intermittente prima dell'installazione.",
+          resolutionType: null,
+          resolutionNote: null,
+          refundAmount: null,
+          replacementSku: null,
+          closedAt: null,
           createdAt: new Date().toISOString(),
+          events: [
+            {
+              id: "demo-rma-event-1",
+              eventType: "rma_submitted",
+              title: "Demo RMA submitted",
+              body: "The after-sales team will update this timeline.",
+              createdAt: new Date().toISOString(),
+            },
+          ],
         },
       ],
     });
@@ -120,7 +148,9 @@ export async function getAccountActivity(
       .limit(100),
     supabase
       .from("rmas")
-      .select("id, status, order_number, sku, quantity, issue_type, description, created_at")
+      .select(
+        "id, rma_number, status, order_number, sku, quantity, issue_type, description, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, created_at",
+      )
       .eq("profile_id", auth.user.id)
       .order("created_at", { ascending: false })
       .limit(100),
@@ -185,7 +215,9 @@ export async function getAccountRmaById(
   const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase
     .from("rmas")
-    .select("id, status, order_number, sku, quantity, issue_type, description, created_at")
+    .select(
+      "id, rma_number, status, order_number, sku, quantity, issue_type, description, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, created_at, rma_events (*)",
+    )
     .eq("profile_id", auth.user.id)
     .eq("id", rmaId)
     .maybeSingle();
@@ -248,23 +280,54 @@ function mapAccountOrder(order: {
 
 function mapAccountRma(rma: {
   id: string;
+  rma_number?: string | null;
   status: string;
   order_number: string;
   sku: string;
   quantity: number;
   issue_type: string;
   description: string | null;
+  resolution_type?: string | null;
+  resolution_note?: string | null;
+  refund_amount?: number | string | null;
+  replacement_sku?: string | null;
+  closed_at?: string | null;
   created_at: string;
+  rma_events?: Array<{
+    id: string;
+    event_type: string;
+    title: string;
+    body?: string | null;
+    created_at: string;
+  }> | null;
 }): AccountRmaRow {
   return {
     id: rma.id,
+    rmaNumber: rma.rma_number ?? null,
     status: rma.status,
     orderNumber: rma.order_number,
     sku: rma.sku,
     quantity: rma.quantity,
     issueType: rma.issue_type,
     description: rma.description,
+    resolutionType: rma.resolution_type ?? null,
+    resolutionNote: rma.resolution_note ?? null,
+    refundAmount:
+      rma.refund_amount === null || rma.refund_amount === undefined
+        ? null
+        : Number(rma.refund_amount),
+    replacementSku: rma.replacement_sku ?? null,
+    closedAt: rma.closed_at ?? null,
     createdAt: rma.created_at,
+    events: (rma.rma_events ?? [])
+      .map((event) => ({
+        id: event.id,
+        eventType: event.event_type,
+        title: event.title,
+        body: event.body ?? null,
+        createdAt: event.created_at,
+      }))
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
   };
 }
 

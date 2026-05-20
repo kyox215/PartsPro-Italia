@@ -184,7 +184,9 @@ export function AccountRmaGrid({
       {rmas.map((rma) => (
         <article key={rma.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="font-mono text-xs font-bold text-slate-900">{rma.id}</p>
+            <p className="font-mono text-xs font-bold text-slate-900">
+              {rma.rmaNumber ?? rma.id}
+            </p>
             <Badge className="border-orange-200 bg-orange-50 text-orange-700">
               {rma.status}
             </Badge>
@@ -198,6 +200,11 @@ export function AccountRmaGrid({
           <p className="mt-3 text-sm leading-6 text-slate-600">
             {rma.description || (locale === "it" ? "Nessuna descrizione." : "无描述。")}
           </p>
+          {rma.resolutionType ? (
+            <p className="mt-3 rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700">
+              {locale === "it" ? "Esito" : "处理结果"}: {rma.resolutionType}
+            </p>
+          ) : null}
           <p className="mt-3 text-xs text-slate-500">
             {new Date(rma.createdAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN")}
           </p>
