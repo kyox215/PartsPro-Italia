@@ -47,8 +47,8 @@ export default async function CheckoutPage({
         {checkout.requiresLogin ? (
           <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             {locale === "it"
-              ? "Accedi per vedere prezzi B2B e creare preordini."
-              : "请先登录，才能查看 B2B 价格并创建预购订单。"}
+              ? "Accedi per vedere prezzi e creare preordini."
+              : "请先登录，才能查看价格并创建预购订单。"}
             <ButtonLink href={localizePath(locale, "/login")} className="mt-4 w-fit">
               {locale === "it" ? "Login" : "登录"}
             </ButtonLink>

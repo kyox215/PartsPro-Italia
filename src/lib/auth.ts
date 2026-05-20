@@ -18,6 +18,19 @@ export type AuthContext = {
   isAdmin: boolean;
 };
 
+const b2bPriceRoles = new Set([
+  "b2b_basic",
+  "b2b_silver",
+  "b2b_gold",
+  "distributor",
+]);
+
+export function canViewB2BPrice(
+  auth: Pick<AuthContext, "role" | "isAdmin">,
+) {
+  return auth.isAdmin || (auth.role ? b2bPriceRoles.has(auth.role) : false);
+}
+
 export async function getAuthContext(): Promise<AuthContext> {
   if (!hasSupabasePublicConfig()) {
     return {

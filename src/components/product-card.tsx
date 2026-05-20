@@ -83,20 +83,12 @@ export function ProductCard({
             <dt className="text-xs text-slate-500">{dictionary.common.moq as string}</dt>
             <dd className="font-semibold text-slate-800">{product.moq}</dd>
           </div>
-          <div>
+          <div className="col-span-2">
             <dt className="text-xs text-slate-500">
               {dictionary.common.retail as string}
             </dt>
             <dd className="font-semibold text-slate-950">
               {formatMoney(product.retailPrice, locale)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-slate-500">
-              {dictionary.common.b2b as string}
-            </dt>
-            <dd className="font-semibold text-blue-700">
-              {formatMoney(product.b2bPrice, locale)}
             </dd>
           </div>
         </dl>

@@ -1,5 +1,5 @@
 import { products, type Product } from "@/lib/catalog";
-import { getAuthContext } from "@/lib/auth";
+import { canViewB2BPrice, getAuthContext } from "@/lib/auth";
 import type { Locale } from "@/lib/i18n";
 import {
   getSupabaseServerClient,
@@ -91,6 +91,7 @@ export type CatalogPageData = {
   pageCount: number;
   state: CatalogSearchState;
   isPriceVisible: boolean;
+  isB2BPriceVisible: boolean;
   isSupabaseBacked: boolean;
 };
 
@@ -98,6 +99,7 @@ export type CatalogItemDetail = {
   item: CatalogItem;
   attributes: Array<{ key: string; label: string; value: string }>;
   isPriceVisible: boolean;
+  isB2BPriceVisible: boolean;
   isSupabaseBacked: boolean;
 };
 
@@ -180,16 +182,22 @@ export async function loadCatalogPage({
   const state = parseCatalogSearchParams(searchParams);
   const auth = await getAuthContext();
   const isPriceVisible = Boolean(auth.user);
+  const isB2BPriceVisible = canViewB2BPrice(auth);
 
   if (!hasSupabasePublicConfig()) {
-    return loadLocalCatalogPage(locale, state, isPriceVisible);
+    return loadLocalCatalogPage(locale, state, isPriceVisible, isB2BPriceVisible);
   }
 
   try {
-    return await loadSupabaseCatalogPage(locale, state, isPriceVisible);
+    return await loadSupabaseCatalogPage(
+      locale,
+      state,
+      isPriceVisible,
+      isB2BPriceVisible,
+    );
   } catch (error) {
     console.error("Failed to load Supabase catalog, using local fallback", error);
-    return loadLocalCatalogPage(locale, state, isPriceVisible);
+    return loadLocalCatalogPage(locale, state, isPriceVisible, isB2BPriceVisible);
   }
 }
 
@@ -199,14 +207,16 @@ export async function loadCatalogItemBySlug(
 ): Promise<CatalogItemDetail | null> {
   const auth = await getAuthContext();
   const isPriceVisible = Boolean(auth.user);
+  const isB2BPriceVisible = canViewB2BPrice(auth);
 
   if (!hasSupabasePublicConfig()) {
     const product = products.find((item) => item.slug === slug);
     if (!product) return null;
     return {
-      item: mapLocalProduct(product, locale, isPriceVisible),
+      item: mapLocalProduct(product, locale, isPriceVisible, isB2BPriceVisible),
       attributes: [],
       isPriceVisible,
+      isB2BPriceVisible,
       isSupabaseBacked: false,
     };
   }
@@ -226,9 +236,10 @@ export async function loadCatalogItemBySlug(
       const product = products.find((item) => item.slug === slug);
       if (!product) return null;
       return {
-        item: mapLocalProduct(product, locale, isPriceVisible),
+        item: mapLocalProduct(product, locale, isPriceVisible, isB2BPriceVisible),
         attributes: [],
         isPriceVisible,
+        isB2BPriceVisible,
         isSupabaseBacked: false,
       };
     }
@@ -236,13 +247,14 @@ export async function loadCatalogItemBySlug(
     const row = data as CatalogRow;
     const attributeRows = await loadAttributeRows([row.sku_id]);
     return {
-      item: mapCatalogRow(row, locale, isPriceVisible),
+      item: mapCatalogRow(row, locale, isPriceVisible, isB2BPriceVisible),
       attributes: attributeRows.map((attribute) => ({
         key: attribute.key,
         label: locale === "it" ? attribute.label_it : attribute.label_zh,
         value: locale === "it" ? attribute.value_label_it : attribute.value_label_zh,
       })),
       isPriceVisible,
+      isB2BPriceVisible,
       isSupabaseBacked: true,
     };
   } catch (error) {
@@ -250,9 +262,10 @@ export async function loadCatalogItemBySlug(
     const product = products.find((item) => item.slug === slug);
     if (!product) return null;
     return {
-      item: mapLocalProduct(product, locale, isPriceVisible),
+      item: mapLocalProduct(product, locale, isPriceVisible, isB2BPriceVisible),
       attributes: [],
       isPriceVisible,
+      isB2BPriceVisible,
       isSupabaseBacked: false,
     };
   }
@@ -315,19 +328,22 @@ async function loadSupabaseCatalogPage(
   locale: Locale,
   state: CatalogSearchState,
   isPriceVisible: boolean,
+  isB2BPriceVisible: boolean,
 ): Promise<CatalogPageData> {
   const supabase = await getSupabaseServerClient();
   const attrSkuIds = await getSkuIdsForAttributeFilters(state);
   const viewName = isPriceVisible ? "catalog_private_items" : "catalog_public_items";
+  const priceColumn = isB2BPriceVisible ? "b2b_price" : "retail_price";
   const offset = (state.page - 1) * pageSize;
 
   const itemQuery = applyCatalogFilters(
     selectCatalogView(supabase, viewName, true),
     state,
     isPriceVisible,
+    priceColumn,
     attrSkuIds,
   );
-  applySort(itemQuery, state.sort, isPriceVisible);
+  applySort(itemQuery, state.sort, isPriceVisible, priceColumn);
   const { data, error, count } = await itemQuery.range(offset, offset + pageSize - 1);
 
   if (error) throw error;
@@ -336,9 +352,10 @@ async function loadSupabaseCatalogPage(
     selectCatalogView(supabase, viewName),
     state,
     isPriceVisible,
+    priceColumn,
     attrSkuIds,
   );
-  applySort(facetQuery, "brand_asc", isPriceVisible);
+  applySort(facetQuery, "brand_asc", isPriceVisible, priceColumn);
   const { data: facetData, error: facetError } = await facetQuery.range(
     0,
     maxFacetRows - 1,
@@ -350,10 +367,11 @@ async function loadSupabaseCatalogPage(
     selectCatalogView(supabase, viewName),
     state,
     isPriceVisible,
+    priceColumn,
     attrSkuIds,
     { includeDevice: false },
   );
-  applySort(deviceQuery, "brand_asc", isPriceVisible);
+  applySort(deviceQuery, "brand_asc", isPriceVisible, priceColumn);
   const { data: deviceData, error: deviceError } = await deviceQuery.range(
     0,
     maxFacetRows - 1,
@@ -368,7 +386,9 @@ async function loadSupabaseCatalogPage(
   const total = count ?? rows.length;
 
   return {
-    items: rows.map((row) => mapCatalogRow(row, locale, isPriceVisible)),
+    items: rows.map((row) =>
+      mapCatalogRow(row, locale, isPriceVisible, isB2BPriceVisible),
+    ),
     facets: buildFacets(facetRows, attributeRows, locale, state, isPriceVisible),
     brandModelGroups: buildBrandModelGroups(deviceRows, state),
     total,
@@ -377,6 +397,7 @@ async function loadSupabaseCatalogPage(
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
     state,
     isPriceVisible,
+    isB2BPriceVisible,
     isSupabaseBacked: true,
   };
 }
@@ -431,6 +452,7 @@ function applyCatalogFilters(
   query: CatalogQueryBuilder,
   state: CatalogSearchState,
   isPriceVisible: boolean,
+  priceColumn: "b2b_price" | "retail_price",
   attrSkuIds: Set<string> | null,
   options: CatalogFilterOptions = {},
 ) {
@@ -469,8 +491,8 @@ function applyCatalogFilters(
   if (isPriceVisible) {
     const minPrice = Number.parseFloat(state.minPrice);
     const maxPrice = Number.parseFloat(state.maxPrice);
-    if (Number.isFinite(minPrice)) nextQuery = nextQuery.gte("b2b_price", minPrice);
-    if (Number.isFinite(maxPrice)) nextQuery = nextQuery.lte("b2b_price", maxPrice);
+    if (Number.isFinite(minPrice)) nextQuery = nextQuery.gte(priceColumn, minPrice);
+    if (Number.isFinite(maxPrice)) nextQuery = nextQuery.lte(priceColumn, maxPrice);
 
     if (state.availability === "in_stock") {
       nextQuery = nextQuery.gt("available_stock", 0);
@@ -490,14 +512,15 @@ function applySort(
   query: CatalogQueryBuilder,
   sort: CatalogSort,
   isPriceVisible: boolean,
+  priceColumn: "b2b_price" | "retail_price",
 ) {
   if (sort === "price_asc" && isPriceVisible) {
-    query.order("b2b_price", { ascending: true }).order("sku", { ascending: true });
+    query.order(priceColumn, { ascending: true }).order("sku", { ascending: true });
     return;
   }
 
   if (sort === "price_desc" && isPriceVisible) {
-    query.order("b2b_price", { ascending: false }).order("sku", { ascending: true });
+    query.order(priceColumn, { ascending: false }).order("sku", { ascending: true });
     return;
   }
 
@@ -528,17 +551,25 @@ function loadLocalCatalogPage(
   locale: Locale,
   state: CatalogSearchState,
   isPriceVisible: boolean,
+  isB2BPriceVisible: boolean,
 ): CatalogPageData {
   const filtered = products.filter((product) => matchesLocalProduct(product, state));
   const deviceRows = products
     .filter((product) => matchesLocalProduct(product, state, { includeDevice: false }))
     .map((product) => localProductToCatalogRow(product));
-  const sorted = sortLocalProducts(filtered, state.sort, isPriceVisible);
+  const sorted = sortLocalProducts(
+    filtered,
+    state.sort,
+    isPriceVisible,
+    isB2BPriceVisible,
+  );
   const offset = (state.page - 1) * pageSize;
   const pageItems = sorted.slice(offset, offset + pageSize);
 
   return {
-    items: pageItems.map((product) => mapLocalProduct(product, locale, isPriceVisible)),
+    items: pageItems.map((product) =>
+      mapLocalProduct(product, locale, isPriceVisible, isB2BPriceVisible),
+    ),
     facets: buildLocalFacets(filtered, state, locale, isPriceVisible),
     brandModelGroups: buildBrandModelGroups(deviceRows, state),
     total: filtered.length,
@@ -547,6 +578,7 @@ function loadLocalCatalogPage(
     pageCount: Math.max(1, Math.ceil(filtered.length / pageSize)),
     state,
     isPriceVisible,
+    isB2BPriceVisible,
     isSupabaseBacked: false,
   };
 }
@@ -755,6 +787,7 @@ function mapCatalogRow(
   row: CatalogRow,
   locale: Locale,
   isPriceVisible: boolean,
+  isB2BPriceVisible: boolean,
 ): CatalogItem {
   return {
     skuId: row.sku_id,
@@ -776,7 +809,7 @@ function mapCatalogRow(
     compatibility: row.compatibility ?? [],
     moq: Number(row.moq ?? 1),
     retailPrice: isPriceVisible ? Number(row.retail_price ?? 0) : null,
-    b2bPrice: isPriceVisible ? Number(row.b2b_price ?? 0) : null,
+    b2bPrice: isB2BPriceVisible ? Number(row.b2b_price ?? 0) : null,
     stockOnHand: isPriceVisible ? Number(row.stock_on_hand ?? 0) : null,
     availableStock: isPriceVisible ? Number(row.available_stock ?? 0) : null,
     incomingQty: isPriceVisible ? Number(row.incoming_qty ?? 0) : null,
@@ -800,6 +833,7 @@ function mapLocalProduct(
   product: Product,
   locale: Locale,
   isPriceVisible: boolean,
+  isB2BPriceVisible: boolean,
 ): CatalogItem {
   return {
     skuId: product.sku,
@@ -819,7 +853,7 @@ function mapLocalProduct(
     compatibility: product.compatibility,
     moq: product.moq,
     retailPrice: isPriceVisible ? product.retailPrice : null,
-    b2bPrice: isPriceVisible ? product.b2bPrice : null,
+    b2bPrice: isB2BPriceVisible ? product.b2bPrice : null,
     stockOnHand: isPriceVisible ? product.stock : null,
     availableStock: isPriceVisible ? product.stock : null,
     incomingQty: isPriceVisible ? (product.incoming ?? 0) : null,
@@ -884,13 +918,22 @@ function sortLocalProducts(
   items: Product[],
   sort: CatalogSort,
   isPriceVisible: boolean,
+  isB2BPriceVisible: boolean,
 ) {
   return [...items].sort((a, b) => {
-    if (sort === "price_asc" && isPriceVisible) return a.b2bPrice - b.b2bPrice;
-    if (sort === "price_desc" && isPriceVisible) return b.b2bPrice - a.b2bPrice;
+    if (sort === "price_asc" && isPriceVisible) {
+      return getComparablePrice(a, isB2BPriceVisible) - getComparablePrice(b, isB2BPriceVisible);
+    }
+    if (sort === "price_desc" && isPriceVisible) {
+      return getComparablePrice(b, isB2BPriceVisible) - getComparablePrice(a, isB2BPriceVisible);
+    }
     if (sort === "name_asc") return a.names.it.localeCompare(b.names.it);
     return `${a.brand} ${a.model} ${a.sku}`.localeCompare(`${b.brand} ${b.model} ${b.sku}`);
   });
+}
+
+function getComparablePrice(product: Product, isB2BPriceVisible: boolean) {
+  return isB2BPriceVisible ? product.b2bPrice : product.retailPrice;
 }
 
 function sanitizeSearchTerm(value: string) {

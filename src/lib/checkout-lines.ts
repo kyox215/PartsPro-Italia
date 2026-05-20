@@ -1,4 +1,4 @@
-import { getAuthContext } from "@/lib/auth";
+import { canViewB2BPrice, getAuthContext } from "@/lib/auth";
 import { products } from "@/lib/catalog";
 import type { Locale } from "@/lib/i18n";
 import { calculateLineTotal } from "@/lib/pricing";
@@ -33,6 +33,7 @@ type CheckoutCatalogRow = {
   sku: string;
   name_it: string;
   name_zh: string;
+  retail_price: number | string | null;
   b2b_price: number | string | null;
   available_stock: number | null;
   incoming_qty: number | null;
@@ -49,6 +50,7 @@ export async function loadCheckoutLines({
   items: Array<{ sku: string; quantity: number }>;
 }>): Promise<CheckoutLinesResult> {
   const auth = await getAuthContext();
+  const useB2BPrice = canViewB2BPrice(auth);
 
   if (hasSupabasePublicConfig()) {
     if (!auth.user) {
@@ -69,7 +71,9 @@ export async function loadCheckoutLines({
           const row = rows.find((candidate) => candidate.sku === item.sku);
           if (!row) return [];
 
-          const unitPrice = Number(row.b2b_price ?? 0);
+          const unitPrice = Number(
+            useB2BPrice ? row.b2b_price ?? 0 : row.retail_price ?? 0,
+          );
           const vatRate = 0.22;
           const subtotal = unitPrice * item.quantity;
           const vat = subtotal * vatRate;
@@ -115,7 +119,7 @@ export async function loadCheckoutLines({
     lines: fallbackItems.flatMap((item) => {
       const product = products.find((candidate) => candidate.sku === item.sku);
       if (!product) return [];
-      const totals = calculateLineTotal(product, item.quantity, true);
+      const totals = calculateLineTotal(product, item.quantity, useB2BPrice);
       return [
         {
           sku: product.sku,

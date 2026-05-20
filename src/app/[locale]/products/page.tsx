@@ -98,8 +98,8 @@ export default async function ProductsPage({
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
               <Lock className="mr-2 inline h-4 w-4" />
               {locale === "it"
-                ? "Accedi per vedere prezzi B2B, stock disponibile e pulsante ordine."
-                : "登录后可查看 B2B 价格、可用库存和下单入口。"}
+                ? "Accedi per vedere prezzi, disponibilita e pulsante ordine."
+                : "登录后可查看价格、可用库存和下单入口。"}
               <Link
                 href={localizePath(locale, "/login")}
                 className="ml-2 font-bold text-amber-950 underline"
@@ -475,6 +475,7 @@ function CatalogProductCardGrid({
           item={item}
           locale={locale}
           isPriceVisible={catalog.isPriceVisible}
+          isB2BPriceVisible={catalog.isB2BPriceVisible}
         />
       ))}
     </div>
@@ -485,7 +486,13 @@ function CatalogProductCard({
   item,
   locale,
   isPriceVisible,
-}: Readonly<{ item: CatalogItem; locale: Locale; isPriceVisible: boolean }>) {
+  isB2BPriceVisible,
+}: Readonly<{
+  item: CatalogItem;
+  locale: Locale;
+  isPriceVisible: boolean;
+  isB2BPriceVisible: boolean;
+}>) {
   const available = item.availableStock ?? 0;
   const incoming = item.incomingAvailable ?? item.incomingQty ?? 0;
   const canOrder = isPriceVisible && (available > 0 || incoming > 0);
@@ -526,13 +533,26 @@ function CatalogProductCard({
         </div>
         {isPriceVisible ? (
           <div>
-            <p className="text-xs text-slate-500">{locale === "it" ? "B2B" : "批发价"}</p>
-            <p className="font-bold text-blue-700">
-              {formatMoney(item.b2bPrice ?? 0, locale)}
-            </p>
-            <p className="text-xs text-slate-500">
-              {formatMoney(item.retailPrice ?? 0, locale)}
-            </p>
+            {isB2BPriceVisible ? (
+              <>
+                <p className="text-xs text-slate-500">{locale === "it" ? "B2B" : "批发价"}</p>
+                <p className="font-bold text-blue-700">
+                  {formatMoney(item.b2bPrice ?? 0, locale)}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {formatMoney(item.retailPrice ?? 0, locale)}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-slate-500">
+                  {locale === "it" ? "Retail" : "零售价"}
+                </p>
+                <p className="font-bold text-slate-900">
+                  {formatMoney(item.retailPrice ?? 0, locale)}
+                </p>
+              </>
+            )}
           </div>
         ) : (
           <div>
@@ -613,11 +633,6 @@ function StockLabel({ item, locale }: Readonly<{ item: CatalogItem; locale: Loca
               ? "Esaurito"
               : "缺货"}
       </p>
-      {incoming > 0 ? (
-        <p className="text-xs text-slate-500">
-          +{incoming} {locale === "it" ? "incoming" : "在途"}
-        </p>
-      ) : null}
     </div>
   );
 }

@@ -75,14 +75,16 @@ export default async function ProductDetailPage({
                   {formatMoney(item.retailPrice ?? 0, locale)}
                 </dd>
               </div>
-              <div>
-                <dt className="text-xs uppercase text-slate-500">
-                  {dictionary.common.b2b}
-                </dt>
-                <dd className="mt-1 text-2xl font-bold text-blue-700">
-                  {formatMoney(item.b2bPrice ?? 0, locale)}
-                </dd>
-              </div>
+              {detail.isB2BPriceVisible ? (
+                <div>
+                  <dt className="text-xs uppercase text-slate-500">
+                    {dictionary.common.b2b}
+                  </dt>
+                  <dd className="mt-1 text-2xl font-bold text-blue-700">
+                    {formatMoney(item.b2bPrice ?? 0, locale)}
+                  </dd>
+                </div>
+              ) : null}
             </>
           ) : (
             <div className="sm:col-span-2">
@@ -92,8 +94,8 @@ export default async function ProductDetailPage({
               <dd className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
                 <Lock className="mr-2 inline h-4 w-4" />
                 {locale === "it"
-                  ? "Accedi per vedere prezzi B2B e disponibilita."
-                  : "登录后查看 B2B 价格和库存。"}
+                  ? "Accedi per vedere prezzi e disponibilita."
+                  : "登录后查看价格和库存。"}
               </dd>
             </div>
           )}
@@ -222,7 +224,7 @@ function StockBadge({
   if (incoming > 0) {
     return (
       <Badge className="border-violet-200 bg-violet-50 text-violet-700">
-        {locale === "it" ? "Preordine" : "预购"} {incoming} / {leadMin}-{leadMax}{" "}
+        {locale === "it" ? "Preordine" : "预购"} {leadMin}-{leadMax}{" "}
         {locale === "it" ? "gg" : "天"}
       </Badge>
     );

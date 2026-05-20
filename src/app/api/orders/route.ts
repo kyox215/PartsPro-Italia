@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthContext } from "@/lib/auth";
+import { canViewB2BPrice, getAuthContext } from "@/lib/auth";
 import { products } from "@/lib/catalog";
 import { getSiteUrl } from "@/lib/env";
 import { parseRequestBody } from "@/lib/request";
@@ -37,6 +37,7 @@ export async function POST(request: Request) {
         { sku: products[1].sku, quantity: 2 },
       ];
   const auth = await getAuthContext();
+  const useB2BPrice = canViewB2BPrice(auth);
   const isSupabaseCatalogConfigured = hasSupabasePublicConfig();
   const canWriteSupabaseOrders = hasSupabaseAdminConfig();
   let lines: OrderLine[];
@@ -54,15 +55,15 @@ export async function POST(request: Request) {
     return orderError(
       request,
       parsed.data.locale,
-      "Login is required to create B2B stock or preorder orders.",
+      "Login is required to create stock or preorder orders.",
       401,
     );
   }
 
   try {
     lines = canWriteSupabaseOrders
-      ? await loadSupabaseOrderLines(items)
-      : loadLocalOrderLines(items);
+      ? await loadSupabaseOrderLines(items, useB2BPrice)
+      : loadLocalOrderLines(items, useB2BPrice);
   } catch (error) {
     return orderError(
       request,
@@ -256,6 +257,7 @@ type SupabaseSkuRow = {
   sku: string;
   moq: number;
   b2b_price: number | string;
+  retail_price: number | string;
   vat_rate: number | string;
   preorder_lead_time_min_days: number | null;
   preorder_lead_time_max_days: number | null;
@@ -274,13 +276,16 @@ type SupabaseSkuRow = {
     | null;
 };
 
-function loadLocalOrderLines(items: Array<{ sku: string; quantity: number }>): OrderLine[] {
+function loadLocalOrderLines(
+  items: Array<{ sku: string; quantity: number }>,
+  useB2BPrice: boolean,
+): OrderLine[] {
   return items.map((item) => {
     const product = products.find((candidate) => candidate.sku === item.sku);
     if (!product) {
       throw new Error(`Unknown SKU: ${item.sku}`);
     }
-    const totals = calculateLineTotal(product, item.quantity, true);
+    const totals = calculateLineTotal(product, item.quantity, useB2BPrice);
     const fulfillmentType = getFulfillmentType(
       item.quantity,
       product.stock,
@@ -308,6 +313,7 @@ function loadLocalOrderLines(items: Array<{ sku: string; quantity: number }>): O
 
 async function loadSupabaseOrderLines(
   items: Array<{ sku: string; quantity: number }>,
+  useB2BPrice: boolean,
 ): Promise<OrderLine[]> {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
@@ -318,6 +324,7 @@ async function loadSupabaseOrderLines(
       sku,
       moq,
       b2b_price,
+      retail_price,
       vat_rate,
       preorder_lead_time_min_days,
       preorder_lead_time_max_days,
@@ -367,7 +374,9 @@ async function loadSupabaseOrderLines(
       );
     }
 
-    const unitPrice = Number(row.b2b_price ?? 0);
+    const unitPrice = Number(
+      useB2BPrice ? row.b2b_price ?? 0 : row.retail_price ?? 0,
+    );
     const vatRate = Number(row.vat_rate ?? 0.22);
     const stockQty = Math.min(item.quantity, availableStock);
     const preorderQty = Math.max(item.quantity - stockQty, 0);
