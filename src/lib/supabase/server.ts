@@ -5,6 +5,10 @@ import {
   getSupabaseUrl,
   hasSupabasePublicConfig,
 } from "@/lib/supabase/config";
+import {
+  persistentAuthCookieOptions,
+  withPersistentAuthCookieOptions,
+} from "@/lib/supabase/auth-cookies";
 
 export { hasSupabasePublicConfig };
 
@@ -24,6 +28,7 @@ export async function getSupabaseServerClient() {
     url!,
     publicKey!,
     {
+      cookieOptions: persistentAuthCookieOptions,
       cookies: {
         getAll() {
           return cookieStore.getAll();
@@ -31,7 +36,11 @@ export async function getSupabaseServerClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options as CookieOptionsWithName);
+              cookieStore.set(
+                name,
+                value,
+                withPersistentAuthCookieOptions(options) as CookieOptionsWithName,
+              );
             });
           } catch {
             // Server Components cannot always write cookies; middleware handles refresh.

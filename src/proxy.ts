@@ -4,6 +4,10 @@ import {
   getSupabasePublicKey,
   getSupabaseUrl,
 } from "@/lib/supabase/config";
+import {
+  persistentAuthCookieOptions,
+  withPersistentAuthCookieOptions,
+} from "@/lib/supabase/auth-cookies";
 
 export async function proxy(request: NextRequest) {
   const url = getSupabaseUrl();
@@ -19,15 +23,23 @@ export async function proxy(request: NextRequest) {
     url,
     publicKey,
     {
+      cookieOptions: persistentAuthCookieOptions,
       cookies: {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet, headers) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           response = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
+            response.cookies.set(
+              name,
+              value,
+              withPersistentAuthCookieOptions(options),
+            );
+          });
+          Object.entries(headers).forEach(([key, value]) => {
+            response.headers.set(key, value);
           });
         },
       },

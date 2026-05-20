@@ -3,6 +3,7 @@ import {
   getSupabasePublicKey,
   getSupabaseUrl,
 } from "@/lib/supabase/config";
+import { persistentAuthCookieOptions } from "@/lib/supabase/auth-cookies";
 
 export function getSupabaseBrowserClient() {
   const url = getSupabaseUrl();
@@ -14,5 +15,7 @@ export function getSupabaseBrowserClient() {
     );
   }
 
-  return createBrowserClient(url, publicKey);
+  return createBrowserClient(url, publicKey, {
+    cookieOptions: persistentAuthCookieOptions,
+  });
 }
