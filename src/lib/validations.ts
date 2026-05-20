@@ -245,6 +245,23 @@ export const adminOrderPaymentProofSchema = z.object({
   note: z.string().optional().or(z.literal("")),
 });
 
+export const adminOrderRefundSchema = z.object({
+  id: z.string().min(1),
+  locale: z.enum(["it", "zh"]).default("it"),
+  returnTo: z.string().optional().or(z.literal("")),
+  amount: z.coerce.number().positive(),
+  reason: z.enum([
+    "duplicate",
+    "fraudulent",
+    "requested_by_customer",
+    "order_cancelled",
+    "rma_refund",
+    "other",
+  ]).default("requested_by_customer"),
+  providerReference: z.string().optional().or(z.literal("")),
+  note: z.string().optional().or(z.literal("")),
+});
+
 export const adminOrderShipmentSchema = z.object({
   id: z.string().min(1),
   locale: z.enum(["it", "zh"]).default("it"),

@@ -18,6 +18,7 @@ type NotificationInput = {
 type OrderNotificationType =
   | "payment_paid"
   | "payment_proof_added"
+  | "refund_recorded"
   | "shipment_updated"
   | "status_updated";
 
@@ -66,6 +67,7 @@ export async function notifyOrderCustomer({
       trackingUrl: order.tracking_url,
       customerNote: order.customer_note,
     },
+    metadata,
   });
 
   return createAndMaybeSendNotification({
@@ -297,6 +299,7 @@ function buildOrderNotification({
   type,
   locale,
   order,
+  metadata = {},
 }: {
   type: OrderNotificationType;
   locale: NotificationLocale;
@@ -312,8 +315,13 @@ function buildOrderNotification({
     trackingUrl?: string | null;
     customerNote?: string | null;
   };
+  metadata?: Record<string, unknown>;
 }) {
   const url = `${getSiteUrl()}/${locale}/account/orders/${order.id}`;
+  const refundAmount =
+    typeof metadata.refundAmount === "number" ? metadata.refundAmount : null;
+  const refundCurrency =
+    typeof metadata.currency === "string" ? metadata.currency : order.currency;
 
   if (locale === "zh") {
     if (type === "payment_paid") {
@@ -332,6 +340,12 @@ function buildOrderNotification({
       return {
         subject: `PartsPro 订单付款记录已更新 ${shortId(order.id)}`,
         body: `您的订单付款记录已更新。\n\n订单：${order.id}\n付款状态：${order.paymentStatus || "-"}\n\n查看订单：${url}`,
+      };
+    }
+    if (type === "refund_recorded") {
+      return {
+        subject: `PartsPro 订单退款已更新 ${shortId(order.id)}`,
+        body: `您的订单退款记录已更新。\n\n订单：${order.id}\n退款金额：${refundAmount === null ? "-" : `${refundAmount.toFixed(2)} ${refundCurrency}`}\n付款状态：${order.paymentStatus || "-"}\n\n查看订单：${url}`,
       };
     }
     return {
@@ -356,6 +370,12 @@ function buildOrderNotification({
     return {
       subject: `PartsPro registro pagamento aggiornato ${shortId(order.id)}`,
       body: `Il registro pagamento del tuo ordine e stato aggiornato.\n\nOrdine: ${order.id}\nStato pagamento: ${order.paymentStatus || "-"}\n\nApri ordine: ${url}`,
+    };
+  }
+  if (type === "refund_recorded") {
+    return {
+      subject: `PartsPro rimborso aggiornato ${shortId(order.id)}`,
+      body: `Il registro rimborso del tuo ordine e stato aggiornato.\n\nOrdine: ${order.id}\nImporto rimborso: ${refundAmount === null ? "-" : `${refundAmount.toFixed(2)} ${refundCurrency}`}\nStato pagamento: ${order.paymentStatus || "-"}\n\nApri ordine: ${url}`,
     };
   }
   return {

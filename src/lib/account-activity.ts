@@ -13,6 +13,7 @@ export type AccountOrderRow = {
   fulfillmentStatus?: string | null;
   paymentMethod: string;
   total: number;
+  refundTotal?: number;
   currency: string;
   reservationExpiresAt?: string | null;
   paidAt?: string | null;
@@ -44,6 +45,18 @@ export type AccountOrderRow = {
     providerReference?: string | null;
     proofUrl?: string | null;
     proofLabel?: string | null;
+    note?: string | null;
+    createdAt: string;
+  }>;
+  refunds: Array<{
+    id: string;
+    paymentMethod: string;
+    amount: number;
+    currency: string;
+    reason: string;
+    status: string;
+    provider?: string | null;
+    providerRefundId?: string | null;
     note?: string | null;
     createdAt: string;
   }>;
@@ -108,6 +121,7 @@ export async function getAccountActivity(
           fulfillmentStatus: "awaiting_preorder",
           paymentMethod: "bank_transfer",
           total: 519.24,
+          refundTotal: 0,
           currency: "EUR",
           reservationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
           paidAt: null,
@@ -141,6 +155,7 @@ export async function getAccountActivity(
             },
           ],
           paymentRecords: [],
+          refunds: [],
           timelineEvents: [
             {
               id: "demo-order-event-1",
@@ -192,7 +207,7 @@ export async function getAccountActivity(
     supabase
       .from("orders")
       .select(
-        "id, status, payment_status, fulfillment_status, payment_method, total, currency, reservation_expires_at, paid_at, created_at, order_items (*)",
+        "id, status, payment_status, fulfillment_status, payment_method, total, refund_total, currency, reservation_expires_at, paid_at, created_at, order_items (*)",
       )
       .eq("profile_id", auth.user.id)
       .order("created_at", { ascending: false })
@@ -237,7 +252,7 @@ export async function getAccountOrderById(
   const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase
     .from("orders")
-    .select("id, status, payment_status, fulfillment_status, payment_method, total, currency, reservation_expires_at, paid_at, shipping_carrier, tracking_number, tracking_url, shipment_note, shipped_at, customer_note, created_at, order_items (*), order_payment_records (*), order_timeline_events (*)")
+    .select("id, status, payment_status, fulfillment_status, payment_method, total, refund_total, currency, reservation_expires_at, paid_at, shipping_carrier, tracking_number, tracking_url, shipment_note, shipped_at, customer_note, created_at, order_items (*), order_payment_records (*), order_refunds (*), order_timeline_events (*)")
     .eq("profile_id", auth.user.id)
     .eq("id", orderId)
     .maybeSingle();
@@ -288,6 +303,7 @@ function mapAccountOrder(order: {
   fulfillment_status?: string | null;
   payment_method: string;
   total: number | string | null;
+  refund_total?: number | string | null;
   currency: string | null;
   reservation_expires_at?: string | null;
   paid_at?: string | null;
@@ -322,6 +338,18 @@ function mapAccountOrder(order: {
     note?: string | null;
     created_at: string;
   }> | null;
+  order_refunds?: Array<{
+    id: string;
+    payment_method: string;
+    amount: number | string;
+    currency: string | null;
+    reason: string;
+    status: string;
+    provider?: string | null;
+    provider_refund_id?: string | null;
+    note?: string | null;
+    created_at: string;
+  }> | null;
   order_timeline_events?: Array<{
     id: string;
     event_type: string;
@@ -338,6 +366,7 @@ function mapAccountOrder(order: {
     fulfillmentStatus: order.fulfillment_status ?? null,
     paymentMethod: order.payment_method,
     total: Number(order.total ?? 0),
+    refundTotal: Number(order.refund_total ?? 0),
     currency: order.currency ?? "EUR",
     reservationExpiresAt: order.reservation_expires_at ?? null,
     paidAt: order.paid_at ?? null,
@@ -372,6 +401,20 @@ function mapAccountOrder(order: {
         proofLabel: record.proof_label ?? null,
         note: record.note ?? null,
         createdAt: record.created_at,
+      }))
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
+    refunds: (order.order_refunds ?? [])
+      .map((refund) => ({
+        id: refund.id,
+        paymentMethod: refund.payment_method,
+        amount: Number(refund.amount ?? 0),
+        currency: refund.currency ?? "EUR",
+        reason: refund.reason,
+        status: refund.status,
+        provider: refund.provider ?? null,
+        providerRefundId: refund.provider_refund_id ?? null,
+        note: refund.note ?? null,
+        createdAt: refund.created_at,
       }))
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
     timelineEvents: (order.order_timeline_events ?? [])
@@ -468,6 +511,9 @@ function summarizeActivity({
     rmas,
     orderCount: orders.length,
     openRmaCount: rmas.filter((rma) => rma.status !== "completed").length,
-    totalSpend: orders.reduce((sum, order) => sum + order.total, 0),
+    totalSpend: orders.reduce(
+      (sum, order) => sum + order.total - (order.refundTotal ?? 0),
+      0,
+    ),
   };
 }

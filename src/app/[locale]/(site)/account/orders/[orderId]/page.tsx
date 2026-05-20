@@ -61,6 +61,10 @@ export default async function AccountOrderDetailPage({
         />
         <MetricCard label={locale === "it" ? "Totale" : "订单总额"} value={formatMoney(order.total, locale)} />
         <MetricCard
+          label={locale === "it" ? "Rimborsato" : "已退款"}
+          value={formatMoney(order.refundTotal ?? 0, locale)}
+        />
+        <MetricCard
           label={locale === "it" ? "Fulfilment" : "履约拆分"}
           value={`${stockQty} stock / ${preorderQty} preorder / ${order.fulfillmentStatus ?? "-"}`}
         />
@@ -156,6 +160,45 @@ export default async function AccountOrderDetailPage({
               {locale === "it"
                 ? "Le conferme pagamento appariranno qui."
                 : "后台确认或登记付款凭证后会显示在这里。"}
+            </p>
+          )}
+        </article>
+
+        <article className="rounded-lg border border-slate-200 bg-white p-5">
+          <h2 className="text-lg font-bold text-slate-950">
+            {locale === "it" ? "Rimborsi" : "退款记录"}
+          </h2>
+          {order.refunds.length ? (
+            <div className="mt-4 grid gap-3">
+              {order.refunds.map((refund) => (
+                <div key={refund.id} className="rounded-lg bg-slate-50 p-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <strong className="text-slate-950">
+                      {formatMoney(refund.amount, locale)}
+                    </strong>
+                    <Badge className="border-slate-200 bg-white text-slate-700">
+                      {refund.status}
+                    </Badge>
+                  </div>
+                  <p className="mt-2 text-xs font-semibold text-slate-500">
+                    {[refund.paymentMethod, refund.reason, refund.providerRefundId]
+                      .filter(Boolean)
+                      .join(" / ")}
+                  </p>
+                  {refund.note ? (
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{refund.note}</p>
+                  ) : null}
+                  <p className="mt-2 text-xs text-slate-500">
+                    {formatDateTime(refund.createdAt, locale)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+              {locale === "it"
+                ? "Eventuali rimborsi appariranno qui."
+                : "如果后台处理退款，记录会显示在这里。"}
             </p>
           )}
         </article>

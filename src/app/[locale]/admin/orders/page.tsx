@@ -61,6 +61,7 @@ export default async function AdminOrdersPage({
     ["processing", locale === "it" ? "In lavorazione" : "处理中"],
     ["shipped", locale === "it" ? "Spediti" : "已发货"],
     ["completed", locale === "it" ? "Completati" : "已完成"],
+    ["refunded", locale === "it" ? "Rimborsati" : "已退款"],
     ["cancelled", locale === "it" ? "Annullati" : "已取消"],
   ].map(([value, label]) => ({
     href: `${localizePath(locale, "/admin/orders")}${value === "all" ? "" : `?filter=${value}`}`,
@@ -211,6 +212,11 @@ export default async function AdminOrdersPage({
                         </td>
                         <td className="px-2.5 py-2.5 font-black text-stone-950">
                           {formatMoney(order.total, locale)}
+                          {order.refundTotal ? (
+                            <p className="mt-1 text-xs font-semibold text-rose-600">
+                              - {formatMoney(order.refundTotal, locale)}
+                            </p>
+                          ) : null}
                         </td>
                         <td className="px-2.5 py-2.5">
                           <StatusSelectForm
@@ -264,6 +270,11 @@ export default async function AdminOrdersPage({
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-stone-500">
                     <StatusPill status={order.paymentStatus ?? "-"} />
                     <span>{formatMoney(order.total, locale)}</span>
+                    {order.refundTotal ? (
+                      <span className="text-rose-600">
+                        - {formatMoney(order.refundTotal, locale)}
+                      </span>
+                    ) : null}
                   </div>
                   <div className="mt-4">
                     <StatusSelectForm
@@ -374,6 +385,11 @@ function filterAdminOrders(
   if (filter === "shipped") return orders.filter((order) => order.status === "shipped");
   if (filter === "completed") {
     return orders.filter((order) => order.status === "completed");
+  }
+  if (filter === "refunded") {
+    return orders.filter(
+      (order) => order.paymentStatus === "refunded" || (order.refundTotal ?? 0) > 0,
+    );
   }
   if (filter === "cancelled") {
     return orders.filter((order) => order.status === "cancelled");

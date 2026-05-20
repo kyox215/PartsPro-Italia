@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { Boxes, ClipboardList, CreditCard, PackageCheck, TimerReset } from "lucide-react";
+import { Boxes, ClipboardList, CreditCard, PackageCheck, RotateCcw, TimerReset } from "lucide-react";
 import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
 import { StatusSelectForm } from "@/components/admin/status-select-form";
 import {
@@ -79,7 +79,7 @@ export default async function AdminOrderDetailPage({
       />
       <Feedback saved={valueOf(query.saved)} error={valueOf(query.error)} locale={locale} />
 
-      <AdminMetricStrip className="md:grid-cols-2 xl:grid-cols-5">
+      <AdminMetricStrip className="md:grid-cols-2 xl:grid-cols-6">
         <AdminMetricCard icon={ClipboardList} label={locale === "it" ? "Stato" : "状态"} value={<StatusPill status={order.status} />} tone="blue" />
         <AdminMetricCard
           icon={CreditCard}
@@ -89,6 +89,12 @@ export default async function AdminOrderDetailPage({
           trend={<StatusPill status={order.paymentStatus ?? "-"} />}
         />
         <AdminMetricCard icon={Boxes} label={locale === "it" ? "Totale" : "总额"} value={formatMoney(order.total, locale)} tone="green" />
+        <AdminMetricCard
+          icon={RotateCcw}
+          label={locale === "it" ? "Rimborsi" : "已退款"}
+          value={formatMoney(order.refundTotal ?? 0, locale)}
+          tone="amber"
+        />
         <AdminMetricCard icon={PackageCheck} label={locale === "it" ? "Stock" : "现货履约"} value={stockQty} tone="slate" />
         <AdminMetricCard
           icon={TimerReset}
@@ -200,6 +206,17 @@ export default async function AdminOrderDetailPage({
             </AdminPanel>
 
             <AdminPanel
+              title={locale === "it" ? "Rimborso" : "退款"}
+              description={
+                locale === "it"
+                  ? "Registra rimborso manuale o invia refund Stripe."
+                  : "记录现金/转账退款，或对 Stripe 订单发起银行卡退款。"
+              }
+            >
+              <RefundForm order={order} locale={locale} returnTo={returnTo} />
+            </AdminPanel>
+
+            <AdminPanel
               title={locale === "it" ? "Spedizione" : "物流信息"}
               description={
                 locale === "it"
@@ -297,6 +314,56 @@ export default async function AdminOrderDetailPage({
                 {locale === "it"
                   ? "Nessuna conferma pagamento registrata."
                   : "暂无付款确认记录。"}
+              </p>
+            )}
+          </AdminPanel>
+
+          <AdminPanel
+            title={locale === "it" ? "Registri rimborso" : "退款记录"}
+            description={
+              locale === "it"
+                ? "Rimborsi parziali, totali e riferimenti provider."
+                : "部分/全额退款和 Stripe/手动参考号。"
+            }
+          >
+            {order.refunds.length > 0 ? (
+              <div className="grid gap-2">
+                {order.refunds.map((refund) => (
+                  <div
+                    key={refund.id}
+                    className="rounded-lg border border-black/5 bg-stone-50 p-3 text-sm"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="font-black text-stone-950">
+                        {formatMoney(refund.amount, locale)}
+                      </div>
+                      <StatusPill status={refund.status} />
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-stone-500">
+                      <span>{refund.paymentMethod}</span>
+                      <span>{refund.reason}</span>
+                      {refund.provider ? <span>{refund.provider}</span> : null}
+                      {refund.providerRefundId ? (
+                        <span className="font-mono">{refund.providerRefundId}</span>
+                      ) : null}
+                      {refund.providerStatus ? <span>{refund.providerStatus}</span> : null}
+                    </div>
+                    {refund.note ? (
+                      <p className="mt-2 text-xs font-semibold text-stone-700">
+                        {refund.note}
+                      </p>
+                    ) : null}
+                    <p className="mt-2 text-xs font-semibold text-stone-400">
+                      {formatDateTime(refund.createdAt, locale)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-lg bg-stone-50 p-3 text-sm font-semibold text-stone-500">
+                {locale === "it"
+                  ? "Nessun rimborso registrato."
+                  : "暂无退款记录。"}
               </p>
             )}
           </AdminPanel>
@@ -511,6 +578,103 @@ function PaymentProofForm({
         type="submit"
       >
         {locale === "it" ? "Salva prova" : "保存付款凭证"}
+      </button>
+    </form>
+  );
+}
+
+function RefundForm({
+  order,
+  locale,
+  returnTo,
+}: Readonly<{
+  order: Awaited<ReturnType<typeof getAdminOrderById>>;
+  locale: Locale;
+  returnTo: string;
+}>) {
+  if (!order) return null;
+
+  const remaining = Math.max(order.total - (order.refundTotal ?? 0), 0);
+
+  return (
+    <form action="/api/admin/orders/refund" className="grid gap-3" method="post">
+      <AdminCsrfField />
+      <input type="hidden" name="id" value={order.id} />
+      <input type="hidden" name="locale" value={locale} />
+      <input type="hidden" name="returnTo" value={returnTo} />
+      <div className="rounded-lg bg-stone-50 p-3 text-xs font-semibold leading-5 text-stone-700">
+        <p>
+          {locale === "it" ? "Rimborsabile" : "可退款"}:{" "}
+          <strong>{formatMoney(remaining, locale)}</strong>
+        </p>
+        <p className="mt-1">
+          {locale === "it" ? "Metodo originale" : "原支付方式"}:{" "}
+          <strong>{order.paymentMethod}</strong>
+        </p>
+      </div>
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Importo rimborso" : "退款金额"}
+        <input
+          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          defaultValue={remaining > 0 ? remaining.toFixed(2) : ""}
+          max={remaining || undefined}
+          min="0.01"
+          name="amount"
+          step="0.01"
+          type="number"
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Motivo" : "退款原因"}
+        <select
+          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          defaultValue="requested_by_customer"
+          name="reason"
+        >
+          <option value="requested_by_customer">
+            {locale === "it" ? "Richiesta cliente" : "客户要求"}
+          </option>
+          <option value="order_cancelled">
+            {locale === "it" ? "Ordine annullato" : "订单取消"}
+          </option>
+          <option value="rma_refund">{locale === "it" ? "RMA" : "售后退款"}</option>
+          <option value="duplicate">{locale === "it" ? "Duplicato" : "重复付款"}</option>
+          <option value="fraudulent">{locale === "it" ? "Frode" : "欺诈风险"}</option>
+          <option value="other">{locale === "it" ? "Altro" : "其他"}</option>
+        </select>
+      </label>
+      {order.paymentMethod !== "stripe" ? (
+        <label className="grid gap-1 text-xs font-black text-stone-500">
+          {locale === "it" ? "Riferimento rimborso" : "退款参考号"}
+          <input
+            className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+            name="providerReference"
+            placeholder={locale === "it" ? "Bonifico / ricevuta" : "转账单号 / 现金凭证"}
+          />
+        </label>
+      ) : null}
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Nota" : "备注"}
+        <textarea
+          className="min-h-20 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          name="note"
+          placeholder={
+            order.paymentMethod === "stripe"
+              ? locale === "it"
+                ? "Viene creato un refund Stripe."
+                : "提交后会创建 Stripe 退款。"
+              : locale === "it"
+                ? "Descrivi come hai rimborsato."
+                : "说明现金/转账退款方式。"
+          }
+        />
+      </label>
+      <button
+        className="inline-flex h-10 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-3 text-xs font-black text-rose-700 transition hover:border-rose-300"
+        disabled={remaining <= 0}
+        type="submit"
+      >
+        {locale === "it" ? "Registra rimborso" : "确认退款"}
       </button>
     </form>
   );

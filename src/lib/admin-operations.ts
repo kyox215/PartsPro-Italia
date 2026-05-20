@@ -23,6 +23,7 @@ export type AdminOrderRow = {
   subtotal?: number;
   vat?: number;
   total: number;
+  refundTotal?: number;
   currency: string;
   reservationExpiresAt?: string | null;
   releasedAt?: string | null;
@@ -59,6 +60,19 @@ export type AdminOrderRow = {
     proofUrl?: string | null;
     proofLabel?: string | null;
     recordedBy?: string | null;
+    note?: string | null;
+    createdAt: string;
+  }>;
+  refunds: Array<{
+    id: string;
+    paymentMethod: string;
+    amount: number;
+    currency: string;
+    reason: string;
+    status: string;
+    provider?: string | null;
+    providerRefundId?: string | null;
+    providerStatus?: string | null;
     note?: string | null;
     createdAt: string;
   }>;
@@ -155,6 +169,7 @@ export async function getAdminOrderRows(): Promise<AdminOrderRow[]> {
         subtotal: 425.61,
         vat: 93.63,
         total: 519.24,
+        refundTotal: 0,
         currency: "EUR",
         reservationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         releasedAt: null,
@@ -192,6 +207,7 @@ export async function getAdminOrderRows(): Promise<AdminOrderRow[]> {
           },
         ],
         paymentRecords: [],
+        refunds: [],
         timelineEvents: [
           {
             id: "demo-event-1",
@@ -233,7 +249,7 @@ export async function getAdminOrderById(
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("orders")
-    .select("*, order_items (*), order_payment_records (*), order_timeline_events (*), notification_events (*)")
+    .select("*, order_items (*), order_payment_records (*), order_refunds (*), order_timeline_events (*), notification_events (*)")
     .eq("id", orderId)
     .maybeSingle();
 
@@ -403,7 +419,10 @@ export async function getAdminDashboardMetrics() {
       .length,
     openRmaCount: rmas.filter((item) => item.status !== "completed").length,
     preorderIncomingTotal,
-    revenueTotal: orders.reduce((sum, order) => sum + order.total, 0),
+    revenueTotal: orders.reduce(
+      (sum, order) => sum + order.total - (order.refundTotal ?? 0),
+      0,
+    ),
   };
 }
 
@@ -451,6 +470,7 @@ function mapAdminOrder(order: {
   subtotal?: number | string | null;
   vat?: number | string | null;
   total: number | string | null;
+  refund_total?: number | string | null;
   currency: string | null;
   reservation_expires_at?: string | null;
   released_at?: string | null;
@@ -487,6 +507,19 @@ function mapAdminOrder(order: {
     proof_url?: string | null;
     proof_label?: string | null;
     recorded_by?: string | null;
+    note?: string | null;
+    created_at: string;
+  }> | null;
+  order_refunds?: Array<{
+    id: string;
+    payment_method: string;
+    amount: number | string;
+    currency: string | null;
+    reason: string;
+    status: string;
+    provider?: string | null;
+    provider_refund_id?: string | null;
+    provider_status?: string | null;
     note?: string | null;
     created_at: string;
   }> | null;
@@ -527,6 +560,7 @@ function mapAdminOrder(order: {
     subtotal: Number(order.subtotal ?? 0),
     vat: Number(order.vat ?? 0),
     total: Number(order.total ?? 0),
+    refundTotal: Number(order.refund_total ?? 0),
     currency: order.currency ?? "EUR",
     reservationExpiresAt: order.reservation_expires_at ?? null,
     releasedAt: order.released_at ?? null,
@@ -566,6 +600,21 @@ function mapAdminOrder(order: {
         recordedBy: record.recorded_by ?? null,
         note: record.note ?? null,
         createdAt: record.created_at,
+      }))
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
+    refunds: (order.order_refunds ?? [])
+      .map((refund) => ({
+        id: refund.id,
+        paymentMethod: refund.payment_method,
+        amount: Number(refund.amount ?? 0),
+        currency: refund.currency ?? "EUR",
+        reason: refund.reason,
+        status: refund.status,
+        provider: refund.provider ?? null,
+        providerRefundId: refund.provider_refund_id ?? null,
+        providerStatus: refund.provider_status ?? null,
+        note: refund.note ?? null,
+        createdAt: refund.created_at,
       }))
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
     timelineEvents: (order.order_timeline_events ?? [])

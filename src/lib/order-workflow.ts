@@ -4,10 +4,18 @@ import {
   getSupabaseAdminClient,
   hasSupabaseAdminConfig,
 } from "@/lib/supabase/admin";
+import { getStripe, hasStripeConfig } from "@/lib/stripe";
 
 export const reservationHours = 24;
 
 export type PaymentMethod = "stripe" | "cash" | "bank_transfer";
+export type RefundReason =
+  | "duplicate"
+  | "fraudulent"
+  | "requested_by_customer"
+  | "order_cancelled"
+  | "rma_refund"
+  | "other";
 
 export type OrderLine = {
   skuId: string;
@@ -64,6 +72,9 @@ type WorkflowOrder = {
   fulfillment_status?: string | null;
   total?: number | string | null;
   currency?: string | null;
+  stripe_checkout_session_id?: string | null;
+  stripe_payment_intent_id?: string | null;
+  refund_total?: number | string | null;
   released_at?: string | null;
   fulfilled_at?: string | null;
   order_items?: WorkflowOrderItem[] | null;
@@ -390,12 +401,14 @@ export async function releaseOrderReservations({
 export async function markOrderPaid({
   orderId,
   stripeCheckoutSessionId,
+  stripePaymentIntentId,
   note,
   actorProfileId,
   locale,
 }: {
   orderId: string;
   stripeCheckoutSessionId?: string;
+  stripePaymentIntentId?: string | null;
   note?: string;
   actorProfileId?: string | null;
   locale?: string | null;
@@ -412,6 +425,10 @@ export async function markOrderPaid({
 
   if (stripeCheckoutSessionId) {
     payload.stripe_checkout_session_id = stripeCheckoutSessionId;
+  }
+
+  if (stripePaymentIntentId) {
+    payload.stripe_payment_intent_id = stripePaymentIntentId;
   }
 
   if (note) {
@@ -436,11 +453,12 @@ export async function markOrderPaid({
     amount: Number(order?.total ?? 0),
     currency: order?.currency ?? "EUR",
     provider: stripeCheckoutSessionId ? "stripe" : order?.payment_method ?? null,
-    providerReference: stripeCheckoutSessionId,
+    providerReference: stripePaymentIntentId ?? stripeCheckoutSessionId,
     recordedBy: actorProfileId,
     note: note ?? "Payment marked paid",
     metadata: {
       stripeCheckoutSessionId: stripeCheckoutSessionId ?? null,
+      stripePaymentIntentId: stripePaymentIntentId ?? null,
       source: stripeCheckoutSessionId ? "stripe_webhook" : "admin_manual",
     },
   });
@@ -455,6 +473,7 @@ export async function markOrderPaid({
     metadata: {
       paymentMethod: order?.payment_method ?? null,
       stripeCheckoutSessionId: stripeCheckoutSessionId ?? null,
+      stripePaymentIntentId: stripePaymentIntentId ?? null,
     },
   });
 
@@ -464,8 +483,266 @@ export async function markOrderPaid({
     locale,
     metadata: {
       stripeCheckoutSessionId: stripeCheckoutSessionId ?? null,
+      stripePaymentIntentId: stripePaymentIntentId ?? null,
     },
   });
+}
+
+export async function issueOrderRefund({
+  orderId,
+  amount,
+  reason = "requested_by_customer",
+  note,
+  providerReference,
+  actorProfileId,
+  locale,
+}: {
+  orderId: string;
+  amount: number;
+  reason?: RefundReason;
+  note?: string | null;
+  providerReference?: string | null;
+  actorProfileId?: string | null;
+  locale?: string | null;
+}) {
+  if (amount <= 0) {
+    throw new Error("Refund amount must be greater than zero.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const order = await loadWorkflowOrder(supabase, orderId);
+  if (!order) throw new Error("Order not found.");
+  if (order.payment_status !== "paid" && order.payment_status !== "refunded") {
+    throw new Error(`Order payment status is ${order.payment_status ?? "-"}, not paid.`);
+  }
+
+  const total = Number(order.total ?? 0);
+  const currency = order.currency ?? "EUR";
+  const activeRefundTotal = await getActiveRefundTotal(supabase, orderId);
+  const remaining = Math.max(total - activeRefundTotal, 0);
+  if (amount > remaining + 0.005) {
+    throw new Error(
+      `Refund exceeds remaining refundable amount ${remaining.toFixed(2)} ${currency}.`,
+    );
+  }
+
+  const paymentMethod = normalizePaymentMethod(order.payment_method);
+  const now = new Date().toISOString();
+  let provider = "manual";
+  let providerRefundId = providerReference?.trim() || null;
+  let providerPaymentIntentId = order.stripe_payment_intent_id ?? null;
+  let providerStatus: string | null = "manual_succeeded";
+  let refundStatus: "pending" | "succeeded" | "failed" | "cancelled" = "succeeded";
+  let providerMetadata: Record<string, unknown> = {};
+
+  if (paymentMethod === "stripe") {
+    if (!hasStripeConfig()) {
+      throw new Error("STRIPE_SECRET_KEY is missing; cannot issue Stripe refund.");
+    }
+
+    provider = "stripe";
+    providerPaymentIntentId =
+      providerPaymentIntentId ||
+      (await resolveStripePaymentIntent(order.stripe_checkout_session_id ?? null));
+
+    if (!providerPaymentIntentId) {
+      throw new Error("Stripe payment intent is missing for this order.");
+    }
+
+    const stripe = getStripe();
+    const refund = await stripe.refunds.create({
+      payment_intent: providerPaymentIntentId,
+      amount: Math.round(amount * 100),
+      reason: toStripeRefundReason(reason),
+      metadata: {
+        orderId,
+        reason,
+      },
+    });
+
+    providerRefundId = refund.id;
+    providerStatus = refund.status ?? null;
+    refundStatus = mapStripeRefundStatus(refund.status);
+    providerMetadata = {
+      stripeRefundId: refund.id,
+      stripeBalanceTransaction:
+        typeof refund.balance_transaction === "string"
+          ? refund.balance_transaction
+          : refund.balance_transaction?.id ?? null,
+      stripeCharge:
+        typeof refund.charge === "string" ? refund.charge : refund.charge?.id ?? null,
+    };
+
+    if (providerPaymentIntentId !== order.stripe_payment_intent_id) {
+      await supabase
+        .from("orders")
+        .update({
+          stripe_payment_intent_id: providerPaymentIntentId,
+          updated_at: now,
+        })
+        .eq("id", orderId);
+    }
+  }
+
+  const paymentRecord = await recordOrderPaymentRecord({
+    supabase,
+    orderId,
+    paymentMethod,
+    paymentStatus: "refunded",
+    amount,
+    currency,
+    provider,
+    providerReference: providerRefundId,
+    recordedBy: actorProfileId,
+    note: note || "Refund recorded",
+    metadata: {
+      source: provider === "stripe" ? "stripe_refund_api" : "admin_manual_refund",
+      reason,
+      providerStatus,
+      providerPaymentIntentId,
+      ...providerMetadata,
+    },
+  });
+
+  const { data: refundRow, error: refundError } = await supabase
+    .from("order_refunds")
+    .insert({
+      order_id: orderId,
+      payment_record_id: paymentRecord?.id ?? null,
+      payment_method: paymentMethod,
+      amount,
+      currency,
+      reason,
+      note: note || null,
+      provider,
+      provider_refund_id: providerRefundId,
+      provider_payment_intent_id: providerPaymentIntentId,
+      provider_status: providerStatus,
+      status: refundStatus,
+      recorded_by: actorProfileId ?? null,
+      metadata: {
+        source: provider === "stripe" ? "stripe_refund_api" : "admin_manual_refund",
+        providerReference: providerReference || null,
+        ...providerMetadata,
+      },
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (refundError) throw new Error(refundError.message);
+
+  const totals = await refreshOrderRefundTotals(supabase, orderId);
+
+  await tryRecordOrderEvent({
+    supabase,
+    orderId,
+    eventType: "refund_recorded",
+    title: "Refund recorded",
+    body: `${formatAmount(amount, currency)} refund ${refundStatus}.`,
+    actorProfileId,
+    metadata: {
+      refundId: refundRow?.id ?? null,
+      amount,
+      currency,
+      reason,
+      provider,
+      providerRefundId,
+      providerStatus,
+      refundStatus,
+      totals,
+    },
+  });
+
+  await tryNotifyOrderCustomer({
+    orderId,
+    type: "refund_recorded",
+    locale,
+    metadata: {
+      refundId: refundRow?.id ?? null,
+      refundAmount: amount,
+      currency,
+      reason,
+      provider,
+      refundStatus,
+    },
+  });
+
+  return {
+    refundId: refundRow?.id ?? null,
+    amount,
+    currency,
+    provider,
+    providerRefundId,
+    providerPaymentIntentId,
+    status: refundStatus,
+    totals,
+  };
+}
+
+export async function syncStripeRefundStatus({
+  stripeRefundId,
+  stripePaymentIntentId,
+  stripeStatus,
+  failureReason,
+}: {
+  stripeRefundId: string;
+  stripePaymentIntentId?: string | null;
+  stripeStatus?: string | null;
+  failureReason?: string | null;
+}) {
+  if (!hasSupabaseAdminConfig()) return { updated: false, demoMode: true };
+
+  const supabase = getSupabaseAdminClient();
+  const { data: refund, error } = await supabase
+    .from("order_refunds")
+    .select("id, order_id, status, metadata")
+    .eq("provider_refund_id", stripeRefundId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!refund) return { updated: false, demoMode: false };
+
+  const nextStatus = mapStripeRefundStatus(stripeStatus);
+  const metadata =
+    refund.metadata && typeof refund.metadata === "object"
+      ? (refund.metadata as Record<string, unknown>)
+      : {};
+
+  const { error: updateError } = await supabase
+    .from("order_refunds")
+    .update({
+      status: nextStatus,
+      provider_status: stripeStatus ?? null,
+      provider_payment_intent_id: stripePaymentIntentId ?? null,
+      metadata: {
+        ...metadata,
+        stripeStatus,
+        failureReason: failureReason ?? null,
+        source: "stripe_webhook",
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", refund.id);
+
+  if (updateError) throw new Error(updateError.message);
+
+  const totals = await refreshOrderRefundTotals(supabase, refund.order_id);
+  await tryRecordOrderEvent({
+    supabase,
+    orderId: refund.order_id,
+    eventType: "refund_status_updated",
+    title: "Stripe refund status updated",
+    body: `Stripe refund ${stripeRefundId} is ${stripeStatus ?? nextStatus}.`,
+    metadata: {
+      stripeRefundId,
+      stripePaymentIntentId: stripePaymentIntentId ?? null,
+      stripeStatus: stripeStatus ?? null,
+      failureReason: failureReason ?? null,
+      totals,
+    },
+  });
+
+  return { updated: true, status: nextStatus, totals, demoMode: false };
 }
 
 export async function confirmManualPayment({
@@ -872,21 +1149,26 @@ export async function recordOrderPaymentRecord({
 }) {
   if (!hasSupabaseAdminConfig()) return;
   const client = supabase ?? getSupabaseAdminClient();
-  const { error } = await client.from("order_payment_records").insert({
-    order_id: orderId,
-    payment_method: paymentMethod,
-    payment_status: paymentStatus,
-    amount,
-    currency: currency ?? "EUR",
-    provider: provider ?? null,
-    provider_reference: providerReference ?? null,
-    proof_url: proofUrl ?? null,
-    proof_label: proofLabel ?? null,
-    recorded_by: recordedBy ?? null,
-    note: note ?? null,
-    metadata,
-  });
+  const { data, error } = await client
+    .from("order_payment_records")
+    .insert({
+      order_id: orderId,
+      payment_method: paymentMethod,
+      payment_status: paymentStatus,
+      amount,
+      currency: currency ?? "EUR",
+      provider: provider ?? null,
+      provider_reference: providerReference ?? null,
+      proof_url: proofUrl ?? null,
+      proof_label: proofLabel ?? null,
+      recorded_by: recordedBy ?? null,
+      note: note ?? null,
+      metadata,
+    })
+    .select("id")
+    .maybeSingle();
   if (error) throw new Error(error.message);
+  return data as { id: string } | null;
 }
 
 async function tryRecordOrderEvent(
@@ -923,13 +1205,117 @@ async function loadWorkflowOrder(supabase: SupabaseClient, orderId: string) {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, status, payment_method, payment_status, fulfillment_status, total, currency, released_at, fulfilled_at, order_items ( id, sku, quantity, stock_qty, preorder_qty, fulfillment_type )",
+      "id, status, payment_method, payment_status, fulfillment_status, total, currency, stripe_checkout_session_id, stripe_payment_intent_id, refund_total, released_at, fulfilled_at, order_items ( id, sku, quantity, stock_qty, preorder_qty, fulfillment_type )",
     )
     .eq("id", orderId)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
   return data as WorkflowOrder | null;
+}
+
+async function getActiveRefundTotal(supabase: SupabaseClient, orderId: string) {
+  const { data, error } = await supabase
+    .from("order_refunds")
+    .select("amount, status")
+    .eq("order_id", orderId)
+    .in("status", ["pending", "succeeded"]);
+
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+}
+
+async function refreshOrderRefundTotals(supabase: SupabaseClient, orderId: string) {
+  const [{ data: refunds, error: refundError }, { data: order, error: orderError }] =
+    await Promise.all([
+      supabase
+        .from("order_refunds")
+        .select("amount, status")
+        .eq("order_id", orderId)
+        .eq("status", "succeeded"),
+      supabase
+        .from("orders")
+        .select("total, payment_status, status")
+        .eq("id", orderId)
+        .maybeSingle(),
+    ]);
+
+  if (refundError) throw new Error(refundError.message);
+  if (orderError) throw new Error(orderError.message);
+  if (!order) throw new Error("Order not found.");
+
+  const refundTotal = (refunds ?? []).reduce(
+    (sum, row) => sum + Number(row.amount ?? 0),
+    0,
+  );
+  const total = Number(order.total ?? 0);
+  const isFullyRefunded = total > 0 && refundTotal >= total - 0.005;
+  const payload: Record<string, string | number | null> = {
+    refund_total: roundMoney(refundTotal),
+    refunded_at: refundTotal > 0 ? new Date().toISOString() : null,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (isFullyRefunded) {
+    payload.payment_status = "refunded";
+    payload.status = "refunded";
+  }
+
+  const { error: updateError } = await supabase
+    .from("orders")
+    .update(payload)
+    .eq("id", orderId);
+
+  if (updateError) throw new Error(updateError.message);
+
+  return {
+    refundTotal: roundMoney(refundTotal),
+    refundableRemaining: roundMoney(Math.max(total - refundTotal, 0)),
+    isFullyRefunded,
+  };
+}
+
+async function resolveStripePaymentIntent(stripeCheckoutSessionId: string | null) {
+  if (!stripeCheckoutSessionId) return null;
+  const stripe = getStripe();
+  const session = await stripe.checkout.sessions.retrieve(stripeCheckoutSessionId);
+  const paymentIntent = session.payment_intent;
+  if (!paymentIntent) return null;
+  return typeof paymentIntent === "string" ? paymentIntent : paymentIntent.id;
+}
+
+function normalizePaymentMethod(value: string): PaymentMethod {
+  if (value === "stripe" || value === "cash" || value === "bank_transfer") {
+    return value;
+  }
+  return "bank_transfer";
+}
+
+function toStripeRefundReason(reason: RefundReason) {
+  if (
+    reason === "duplicate" ||
+    reason === "fraudulent" ||
+    reason === "requested_by_customer"
+  ) {
+    return reason;
+  }
+  return "requested_by_customer";
+}
+
+function mapStripeRefundStatus(status: string | null | undefined) {
+  if (status === "succeeded") return "succeeded";
+  if (status === "failed") return "failed";
+  if (status === "canceled" || status === "cancelled") return "cancelled";
+  return "pending";
+}
+
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+function formatAmount(amount: number, currency: string) {
+  return `${amount.toFixed(2)} ${currency}`;
 }
 
 async function insertInventoryMovement(
