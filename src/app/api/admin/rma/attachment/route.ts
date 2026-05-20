@@ -62,6 +62,7 @@ export async function POST(request: Request) {
       url: parsed.data.url,
       note: parsed.data.note || null,
       actorProfileId: admin.context.user?.id,
+      locale: parsed.data.locale,
     });
 
     await recordAdminActivity({

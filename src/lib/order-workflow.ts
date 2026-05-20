@@ -1,4 +1,5 @@
 import { getFulfillmentType, normalizeCartItems, type CartInputItem } from "@/lib/cart-quote";
+import { notifyOrderCustomer } from "@/lib/notifications";
 import {
   getSupabaseAdminClient,
   hasSupabaseAdminConfig,
@@ -391,11 +392,13 @@ export async function markOrderPaid({
   stripeCheckoutSessionId,
   note,
   actorProfileId,
+  locale,
 }: {
   orderId: string;
   stripeCheckoutSessionId?: string;
   note?: string;
   actorProfileId?: string | null;
+  locale?: string | null;
 }) {
   const supabase = getSupabaseAdminClient();
   const order = await loadWorkflowOrder(supabase, orderId);
@@ -454,16 +457,27 @@ export async function markOrderPaid({
       stripeCheckoutSessionId: stripeCheckoutSessionId ?? null,
     },
   });
+
+  await tryNotifyOrderCustomer({
+    orderId,
+    type: "payment_paid",
+    locale,
+    metadata: {
+      stripeCheckoutSessionId: stripeCheckoutSessionId ?? null,
+    },
+  });
 }
 
 export async function confirmManualPayment({
   orderId,
   expectedMethod,
   actorProfileId,
+  locale,
 }: {
   orderId: string;
   expectedMethod: "cash" | "bank_transfer";
   actorProfileId?: string | null;
+  locale?: string | null;
 }) {
   const supabase = getSupabaseAdminClient();
   const order = await loadWorkflowOrder(supabase, orderId);
@@ -474,6 +488,7 @@ export async function confirmManualPayment({
   await markOrderPaid({
     orderId,
     actorProfileId,
+    locale,
     note:
       expectedMethod === "cash"
         ? "Cash payment confirmed by admin"
@@ -491,6 +506,7 @@ export async function addOrderPaymentProof({
   proofLabel,
   note,
   actorProfileId,
+  locale,
 }: {
   orderId: string;
   paymentMethod: PaymentMethod;
@@ -501,6 +517,7 @@ export async function addOrderPaymentProof({
   proofLabel?: string | null;
   note?: string | null;
   actorProfileId?: string | null;
+  locale?: string | null;
 }) {
   const supabase = getSupabaseAdminClient();
   const order = await loadWorkflowOrder(supabase, orderId);
@@ -543,6 +560,20 @@ export async function addOrderPaymentProof({
     },
   });
 
+  await tryNotifyOrderCustomer({
+    orderId,
+    type: "payment_proof_added",
+    locale,
+    metadata: {
+      paymentMethod,
+      paymentStatus,
+      amount,
+      providerReference: providerReference || null,
+      proofUrl: proofUrl || null,
+      proofLabel: proofLabel || null,
+    },
+  });
+
   return {
     paymentMethod,
     paymentStatus,
@@ -561,6 +592,7 @@ export async function updateOrderShipment({
   shipmentNote,
   customerNote,
   actorProfileId,
+  locale,
 }: {
   orderId: string;
   shippingCarrier?: string | null;
@@ -569,6 +601,7 @@ export async function updateOrderShipment({
   shipmentNote?: string | null;
   customerNote?: string | null;
   actorProfileId?: string | null;
+  locale?: string | null;
 }) {
   const supabase = getSupabaseAdminClient();
   const now = new Date().toISOString();
@@ -605,6 +638,17 @@ export async function updateOrderShipment({
       shipmentNote: shipmentNote || null,
       customerNote: customerNote || null,
       shippedAt: shipmentPayload.shipped_at,
+    },
+  });
+
+  await tryNotifyOrderCustomer({
+    orderId,
+    type: "shipment_updated",
+    locale,
+    metadata: {
+      shippingCarrier: shippingCarrier || null,
+      trackingNumber: trackingNumber || null,
+      trackingUrl: trackingUrl || null,
     },
   });
 
@@ -862,6 +906,16 @@ async function tryRecordOrderPaymentRecord(
     await recordOrderPaymentRecord(payload);
   } catch (error) {
     console.error("Failed to record order payment record", error);
+  }
+}
+
+async function tryNotifyOrderCustomer(
+  payload: Parameters<typeof notifyOrderCustomer>[0],
+) {
+  try {
+    await notifyOrderCustomer(payload);
+  } catch (error) {
+    console.error("Failed to notify order customer", error);
   }
 }
 

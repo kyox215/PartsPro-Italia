@@ -2,6 +2,7 @@ import {
   getSupabaseAdminClient,
   hasSupabaseAdminConfig,
 } from "@/lib/supabase/admin";
+import { notifyRmaCustomer } from "@/lib/notifications";
 
 type SupabaseClient = ReturnType<typeof getSupabaseAdminClient>;
 
@@ -55,10 +56,12 @@ export async function updateRmaStatus({
   rmaId,
   status,
   actorProfileId,
+  locale,
 }: {
   rmaId: string;
   status: string;
   actorProfileId?: string | null;
+  locale?: string | null;
 }) {
   const supabase = getSupabaseAdminClient();
   const now = new Date().toISOString();
@@ -84,6 +87,15 @@ export async function updateRmaStatus({
       status,
     },
   });
+
+  await tryNotifyRmaCustomer({
+    rmaId,
+    type: "rma_status_updated",
+    locale,
+    metadata: {
+      status,
+    },
+  });
 }
 
 export async function updateRmaResolution({
@@ -94,6 +106,7 @@ export async function updateRmaResolution({
   replacementSku,
   closeCase,
   actorProfileId,
+  locale,
 }: {
   rmaId: string;
   resolutionType: string;
@@ -102,6 +115,7 @@ export async function updateRmaResolution({
   replacementSku?: string | null;
   closeCase?: boolean;
   actorProfileId?: string | null;
+  locale?: string | null;
 }) {
   const supabase = getSupabaseAdminClient();
   const now = new Date().toISOString();
@@ -140,6 +154,19 @@ export async function updateRmaResolution({
     },
   });
 
+  await tryNotifyRmaCustomer({
+    rmaId,
+    type: "rma_resolution_updated",
+    locale,
+    metadata: {
+      resolutionType,
+      refundAmount: refundAmount ?? null,
+      replacementSku: replacementSku || null,
+      closeCase: Boolean(closeCase),
+      status: nextStatus,
+    },
+  });
+
   return {
     status: nextStatus,
     resolutionType,
@@ -155,12 +182,14 @@ export async function addRmaAttachment({
   url,
   note,
   actorProfileId,
+  locale,
 }: {
   rmaId: string;
   label: string;
   url: string;
   note?: string | null;
   actorProfileId?: string | null;
+  locale?: string | null;
 }) {
   const supabase = getSupabaseAdminClient();
   const { data, error: loadError } = await supabase
@@ -203,6 +232,16 @@ export async function addRmaAttachment({
     },
   });
 
+  await tryNotifyRmaCustomer({
+    rmaId,
+    type: "rma_attachment_added",
+    locale,
+    metadata: {
+      attachmentId: attachment.id,
+      label: attachment.label,
+    },
+  });
+
   return attachment;
 }
 
@@ -234,4 +273,14 @@ function normalizeAttachments(value: unknown): RmaAttachment[] {
             : null,
     }))
     .filter((item) => item.url.length > 0);
+}
+
+async function tryNotifyRmaCustomer(
+  payload: Parameters<typeof notifyRmaCustomer>[0],
+) {
+  try {
+    await notifyRmaCustomer(payload);
+  } catch (error) {
+    console.error("Failed to notify RMA customer", error);
+  }
 }

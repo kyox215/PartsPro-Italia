@@ -71,6 +71,15 @@ export type AdminOrderRow = {
     customerVisible?: boolean;
     createdAt: string;
   }>;
+  notifications: Array<{
+    id: string;
+    status: string;
+    recipientEmail: string;
+    subject: string;
+    errorMessage?: string | null;
+    sentAt?: string | null;
+    createdAt: string;
+  }>;
 };
 
 export type AdminB2BApplicationRow = {
@@ -115,6 +124,15 @@ export type AdminRmaRow = {
     body?: string | null;
     actorProfileId?: string | null;
     customerVisible?: boolean;
+    createdAt: string;
+  }>;
+  notifications: Array<{
+    id: string;
+    status: string;
+    recipientEmail: string;
+    subject: string;
+    errorMessage?: string | null;
+    sentAt?: string | null;
     createdAt: string;
   }>;
 };
@@ -184,6 +202,7 @@ export async function getAdminOrderRows(): Promise<AdminOrderRow[]> {
             createdAt: new Date().toISOString(),
           },
         ],
+        notifications: [],
       },
     ];
   }
@@ -214,7 +233,7 @@ export async function getAdminOrderById(
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("orders")
-    .select("*, order_items (*), order_payment_records (*), order_timeline_events (*)")
+    .select("*, order_items (*), order_payment_records (*), order_timeline_events (*), notification_events (*)")
     .eq("id", orderId)
     .maybeSingle();
 
@@ -303,6 +322,7 @@ export async function getAdminRmaRows(): Promise<AdminRmaRow[]> {
             createdAt: new Date().toISOString(),
           },
         ],
+        notifications: [],
       },
     ];
   }
@@ -334,7 +354,7 @@ export async function getAdminRmaById(rmaId: string): Promise<AdminRmaRow | null
   const { data, error } = await supabase
     .from("rmas")
     .select(
-      "id, rma_number, order_id, profile_id, status, order_number, sku, quantity, issue_type, description, installation_tested, installed, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, attachments, created_at, rma_events (*)",
+      "id, rma_number, order_id, profile_id, status, order_number, sku, quantity, issue_type, description, installation_tested, installed, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, attachments, created_at, rma_events (*), notification_events (*)",
     )
     .eq("id", rmaId)
     .maybeSingle();
@@ -479,6 +499,15 @@ function mapAdminOrder(order: {
     customer_visible?: boolean | null;
     created_at: string;
   }> | null;
+  notification_events?: Array<{
+    id: string;
+    status: string;
+    recipient_email: string;
+    subject: string;
+    error_message?: string | null;
+    sent_at?: string | null;
+    created_at: string;
+  }> | null;
 }): AdminOrderRow {
   return {
     id: order.id,
@@ -550,6 +579,7 @@ function mapAdminOrder(order: {
         createdAt: event.created_at,
       }))
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
+    notifications: mapNotifications(order.notification_events),
   };
 }
 
@@ -580,6 +610,15 @@ function mapAdminRma(row: {
     body?: string | null;
     actor_profile_id?: string | null;
     customer_visible?: boolean | null;
+    created_at: string;
+  }> | null;
+  notification_events?: Array<{
+    id: string;
+    status: string;
+    recipient_email: string;
+    subject: string;
+    error_message?: string | null;
+    sent_at?: string | null;
     created_at: string;
   }> | null;
 }): AdminRmaRow {
@@ -617,7 +656,35 @@ function mapAdminRma(row: {
         createdAt: event.created_at,
       }))
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
+    notifications: mapNotifications(row.notification_events),
   };
+}
+
+function mapNotifications(
+  rows:
+    | Array<{
+        id: string;
+        status: string;
+        recipient_email: string;
+        subject: string;
+        error_message?: string | null;
+        sent_at?: string | null;
+        created_at: string;
+      }>
+    | null
+    | undefined,
+) {
+  return (rows ?? [])
+    .map((row) => ({
+      id: row.id,
+      status: row.status,
+      recipientEmail: row.recipient_email,
+      subject: row.subject,
+      errorMessage: row.error_message ?? null,
+      sentAt: row.sent_at ?? null,
+      createdAt: row.created_at,
+    }))
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
 
 function normalizeRmaAttachments(value: unknown) {

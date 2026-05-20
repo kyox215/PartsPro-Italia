@@ -62,6 +62,7 @@ export async function POST(request: Request) {
       proofLabel: parsed.data.proofLabel || uploaded?.label || null,
       note: parsed.data.note || null,
       actorProfileId: admin.context.user?.id,
+      locale: parsed.data.locale,
     });
 
     await recordAdminActivity({

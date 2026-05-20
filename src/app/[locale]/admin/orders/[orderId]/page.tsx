@@ -344,6 +344,17 @@ export default async function AdminOrderDetailPage({
         </div>
 
         <AdminPanel
+          title={locale === "it" ? "Notifiche cliente" : "客户通知"}
+          description={
+            locale === "it"
+              ? "Outbox email: inviata, saltata o fallita."
+              : "邮件 outbox：已发送、跳过或失败。"
+          }
+        >
+          <NotificationList notifications={order.notifications} locale={locale} />
+        </AdminPanel>
+
+        <AdminPanel
           title={locale === "it" ? "Righe e fulfilment" : "商品与履约"}
           description={new Date(order.createdAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN")}
         >
@@ -573,6 +584,48 @@ function ShipmentForm({
         {locale === "it" ? "Salva tracking" : "保存物流信息"}
       </button>
     </form>
+  );
+}
+
+function NotificationList({
+  notifications,
+  locale,
+}: Readonly<{
+  notifications: NonNullable<Awaited<ReturnType<typeof getAdminOrderById>>>["notifications"];
+  locale: Locale;
+}>) {
+  if (!notifications.length) {
+    return (
+      <p className="rounded-lg bg-stone-50 p-3 text-sm font-semibold text-stone-500">
+        {locale === "it"
+          ? "Nessuna notifica registrata."
+          : "暂无客户通知记录。"}
+      </p>
+    );
+  }
+
+  return (
+    <div className="grid gap-2">
+      {notifications.map((notification) => (
+        <div key={notification.id} className="rounded-lg border border-black/5 bg-stone-50 p-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-black text-stone-950">{notification.subject}</p>
+            <StatusPill status={notification.status} />
+          </div>
+          <p className="mt-2 text-xs font-semibold text-stone-500">
+            {notification.recipientEmail}
+          </p>
+          {notification.errorMessage ? (
+            <p className="mt-2 text-xs font-semibold leading-5 text-rose-700">
+              {notification.errorMessage}
+            </p>
+          ) : null}
+          <p className="mt-2 text-xs font-semibold text-stone-400">
+            {formatDateTime(notification.sentAt ?? notification.createdAt, locale)}
+          </p>
+        </div>
+      ))}
+    </div>
   );
 }
 

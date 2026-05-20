@@ -54,6 +54,7 @@ export async function POST(request: Request) {
       shipmentNote: parsed.data.shipmentNote || null,
       customerNote: parsed.data.customerNote || null,
       actorProfileId: admin.context.user?.id,
+      locale: parsed.data.locale,
     });
 
     await recordAdminActivity({

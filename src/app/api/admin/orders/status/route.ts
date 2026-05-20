@@ -10,6 +10,7 @@ import {
   getSupabaseAdminClient,
   hasSupabaseAdminConfig,
 } from "@/lib/supabase/admin";
+import { notifyOrderCustomer } from "@/lib/notifications";
 import { recordOrderEvent } from "@/lib/order-workflow";
 import { adminOrderStatusSchema } from "@/lib/validations";
 
@@ -84,6 +85,19 @@ export async function POST(request: Request) {
       status: parsed.data.status,
     },
   });
+
+  try {
+    await notifyOrderCustomer({
+      orderId: parsed.data.id,
+      type: "status_updated",
+      locale: parsed.data.locale,
+      metadata: {
+        status: parsed.data.status,
+      },
+    });
+  } catch (notificationError) {
+    console.error("Failed to notify order customer", notificationError);
+  }
 
   backUrl.searchParams.set("saved", "1");
   return NextResponse.redirect(backUrl, 303);

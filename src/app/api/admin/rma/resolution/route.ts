@@ -56,6 +56,7 @@ export async function POST(request: Request) {
       replacementSku: parsed.data.replacementSku || null,
       closeCase: parsed.data.closeCase,
       actorProfileId: admin.context.user?.id,
+      locale: parsed.data.locale,
     });
 
     await recordAdminActivity({

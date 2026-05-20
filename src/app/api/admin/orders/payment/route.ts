@@ -51,6 +51,7 @@ export async function POST(request: Request) {
       expectedMethod:
         parsed.data.action === "confirm_cash" ? "cash" : "bank_transfer",
       actorProfileId: admin.context.user?.id,
+      locale: parsed.data.locale,
     });
     await recordAdminActivity({
       request,

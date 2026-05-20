@@ -51,6 +51,7 @@ export async function POST(request: Request) {
       rmaId: parsed.data.id,
       status: parsed.data.status,
       actorProfileId: admin.context.user?.id,
+      locale: parsed.data.locale,
     });
   } catch (error) {
     backUrl.searchParams.set(

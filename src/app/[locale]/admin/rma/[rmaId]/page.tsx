@@ -240,6 +240,17 @@ export default async function AdminRmaDetailPage({
         </div>
 
         <AdminPanel
+          title={locale === "it" ? "Notifiche cliente" : "客户通知"}
+          description={
+            locale === "it"
+              ? "Outbox email della pratica RMA."
+              : "该售后单的邮件通知记录。"
+          }
+        >
+          <NotificationList notifications={rma.notifications} locale={locale} />
+        </AdminPanel>
+
+        <AdminPanel
           title={locale === "it" ? "Allegati pratica" : "售后附件"}
           description={
             locale === "it"
@@ -433,6 +444,48 @@ function AttachmentForm({
         {locale === "it" ? "Aggiungi allegato" : "添加附件"}
       </button>
     </form>
+  );
+}
+
+function NotificationList({
+  notifications,
+  locale,
+}: Readonly<{
+  notifications: NonNullable<Awaited<ReturnType<typeof getAdminRmaById>>>["notifications"];
+  locale: Locale;
+}>) {
+  if (!notifications.length) {
+    return (
+      <p className="rounded-lg bg-stone-50 p-3 text-sm font-semibold text-stone-500">
+        {locale === "it"
+          ? "Nessuna notifica registrata."
+          : "暂无客户通知记录。"}
+      </p>
+    );
+  }
+
+  return (
+    <div className="grid gap-2">
+      {notifications.map((notification) => (
+        <div key={notification.id} className="rounded-lg border border-black/5 bg-stone-50 p-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-black text-stone-950">{notification.subject}</p>
+            <StatusPill status={notification.status} />
+          </div>
+          <p className="mt-2 text-xs font-semibold text-stone-500">
+            {notification.recipientEmail}
+          </p>
+          {notification.errorMessage ? (
+            <p className="mt-2 text-xs font-semibold leading-5 text-rose-700">
+              {notification.errorMessage}
+            </p>
+          ) : null}
+          <p className="mt-2 text-xs font-semibold text-stone-400">
+            {formatDateTime(notification.sentAt ?? notification.createdAt, locale)}
+          </p>
+        </div>
+      ))}
+    </div>
   );
 }
 
