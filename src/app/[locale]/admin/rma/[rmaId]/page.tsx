@@ -116,6 +116,16 @@ export default async function AdminRmaDetailPage({
             >
               <ResolutionForm rma={rma} locale={locale} returnTo={returnTo} />
             </AdminPanel>
+            <AdminPanel
+              title={locale === "it" ? "Allegato" : "售后附件"}
+              description={
+                locale === "it"
+                  ? "Link foto, video o documento visibile al cliente."
+                  : "登记照片、视频或文件链接，客户详情页可见。"
+              }
+            >
+              <AttachmentForm rma={rma} locale={locale} returnTo={returnTo} />
+            </AdminPanel>
             <AdminPanel title={locale === "it" ? "Collegamenti" : "关联信息"} contentClassName="grid gap-2 p-2">
               <AdminButtonLink
                 href={localizePath(locale, `/admin/orders/${rma.orderId ?? rma.orderNumber}`)}
@@ -228,6 +238,45 @@ export default async function AdminRmaDetailPage({
             )}
           </AdminPanel>
         </div>
+
+        <AdminPanel
+          title={locale === "it" ? "Allegati pratica" : "售后附件"}
+          description={
+            locale === "it"
+              ? "Foto, video, ricevute o documenti collegati alla pratica."
+              : "与该售后相关的照片、视频、收据或文件。"
+          }
+        >
+          {rma.attachments.length ? (
+            <div className="grid gap-2 md:grid-cols-2">
+              {rma.attachments.map((attachment) => (
+                <a
+                  key={attachment.id}
+                  className="rounded-lg border border-black/5 bg-stone-50 p-3 text-sm transition hover:border-blue-200 hover:bg-blue-50"
+                  href={attachment.url}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  <span className="block font-black text-stone-950">{attachment.label}</span>
+                  {attachment.note ? (
+                    <span className="mt-1 block text-xs font-semibold leading-5 text-stone-600">
+                      {attachment.note}
+                    </span>
+                  ) : null}
+                  <span className="mt-2 block text-xs font-semibold text-stone-400">
+                    {attachment.createdAt ? formatDateTime(attachment.createdAt, locale) : "-"}
+                  </span>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-lg bg-stone-50 p-3 text-sm font-semibold text-stone-500">
+              {locale === "it"
+                ? "Nessun allegato collegato."
+                : "暂无售后附件。"}
+            </p>
+          )}
+        </AdminPanel>
       </AdminWorkspaceGrid>
     </div>
   );
@@ -317,6 +366,58 @@ function ResolutionForm({
         type="submit"
       >
         {locale === "it" ? "Salva esito" : "保存处理结论"}
+      </button>
+    </form>
+  );
+}
+
+function AttachmentForm({
+  rma,
+  locale,
+  returnTo,
+}: Readonly<{
+  rma: AdminRmaRow;
+  locale: Locale;
+  returnTo: string;
+}>) {
+  return (
+    <form action="/api/admin/rma/attachment" className="grid gap-3" method="post">
+      <AdminCsrfField />
+      <input type="hidden" name="id" value={rma.id} />
+      <input type="hidden" name="locale" value={locale} />
+      <input type="hidden" name="returnTo" value={returnTo} />
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Nome allegato" : "附件名称"}
+        <input
+          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          name="label"
+          placeholder={locale === "it" ? "Foto test / ricevuta" : "检测照片 / 退款凭证"}
+          required
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "URL allegato" : "附件链接"}
+        <input
+          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          name="url"
+          placeholder="https://..."
+          required
+          type="url"
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Nota" : "说明"}
+        <textarea
+          className="min-h-20 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          name="note"
+          placeholder={locale === "it" ? "Visibile nel dettaglio RMA cliente" : "客户 RMA 详情页可见"}
+        />
+      </label>
+      <button
+        className="inline-flex h-10 items-center justify-center rounded-lg border border-stone-950 bg-stone-950 px-3 text-xs font-black text-white transition hover:bg-stone-800"
+        type="submit"
+      >
+        {locale === "it" ? "Aggiungi allegato" : "添加附件"}
       </button>
     </form>
   );

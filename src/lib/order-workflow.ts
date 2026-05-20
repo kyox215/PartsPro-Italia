@@ -481,6 +481,136 @@ export async function confirmManualPayment({
   });
 }
 
+export async function addOrderPaymentProof({
+  orderId,
+  paymentMethod,
+  paymentStatus,
+  amount,
+  providerReference,
+  proofUrl,
+  proofLabel,
+  note,
+  actorProfileId,
+}: {
+  orderId: string;
+  paymentMethod: PaymentMethod;
+  paymentStatus: string;
+  amount: number;
+  providerReference?: string | null;
+  proofUrl?: string | null;
+  proofLabel?: string | null;
+  note?: string | null;
+  actorProfileId?: string | null;
+}) {
+  const supabase = getSupabaseAdminClient();
+  const order = await loadWorkflowOrder(supabase, orderId);
+  if (!order) throw new Error("Order not found.");
+
+  await recordOrderPaymentRecord({
+    supabase,
+    orderId,
+    paymentMethod,
+    paymentStatus,
+    amount,
+    currency: order.currency ?? "EUR",
+    provider: paymentMethod === "stripe" ? "stripe" : "manual",
+    providerReference: providerReference || null,
+    proofUrl: proofUrl || null,
+    proofLabel: proofLabel || null,
+    recordedBy: actorProfileId,
+    note: note || "Payment proof recorded",
+    metadata: {
+      source: "admin_payment_proof",
+      proofUrl: proofUrl || null,
+      proofLabel: proofLabel || null,
+    },
+  });
+
+  await tryRecordOrderEvent({
+    supabase,
+    orderId,
+    eventType: "payment_proof_added",
+    title: "Payment proof added",
+    body: note || proofLabel || "Admin added a payment proof/reference.",
+    actorProfileId,
+    metadata: {
+      paymentMethod,
+      paymentStatus,
+      amount,
+      providerReference: providerReference || null,
+      proofUrl: proofUrl || null,
+      proofLabel: proofLabel || null,
+    },
+  });
+
+  return {
+    paymentMethod,
+    paymentStatus,
+    amount,
+    providerReference: providerReference || null,
+    proofUrl: proofUrl || null,
+    proofLabel: proofLabel || null,
+  };
+}
+
+export async function updateOrderShipment({
+  orderId,
+  shippingCarrier,
+  trackingNumber,
+  trackingUrl,
+  shipmentNote,
+  customerNote,
+  actorProfileId,
+}: {
+  orderId: string;
+  shippingCarrier?: string | null;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
+  shipmentNote?: string | null;
+  customerNote?: string | null;
+  actorProfileId?: string | null;
+}) {
+  const supabase = getSupabaseAdminClient();
+  const now = new Date().toISOString();
+  const shipmentPayload = {
+    shipping_carrier: shippingCarrier || null,
+    tracking_number: trackingNumber || null,
+    tracking_url: trackingUrl || null,
+    shipment_note: shipmentNote || null,
+    customer_note: customerNote || null,
+    shipped_at: trackingNumber || trackingUrl ? now : null,
+    updated_at: now,
+  };
+  const { error } = await supabase
+    .from("orders")
+    .update(shipmentPayload)
+    .eq("id", orderId);
+  if (error) throw new Error(error.message);
+
+  await tryRecordOrderEvent({
+    supabase,
+    orderId,
+    eventType: "shipment_updated",
+    title: "Shipment information updated",
+    body:
+      customerNote ||
+      shipmentNote ||
+      [shippingCarrier, trackingNumber].filter(Boolean).join(" / ") ||
+      "Admin updated shipment information.",
+    actorProfileId,
+    metadata: {
+      shippingCarrier: shippingCarrier || null,
+      trackingNumber: trackingNumber || null,
+      trackingUrl: trackingUrl || null,
+      shipmentNote: shipmentNote || null,
+      customerNote: customerNote || null,
+      shippedAt: shipmentPayload.shipped_at,
+    },
+  });
+
+  return shipmentPayload;
+}
+
 export async function startOrderPicking(orderId: string, actorProfileId?: string | null) {
   const supabase = getSupabaseAdminClient();
   const now = new Date().toISOString();
@@ -661,6 +791,7 @@ export async function recordOrderEvent({
     title,
     body: body ?? null,
     actor_profile_id: actorProfileId ?? null,
+    customer_visible: true,
     metadata,
   });
   if (error) throw new Error(error.message);
@@ -675,6 +806,8 @@ export async function recordOrderPaymentRecord({
   currency = "EUR",
   provider,
   providerReference,
+  proofUrl,
+  proofLabel,
   recordedBy,
   note,
   metadata = {},
@@ -687,6 +820,8 @@ export async function recordOrderPaymentRecord({
   currency?: string | null;
   provider?: string | null;
   providerReference?: string | null;
+  proofUrl?: string | null;
+  proofLabel?: string | null;
   recordedBy?: string | null;
   note?: string | null;
   metadata?: Record<string, unknown>;
@@ -701,6 +836,8 @@ export async function recordOrderPaymentRecord({
     currency: currency ?? "EUR",
     provider: provider ?? null,
     provider_reference: providerReference ?? null,
+    proof_url: proofUrl ?? null,
+    proof_label: proofLabel ?? null,
     recorded_by: recordedBy ?? null,
     note: note ?? null,
     metadata,

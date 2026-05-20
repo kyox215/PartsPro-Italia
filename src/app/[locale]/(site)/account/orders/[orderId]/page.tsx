@@ -77,6 +77,122 @@ export default async function AccountOrderDetailPage({
         </section>
       ) : null}
 
+      <section className="grid gap-4 lg:grid-cols-2">
+        <article className="rounded-lg border border-slate-200 bg-white p-5">
+          <h2 className="text-lg font-bold text-slate-950">
+            {locale === "it" ? "Spedizione" : "物流信息"}
+          </h2>
+          <dl className="mt-4 grid gap-3 text-sm">
+            <InfoRow
+              label={locale === "it" ? "Corriere" : "物流公司"}
+              value={order.shippingCarrier ?? "-"}
+            />
+            <InfoRow
+              label={locale === "it" ? "Tracking" : "物流单号"}
+              value={order.trackingNumber ?? "-"}
+            />
+            <InfoRow
+              label={locale === "it" ? "Spedito" : "发货时间"}
+              value={order.shippedAt ? formatDateTime(order.shippedAt, locale) : "-"}
+            />
+          </dl>
+          {order.trackingUrl ? (
+            <a
+              className="mt-4 inline-flex h-10 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-bold text-blue-700 transition hover:border-blue-300"
+              href={order.trackingUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {locale === "it" ? "Apri tracking" : "打开物流跟踪"}
+            </a>
+          ) : null}
+          {order.customerNote ? (
+            <p className="mt-4 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+              {order.customerNote}
+            </p>
+          ) : null}
+        </article>
+
+        <article className="rounded-lg border border-slate-200 bg-white p-5">
+          <h2 className="text-lg font-bold text-slate-950">
+            {locale === "it" ? "Pagamenti" : "付款记录"}
+          </h2>
+          {order.paymentRecords.length ? (
+            <div className="mt-4 grid gap-3">
+              {order.paymentRecords.map((record) => (
+                <div key={record.id} className="rounded-lg bg-slate-50 p-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <strong className="text-slate-950">
+                      {formatMoney(record.amount, locale)}
+                    </strong>
+                    <Badge className="border-slate-200 bg-white text-slate-700">
+                      {record.paymentStatus}
+                    </Badge>
+                  </div>
+                  <p className="mt-2 text-xs font-semibold text-slate-500">
+                    {[record.paymentMethod, record.providerReference].filter(Boolean).join(" / ")}
+                  </p>
+                  {record.proofUrl ? (
+                    <a
+                      className="mt-2 inline-flex text-sm font-bold text-blue-700 hover:text-blue-900"
+                      href={record.proofUrl}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      {record.proofLabel || (locale === "it" ? "Allegato" : "付款凭证")}
+                    </a>
+                  ) : null}
+                  {record.note ? (
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{record.note}</p>
+                  ) : null}
+                  <p className="mt-2 text-xs text-slate-500">
+                    {formatDateTime(record.createdAt, locale)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+              {locale === "it"
+                ? "Le conferme pagamento appariranno qui."
+                : "后台确认或登记付款凭证后会显示在这里。"}
+            </p>
+          )}
+        </article>
+      </section>
+
+      <section className="rounded-lg border border-slate-200 bg-white p-5">
+        <h2 className="text-lg font-bold text-slate-950">
+          {locale === "it" ? "Timeline ordine" : "订单进度"}
+        </h2>
+        {order.timelineEvents.length ? (
+          <ol className="mt-4 grid gap-3">
+            {order.timelineEvents.map((event) => (
+              <li key={event.id} className="rounded-lg bg-slate-50 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-bold text-slate-950">{event.title}</p>
+                  <Badge className="border-slate-200 bg-white text-slate-600">
+                    {event.eventType}
+                  </Badge>
+                </div>
+                {event.body ? (
+                  <p className="mt-2 text-sm leading-6 text-slate-600">{event.body}</p>
+                ) : null}
+                <p className="mt-2 text-xs text-slate-500">
+                  {formatDateTime(event.createdAt, locale)}
+                </p>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+            {locale === "it"
+              ? "Gli aggiornamenti dell'ordine appariranno qui."
+              : "订单处理进度会显示在这里。"}
+          </p>
+        )}
+      </section>
+
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="border-b border-slate-200 px-5 py-4">
           <h2 className="text-lg font-bold text-slate-950">
@@ -148,6 +264,19 @@ export default async function AccountOrderDetailPage({
       </section>
     </div>
   );
+}
+
+function InfoRow({ label, value }: Readonly<{ label: string; value: string }>) {
+  return (
+    <div className="grid gap-1 rounded-lg bg-slate-50 p-2.5 sm:grid-cols-[112px_1fr]">
+      <dt className="font-semibold text-slate-500">{label}</dt>
+      <dd className="break-words font-bold text-slate-950">{value}</dd>
+    </div>
+  );
+}
+
+function formatDateTime(value: string, locale: Locale) {
+  return new Date(value).toLocaleString(locale === "it" ? "it-IT" : "zh-CN");
 }
 
 function MetricCard({

@@ -5,6 +5,15 @@ import {
 
 type SupabaseClient = ReturnType<typeof getSupabaseAdminClient>;
 
+export type RmaAttachment = {
+  id: string;
+  label: string;
+  url: string;
+  note?: string | null;
+  createdAt: string;
+  actorProfileId?: string | null;
+};
+
 export function generateRmaNumber(rmaId: string, date = new Date()) {
   const compactDate = date.toISOString().slice(0, 10).replaceAll("-", "");
   const suffix = rmaId.replaceAll("-", "").slice(0, 6).toUpperCase();
@@ -36,6 +45,7 @@ export async function recordRmaEvent({
     title,
     body: body ?? null,
     actor_profile_id: actorProfileId ?? null,
+    customer_visible: true,
     metadata,
   });
   if (error) throw new Error(error.message);
@@ -139,6 +149,63 @@ export async function updateRmaResolution({
   };
 }
 
+export async function addRmaAttachment({
+  rmaId,
+  label,
+  url,
+  note,
+  actorProfileId,
+}: {
+  rmaId: string;
+  label: string;
+  url: string;
+  note?: string | null;
+  actorProfileId?: string | null;
+}) {
+  const supabase = getSupabaseAdminClient();
+  const { data, error: loadError } = await supabase
+    .from("rmas")
+    .select("attachments")
+    .eq("id", rmaId)
+    .maybeSingle();
+
+  if (loadError) throw new Error(loadError.message);
+  if (!data) throw new Error("RMA not found.");
+
+  const attachment: RmaAttachment = {
+    id: crypto.randomUUID(),
+    label,
+    url,
+    note: note || null,
+    createdAt: new Date().toISOString(),
+    actorProfileId: actorProfileId ?? null,
+  };
+  const attachments = normalizeAttachments(data.attachments);
+  const { error } = await supabase
+    .from("rmas")
+    .update({
+      attachments: [...attachments, attachment],
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", rmaId);
+
+  if (error) throw new Error(error.message);
+
+  await recordRmaEvent({
+    supabase,
+    rmaId,
+    eventType: "attachment_added",
+    title: "RMA attachment added",
+    body: note || label,
+    actorProfileId,
+    metadata: {
+      attachment,
+    },
+  });
+
+  return attachment;
+}
+
 function getStatusForResolution(resolutionType: string) {
   if (resolutionType === "replace") return "replacement_sent";
   if (resolutionType === "refund" || resolutionType === "credit_note") {
@@ -147,4 +214,24 @@ function getStatusForResolution(resolutionType: string) {
   if (resolutionType === "reject") return "rejected";
   if (resolutionType === "repair") return "approved";
   return "testing";
+}
+
+function normalizeAttachments(value: unknown): RmaAttachment[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+    .map((item) => ({
+      id: String(item.id ?? crypto.randomUUID()),
+      label: String(item.label ?? item.name ?? "Attachment"),
+      url: String(item.url ?? ""),
+      note: typeof item.note === "string" ? item.note : null,
+      createdAt: String(item.createdAt ?? item.created_at ?? new Date().toISOString()),
+      actorProfileId:
+        typeof item.actorProfileId === "string"
+          ? item.actorProfileId
+          : typeof item.actor_profile_id === "string"
+            ? item.actor_profile_id
+            : null,
+    }))
+    .filter((item) => item.url.length > 0);
 }

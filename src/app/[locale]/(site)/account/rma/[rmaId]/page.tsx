@@ -121,6 +121,41 @@ export default async function AccountRmaDetailPage({
 
       <section className="rounded-lg border border-slate-200 bg-white p-5">
         <h2 className="text-lg font-bold text-slate-950">
+          {locale === "it" ? "Allegati" : "售后附件"}
+        </h2>
+        {rma.attachments.length ? (
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {rma.attachments.map((attachment) => (
+              <a
+                key={attachment.id}
+                className="rounded-lg bg-slate-50 p-3 text-sm transition hover:bg-blue-50"
+                href={attachment.url}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <span className="block font-bold text-slate-950">{attachment.label}</span>
+                {attachment.note ? (
+                  <span className="mt-2 block text-sm leading-6 text-slate-600">
+                    {attachment.note}
+                  </span>
+                ) : null}
+                <span className="mt-2 block text-xs text-slate-500">
+                  {attachment.createdAt ? formatDateTime(attachment.createdAt, locale) : "-"}
+                </span>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+            {locale === "it"
+              ? "Gli allegati della pratica appariranno qui."
+              : "售后团队添加的图片、视频或凭证会显示在这里。"}
+          </p>
+        )}
+      </section>
+
+      <section className="rounded-lg border border-slate-200 bg-white p-5">
+        <h2 className="text-lg font-bold text-slate-950">
           {locale === "it" ? "Descrizione" : "问题描述"}
         </h2>
         <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-600">

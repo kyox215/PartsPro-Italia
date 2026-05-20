@@ -28,6 +28,12 @@ export type AdminOrderRow = {
   paidAt?: string | null;
   cancelledAt?: string | null;
   fulfilledAt?: string | null;
+  shippingCarrier?: string | null;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
+  shipmentNote?: string | null;
+  shippedAt?: string | null;
+  customerNote?: string | null;
   adminNote?: string | null;
   createdAt: string;
   items: Array<{
@@ -49,6 +55,8 @@ export type AdminOrderRow = {
     currency: string;
     provider?: string | null;
     providerReference?: string | null;
+    proofUrl?: string | null;
+    proofLabel?: string | null;
     recordedBy?: string | null;
     note?: string | null;
     createdAt: string;
@@ -59,6 +67,7 @@ export type AdminOrderRow = {
     title: string;
     body?: string | null;
     actorProfileId?: string | null;
+    customerVisible?: boolean;
     createdAt: string;
   }>;
 };
@@ -90,6 +99,13 @@ export type AdminRmaRow = {
   refundAmount?: number | null;
   replacementSku?: string | null;
   closedAt?: string | null;
+  attachments: Array<{
+    id: string;
+    label: string;
+    url: string;
+    note?: string | null;
+    createdAt: string;
+  }>;
   createdAt: string;
   events: Array<{
     id: string;
@@ -97,6 +113,7 @@ export type AdminRmaRow = {
     title: string;
     body?: string | null;
     actorProfileId?: string | null;
+    customerVisible?: boolean;
     createdAt: string;
   }>;
 };
@@ -125,6 +142,12 @@ export async function getAdminOrderRows(): Promise<AdminOrderRow[]> {
         paidAt: null,
         cancelledAt: null,
         fulfilledAt: null,
+        shippingCarrier: "DHL",
+        trackingNumber: "DEMO123456",
+        trackingUrl: "https://www.dhl.com/",
+        shipmentNote: "Demo shipment reference.",
+        shippedAt: null,
+        customerNote: "Demo: shipment details appear here after dispatch.",
         adminNote: null,
         createdAt: new Date().toISOString(),
         items: [
@@ -267,6 +290,7 @@ export async function getAdminRmaRows(): Promise<AdminRmaRow[]> {
         refundAmount: null,
         replacementSku: null,
         closedAt: null,
+        attachments: [],
         createdAt: new Date().toISOString(),
         events: [
           {
@@ -286,7 +310,7 @@ export async function getAdminRmaRows(): Promise<AdminRmaRow[]> {
   const { data, error } = await supabase
     .from("rmas")
     .select(
-      "id, rma_number, order_id, profile_id, status, order_number, sku, quantity, issue_type, description, installation_tested, installed, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, created_at",
+      "id, rma_number, order_id, profile_id, status, order_number, sku, quantity, issue_type, description, installation_tested, installed, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, attachments, created_at",
     )
     .order("created_at", { ascending: false })
     .limit(100);
@@ -309,7 +333,7 @@ export async function getAdminRmaById(rmaId: string): Promise<AdminRmaRow | null
   const { data, error } = await supabase
     .from("rmas")
     .select(
-      "id, rma_number, order_id, profile_id, status, order_number, sku, quantity, issue_type, description, installation_tested, installed, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, created_at, rma_events (*)",
+      "id, rma_number, order_id, profile_id, status, order_number, sku, quantity, issue_type, description, installation_tested, installed, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, attachments, created_at, rma_events (*)",
     )
     .eq("id", rmaId)
     .maybeSingle();
@@ -412,6 +436,12 @@ function mapAdminOrder(order: {
   paid_at?: string | null;
   cancelled_at?: string | null;
   fulfilled_at?: string | null;
+  shipping_carrier?: string | null;
+  tracking_number?: string | null;
+  tracking_url?: string | null;
+  shipment_note?: string | null;
+  shipped_at?: string | null;
+  customer_note?: string | null;
   admin_note?: string | null;
   created_at: string;
   order_items?: Array<{
@@ -433,6 +463,8 @@ function mapAdminOrder(order: {
     currency: string | null;
     provider?: string | null;
     provider_reference?: string | null;
+    proof_url?: string | null;
+    proof_label?: string | null;
     recorded_by?: string | null;
     note?: string | null;
     created_at: string;
@@ -443,6 +475,7 @@ function mapAdminOrder(order: {
     title: string;
     body?: string | null;
     actor_profile_id?: string | null;
+    customer_visible?: boolean | null;
     created_at: string;
   }> | null;
 }): AdminOrderRow {
@@ -470,6 +503,12 @@ function mapAdminOrder(order: {
     paidAt: order.paid_at ?? null,
     cancelledAt: order.cancelled_at ?? null,
     fulfilledAt: order.fulfilled_at ?? null,
+    shippingCarrier: order.shipping_carrier ?? null,
+    trackingNumber: order.tracking_number ?? null,
+    trackingUrl: order.tracking_url ?? null,
+    shipmentNote: order.shipment_note ?? null,
+    shippedAt: order.shipped_at ?? null,
+    customerNote: order.customer_note ?? null,
     adminNote: order.admin_note ?? null,
     createdAt: order.created_at,
     items: (order.order_items ?? []).map((item) => ({
@@ -492,6 +531,8 @@ function mapAdminOrder(order: {
         currency: record.currency ?? "EUR",
         provider: record.provider ?? null,
         providerReference: record.provider_reference ?? null,
+        proofUrl: record.proof_url ?? null,
+        proofLabel: record.proof_label ?? null,
         recordedBy: record.recorded_by ?? null,
         note: record.note ?? null,
         createdAt: record.created_at,
@@ -504,6 +545,7 @@ function mapAdminOrder(order: {
         title: event.title,
         body: event.body ?? null,
         actorProfileId: event.actor_profile_id ?? null,
+        customerVisible: event.customer_visible ?? true,
         createdAt: event.created_at,
       }))
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
@@ -528,6 +570,7 @@ function mapAdminRma(row: {
   refund_amount?: number | string | null;
   replacement_sku?: string | null;
   closed_at?: string | null;
+  attachments?: unknown;
   created_at: string;
   rma_events?: Array<{
     id: string;
@@ -535,6 +578,7 @@ function mapAdminRma(row: {
     title: string;
     body?: string | null;
     actor_profile_id?: string | null;
+    customer_visible?: boolean | null;
     created_at: string;
   }> | null;
 }): AdminRmaRow {
@@ -559,6 +603,7 @@ function mapAdminRma(row: {
         : Number(row.refund_amount),
     replacementSku: row.replacement_sku ?? null,
     closedAt: row.closed_at ?? null,
+    attachments: normalizeRmaAttachments(row.attachments),
     createdAt: row.created_at,
     events: (row.rma_events ?? [])
       .map((event) => ({
@@ -567,8 +612,23 @@ function mapAdminRma(row: {
         title: event.title,
         body: event.body ?? null,
         actorProfileId: event.actor_profile_id ?? null,
+        customerVisible: event.customer_visible ?? true,
         createdAt: event.created_at,
       }))
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
   };
+}
+
+function normalizeRmaAttachments(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+    .map((item) => ({
+      id: String(item.id ?? ""),
+      label: String(item.label ?? item.name ?? "Attachment"),
+      url: String(item.url ?? ""),
+      note: typeof item.note === "string" ? item.note : null,
+      createdAt: String(item.createdAt ?? item.created_at ?? ""),
+    }))
+    .filter((item) => item.id && item.url);
 }

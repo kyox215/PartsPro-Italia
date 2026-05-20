@@ -187,6 +187,28 @@ export default async function AdminOrderDetailPage({
                 </ActionForm>
               </div>
             </AdminPanel>
+
+            <AdminPanel
+              title={locale === "it" ? "Prova pagamento" : "付款凭证"}
+              description={
+                locale === "it"
+                  ? "Registra ricevuta, riferimento o link allegato."
+                  : "登记收款凭证、转账参考或附件链接。"
+              }
+            >
+              <PaymentProofForm order={order} locale={locale} returnTo={returnTo} />
+            </AdminPanel>
+
+            <AdminPanel
+              title={locale === "it" ? "Spedizione" : "物流信息"}
+              description={
+                locale === "it"
+                  ? "Tracking visibile al cliente nella pagina ordine."
+                  : "客户订单详情页可见物流单号和通知。"
+              }
+            >
+              <ShipmentForm order={order} locale={locale} returnTo={returnTo} />
+            </AdminPanel>
           </AdminActionRail>
         }
       >
@@ -199,7 +221,25 @@ export default async function AdminOrderDetailPage({
             <InfoRow label="Fiscal code" value={order.fiscalCode || "-"} />
             <InfoRow label="SDI / PEC" value={[order.sdi, order.pec].filter(Boolean).join(" / ") || "-"} />
             <InfoRow label="Shipping" value={order.shippingAddress || "-"} />
+            <InfoRow
+              label={locale === "it" ? "Tracking" : "物流单号"}
+              value={[order.shippingCarrier, order.trackingNumber].filter(Boolean).join(" / ") || "-"}
+            />
+            <InfoRow
+              label={locale === "it" ? "Nota cliente" : "客户通知"}
+              value={order.customerNote || "-"}
+            />
           </dl>
+          {order.trackingUrl ? (
+            <a
+              className="mt-3 inline-flex text-sm font-black text-blue-700 hover:text-blue-900"
+              href={order.trackingUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {locale === "it" ? "Apri tracking" : "打开物流跟踪"}
+            </a>
+          ) : null}
         </AdminPanel>
 
         <div className="grid gap-3 xl:grid-cols-2">
@@ -229,6 +269,16 @@ export default async function AdminOrderDetailPage({
                       {record.provider ? <span>{record.provider}</span> : null}
                       {record.providerReference ? (
                         <span className="font-mono">{record.providerReference}</span>
+                      ) : null}
+                      {record.proofUrl ? (
+                        <a
+                          className="font-black text-blue-700 hover:text-blue-900"
+                          href={record.proofUrl}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          {record.proofLabel || (locale === "it" ? "Allegato" : "凭证")}
+                        </a>
                       ) : null}
                     </div>
                     {record.note ? (
@@ -339,6 +389,176 @@ export default async function AdminOrderDetailPage({
         </AdminPanel>
       </AdminWorkspaceGrid>
     </div>
+  );
+}
+
+function PaymentProofForm({
+  order,
+  locale,
+  returnTo,
+}: Readonly<{
+  order: Awaited<ReturnType<typeof getAdminOrderById>>;
+  locale: Locale;
+  returnTo: string;
+}>) {
+  if (!order) return null;
+
+  return (
+    <form action="/api/admin/orders/payment-proof" className="grid gap-3" method="post">
+      <AdminCsrfField />
+      <input type="hidden" name="id" value={order.id} />
+      <input type="hidden" name="locale" value={locale} />
+      <input type="hidden" name="returnTo" value={returnTo} />
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Metodo" : "付款方式"}
+        <select
+          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          defaultValue={order.paymentMethod}
+          name="paymentMethod"
+        >
+          <option value="bank_transfer">{locale === "it" ? "Bonifico" : "银行转账"}</option>
+          <option value="cash">{locale === "it" ? "Contanti" : "现金"}</option>
+          <option value="stripe">{locale === "it" ? "Carta Stripe" : "Stripe 银行卡"}</option>
+        </select>
+      </label>
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Stato pagamento" : "付款状态"}
+        <select
+          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          defaultValue={order.paymentStatus ?? "pending_bank_transfer"}
+          name="paymentStatus"
+        >
+          <option value="pending_bank_transfer">{locale === "it" ? "Bonifico atteso" : "等待转账"}</option>
+          <option value="pending_cash">{locale === "it" ? "Contanti attesi" : "等待现金"}</option>
+          <option value="pending_card">{locale === "it" ? "Carta attesa" : "等待银行卡"}</option>
+          <option value="paid">{locale === "it" ? "Pagato" : "已支付"}</option>
+          <option value="failed">{locale === "it" ? "Fallito" : "失败"}</option>
+          <option value="cancelled">{locale === "it" ? "Annullato" : "已取消"}</option>
+          <option value="refunded">{locale === "it" ? "Rimborsato" : "已退款"}</option>
+        </select>
+      </label>
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Importo" : "金额"}
+        <input
+          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          defaultValue={order.total}
+          min="0"
+          name="amount"
+          step="0.01"
+          type="number"
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Riferimento" : "付款参考号"}
+        <input
+          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          name="providerReference"
+          placeholder={locale === "it" ? "CRO / ID transazione" : "CRO / 交易号"}
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Link allegato" : "凭证链接"}
+        <input
+          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          name="proofUrl"
+          placeholder="https://..."
+          type="url"
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Etichetta" : "凭证名称"}
+        <input
+          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          name="proofLabel"
+          placeholder={locale === "it" ? "Ricevuta bonifico" : "银行转账截图"}
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Nota" : "备注"}
+        <textarea
+          className="min-h-20 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          name="note"
+          placeholder={locale === "it" ? "Dettagli incasso" : "收款说明"}
+        />
+      </label>
+      <button
+        className="inline-flex h-10 items-center justify-center rounded-lg border border-stone-950 bg-stone-950 px-3 text-xs font-black text-white transition hover:bg-stone-800"
+        type="submit"
+      >
+        {locale === "it" ? "Salva prova" : "保存付款凭证"}
+      </button>
+    </form>
+  );
+}
+
+function ShipmentForm({
+  order,
+  locale,
+  returnTo,
+}: Readonly<{
+  order: Awaited<ReturnType<typeof getAdminOrderById>>;
+  locale: Locale;
+  returnTo: string;
+}>) {
+  if (!order) return null;
+
+  return (
+    <form action="/api/admin/orders/shipment" className="grid gap-3" method="post">
+      <AdminCsrfField />
+      <input type="hidden" name="id" value={order.id} />
+      <input type="hidden" name="locale" value={locale} />
+      <input type="hidden" name="returnTo" value={returnTo} />
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Corriere" : "物流公司"}
+        <input
+          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          defaultValue={order.shippingCarrier ?? ""}
+          name="shippingCarrier"
+          placeholder="DHL / GLS / BRT"
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Tracking" : "物流单号"}
+        <input
+          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          defaultValue={order.trackingNumber ?? ""}
+          name="trackingNumber"
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "URL tracking" : "跟踪链接"}
+        <input
+          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          defaultValue={order.trackingUrl ?? ""}
+          name="trackingUrl"
+          placeholder="https://..."
+          type="url"
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Nota cliente" : "客户通知"}
+        <textarea
+          className="min-h-20 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          defaultValue={order.customerNote ?? ""}
+          name="customerNote"
+          placeholder={locale === "it" ? "Messaggio visibile al cliente" : "客户订单详情页可见"}
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-black text-stone-500">
+        {locale === "it" ? "Nota interna" : "内部备注"}
+        <textarea
+          className="min-h-20 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          defaultValue={order.shipmentNote ?? ""}
+          name="shipmentNote"
+        />
+      </label>
+      <button
+        className="inline-flex h-10 items-center justify-center rounded-lg border border-stone-950 bg-stone-950 px-3 text-xs font-black text-white transition hover:bg-stone-800"
+        type="submit"
+      >
+        {locale === "it" ? "Salva tracking" : "保存物流信息"}
+      </button>
+    </form>
   );
 }
 

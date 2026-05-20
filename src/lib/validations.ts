@@ -224,6 +224,38 @@ export const adminOrderWorkflowSchema = z.object({
   returnTo: z.string().optional().or(z.literal("")),
 });
 
+export const adminOrderPaymentProofSchema = z.object({
+  id: z.string().min(1),
+  locale: z.enum(["it", "zh"]).default("it"),
+  returnTo: z.string().optional().or(z.literal("")),
+  paymentMethod: z.enum(["stripe", "cash", "bank_transfer"]),
+  paymentStatus: z.enum([
+    "pending_card",
+    "pending_cash",
+    "pending_bank_transfer",
+    "paid",
+    "failed",
+    "cancelled",
+    "refunded",
+  ]),
+  amount: z.coerce.number().nonnegative(),
+  providerReference: z.string().optional().or(z.literal("")),
+  proofUrl: z.string().url().optional().or(z.literal("")),
+  proofLabel: z.string().optional().or(z.literal("")),
+  note: z.string().optional().or(z.literal("")),
+});
+
+export const adminOrderShipmentSchema = z.object({
+  id: z.string().min(1),
+  locale: z.enum(["it", "zh"]).default("it"),
+  returnTo: z.string().optional().or(z.literal("")),
+  shippingCarrier: z.string().optional().or(z.literal("")),
+  trackingNumber: z.string().optional().or(z.literal("")),
+  trackingUrl: z.string().url().optional().or(z.literal("")),
+  shipmentNote: z.string().optional().or(z.literal("")),
+  customerNote: z.string().optional().or(z.literal("")),
+});
+
 export const adminB2BStatusSchema = z.object({
   id: z.string().min(1),
   status: z.enum(["pending", "approved", "rejected"]),
@@ -327,3 +359,12 @@ export const adminRmaResolutionSchema = z
       });
     }
   });
+
+export const adminRmaAttachmentSchema = z.object({
+  id: z.string().min(1),
+  locale: z.enum(["it", "zh"]).default("it"),
+  returnTo: z.string().optional().or(z.literal("")),
+  label: z.string().min(1),
+  url: z.string().url(),
+  note: z.string().optional().or(z.literal("")),
+});

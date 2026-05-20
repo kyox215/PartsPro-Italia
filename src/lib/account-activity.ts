@@ -15,6 +15,12 @@ export type AccountOrderRow = {
   currency: string;
   reservationExpiresAt?: string | null;
   paidAt?: string | null;
+  shippingCarrier?: string | null;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
+  shipmentNote?: string | null;
+  shippedAt?: string | null;
+  customerNote?: string | null;
   createdAt: string;
   items: Array<{
     sku: string;
@@ -26,6 +32,26 @@ export type AccountOrderRow = {
     preorderQty?: number;
     preorderLeadTimeMinDays?: number | null;
     preorderLeadTimeMaxDays?: number | null;
+  }>;
+  paymentRecords: Array<{
+    id: string;
+    paymentMethod: string;
+    paymentStatus: string;
+    amount: number;
+    currency: string;
+    provider?: string | null;
+    providerReference?: string | null;
+    proofUrl?: string | null;
+    proofLabel?: string | null;
+    note?: string | null;
+    createdAt: string;
+  }>;
+  timelineEvents: Array<{
+    id: string;
+    eventType: string;
+    title: string;
+    body?: string | null;
+    createdAt: string;
   }>;
 };
 
@@ -43,6 +69,13 @@ export type AccountRmaRow = {
   refundAmount?: number | null;
   replacementSku?: string | null;
   closedAt?: string | null;
+  attachments: Array<{
+    id: string;
+    label: string;
+    url: string;
+    note?: string | null;
+    createdAt: string;
+  }>;
   createdAt: string;
   events: Array<{
     id: string;
@@ -77,6 +110,12 @@ export async function getAccountActivity(
           currency: "EUR",
           reservationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
           paidAt: null,
+          shippingCarrier: "DHL",
+          trackingNumber: "DEMO123456",
+          trackingUrl: "https://www.dhl.com/",
+          shipmentNote: "Demo shipment reference.",
+          shippedAt: null,
+          customerNote: "Demo: shipment details appear here after dispatch.",
           createdAt: new Date().toISOString(),
           items: [
             {
@@ -100,6 +139,16 @@ export async function getAccountActivity(
               preorderLeadTimeMaxDays: 14,
             },
           ],
+          paymentRecords: [],
+          timelineEvents: [
+            {
+              id: "demo-order-event-1",
+              eventType: "order_created",
+              title: "Demo order created",
+              body: "Order updates will appear here.",
+              createdAt: new Date().toISOString(),
+            },
+          ],
         },
       ],
       rmas: [
@@ -117,6 +166,7 @@ export async function getAccountActivity(
           refundAmount: null,
           replacementSku: null,
           closedAt: null,
+          attachments: [],
           createdAt: new Date().toISOString(),
           events: [
             {
@@ -149,7 +199,7 @@ export async function getAccountActivity(
     supabase
       .from("rmas")
       .select(
-        "id, rma_number, status, order_number, sku, quantity, issue_type, description, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, created_at",
+        "id, rma_number, status, order_number, sku, quantity, issue_type, description, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, attachments, created_at",
       )
       .eq("profile_id", auth.user.id)
       .order("created_at", { ascending: false })
@@ -186,7 +236,7 @@ export async function getAccountOrderById(
   const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase
     .from("orders")
-    .select("id, status, payment_status, fulfillment_status, payment_method, total, currency, reservation_expires_at, paid_at, created_at, order_items (*)")
+    .select("id, status, payment_status, fulfillment_status, payment_method, total, currency, reservation_expires_at, paid_at, shipping_carrier, tracking_number, tracking_url, shipment_note, shipped_at, customer_note, created_at, order_items (*), order_payment_records (*), order_timeline_events (*)")
     .eq("profile_id", auth.user.id)
     .eq("id", orderId)
     .maybeSingle();
@@ -216,7 +266,7 @@ export async function getAccountRmaById(
   const { data, error } = await supabase
     .from("rmas")
     .select(
-      "id, rma_number, status, order_number, sku, quantity, issue_type, description, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, created_at, rma_events (*)",
+      "id, rma_number, status, order_number, sku, quantity, issue_type, description, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, attachments, created_at, rma_events (*)",
     )
     .eq("profile_id", auth.user.id)
     .eq("id", rmaId)
@@ -240,6 +290,12 @@ function mapAccountOrder(order: {
   currency: string | null;
   reservation_expires_at?: string | null;
   paid_at?: string | null;
+  shipping_carrier?: string | null;
+  tracking_number?: string | null;
+  tracking_url?: string | null;
+  shipment_note?: string | null;
+  shipped_at?: string | null;
+  customer_note?: string | null;
   created_at: string;
   order_items?: Array<{
     sku: string;
@@ -252,6 +308,27 @@ function mapAccountOrder(order: {
     preorder_lead_time_min_days?: number | null;
     preorder_lead_time_max_days?: number | null;
   }> | null;
+  order_payment_records?: Array<{
+    id: string;
+    payment_method: string;
+    payment_status: string;
+    amount: number | string;
+    currency: string | null;
+    provider?: string | null;
+    provider_reference?: string | null;
+    proof_url?: string | null;
+    proof_label?: string | null;
+    note?: string | null;
+    created_at: string;
+  }> | null;
+  order_timeline_events?: Array<{
+    id: string;
+    event_type: string;
+    title: string;
+    body?: string | null;
+    customer_visible?: boolean | null;
+    created_at: string;
+  }> | null;
 }): AccountOrderRow {
   return {
     id: order.id,
@@ -263,6 +340,12 @@ function mapAccountOrder(order: {
     currency: order.currency ?? "EUR",
     reservationExpiresAt: order.reservation_expires_at ?? null,
     paidAt: order.paid_at ?? null,
+    shippingCarrier: order.shipping_carrier ?? null,
+    trackingNumber: order.tracking_number ?? null,
+    trackingUrl: order.tracking_url ?? null,
+    shipmentNote: order.shipment_note ?? null,
+    shippedAt: order.shipped_at ?? null,
+    customerNote: order.customer_note ?? null,
     createdAt: order.created_at,
     items: (order.order_items ?? []).map((item) => ({
       sku: item.sku,
@@ -275,6 +358,31 @@ function mapAccountOrder(order: {
       preorderLeadTimeMinDays: item.preorder_lead_time_min_days ?? null,
       preorderLeadTimeMaxDays: item.preorder_lead_time_max_days ?? null,
     })),
+    paymentRecords: (order.order_payment_records ?? [])
+      .map((record) => ({
+        id: record.id,
+        paymentMethod: record.payment_method,
+        paymentStatus: record.payment_status,
+        amount: Number(record.amount ?? 0),
+        currency: record.currency ?? "EUR",
+        provider: record.provider ?? null,
+        providerReference: record.provider_reference ?? null,
+        proofUrl: record.proof_url ?? null,
+        proofLabel: record.proof_label ?? null,
+        note: record.note ?? null,
+        createdAt: record.created_at,
+      }))
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
+    timelineEvents: (order.order_timeline_events ?? [])
+      .filter((event) => event.customer_visible ?? true)
+      .map((event) => ({
+        id: event.id,
+        eventType: event.event_type,
+        title: event.title,
+        body: event.body ?? null,
+        createdAt: event.created_at,
+      }))
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
   };
 }
 
@@ -292,6 +400,7 @@ function mapAccountRma(rma: {
   refund_amount?: number | string | null;
   replacement_sku?: string | null;
   closed_at?: string | null;
+  attachments?: unknown;
   created_at: string;
   rma_events?: Array<{
     id: string;
@@ -318,6 +427,7 @@ function mapAccountRma(rma: {
         : Number(rma.refund_amount),
     replacementSku: rma.replacement_sku ?? null,
     closedAt: rma.closed_at ?? null,
+    attachments: normalizeRmaAttachments(rma.attachments),
     createdAt: rma.created_at,
     events: (rma.rma_events ?? [])
       .map((event) => ({
@@ -329,6 +439,20 @@ function mapAccountRma(rma: {
       }))
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
   };
+}
+
+function normalizeRmaAttachments(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+    .map((item) => ({
+      id: String(item.id ?? ""),
+      label: String(item.label ?? item.name ?? "Attachment"),
+      url: String(item.url ?? ""),
+      note: typeof item.note === "string" ? item.note : null,
+      createdAt: String(item.createdAt ?? item.created_at ?? ""),
+    }))
+    .filter((item) => item.id && item.url);
 }
 
 function summarizeActivity({
