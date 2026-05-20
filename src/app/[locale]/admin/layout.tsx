@@ -56,10 +56,16 @@ export default async function AdminLayout({
       icon: "clipboard",
     },
     {
-      href: localizePath(locale, "/admin/b2b"),
-      label: locale === "it" ? "Clienti B2B" : "B2B 审核",
-      description: locale === "it" ? "Account wholesale" : "批发账户",
+      href: localizePath(locale, "/admin/customers"),
+      label: locale === "it" ? "Clienti" : "客户管理",
+      description: locale === "it" ? "CRM e price group" : "CRM 与价格组",
       icon: "users",
+    },
+    {
+      href: localizePath(locale, "/admin/b2b"),
+      label: locale === "it" ? "B2B review" : "B2B 审核",
+      description: locale === "it" ? "Code richieste" : "申请队列",
+      icon: "user",
     },
     {
       href: localizePath(locale, "/admin/rma"),

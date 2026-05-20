@@ -36,18 +36,18 @@ export function AdminPageHeader({
   actions?: ReactNode;
 }>) {
   return (
-    <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
       <div className="min-w-0">
         {eyebrow ? (
-          <p className="mb-2 text-xs font-black uppercase tracking-wide text-stone-500">
+          <p className="mb-1 text-[11px] font-black uppercase tracking-wide text-stone-500">
             {eyebrow}
           </p>
         ) : null}
-        <h2 className="max-w-4xl text-2xl font-black leading-tight text-stone-950 sm:text-3xl">
+        <h2 className="max-w-4xl text-xl font-black leading-tight text-stone-950 sm:text-2xl">
           {title}
         </h2>
         {description ? (
-          <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-stone-600">
+          <p className="mt-1 max-w-3xl text-xs font-semibold leading-5 text-stone-600 sm:text-sm">
             {description}
           </p>
         ) : null}
@@ -75,13 +75,13 @@ export function AdminPanel({
   return (
     <section className={cn("rounded-lg border border-black/5 bg-white shadow-sm", className)}>
       {(title || description || toolbar) ? (
-        <div className="flex flex-col gap-3 border-b border-black/5 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-2 border-b border-black/5 px-3 py-2.5 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             {title ? (
-              <h3 className="text-base font-black leading-6 text-stone-950">{title}</h3>
+              <h3 className="text-sm font-black leading-5 text-stone-950">{title}</h3>
             ) : null}
             {description ? (
-              <p className="mt-1 text-sm font-medium leading-6 text-stone-500">
+              <p className="mt-0.5 text-xs font-semibold leading-5 text-stone-500">
                 {description}
               </p>
             ) : null}
@@ -89,7 +89,7 @@ export function AdminPanel({
           {toolbar ? <div className="shrink-0">{toolbar}</div> : null}
         </div>
       ) : null}
-      <div className={cn("p-4", contentClassName)}>{children}</div>
+      <div className={cn("p-3", contentClassName)}>{children}</div>
     </section>
   );
 }
@@ -110,27 +110,27 @@ export function AdminMetricCard({
   caption?: ReactNode;
 }>) {
   return (
-    <div className="rounded-lg border border-black/5 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
+    <div className="rounded-lg border border-black/5 bg-white p-3 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-xs font-black uppercase tracking-wide text-stone-400">
+          <p className="truncate text-[11px] font-black uppercase tracking-wide text-stone-400">
             {label}
           </p>
-          <p className="mt-3 break-words text-2xl font-black leading-none text-stone-950">
+          <p className="mt-2 break-words text-xl font-black leading-none text-stone-950">
             {value}
           </p>
         </div>
         {Icon ? (
-          <span className={cn("rounded-lg p-2 ring-1", toneClasses[tone])}>
-            <Icon className="h-5 w-5" />
+          <span className={cn("rounded-md p-1.5 ring-1", toneClasses[tone])}>
+            <Icon className="h-4 w-4" />
           </span>
         ) : null}
       </div>
       {(trend || caption) ? (
-        <div className="mt-4 flex min-h-6 flex-wrap items-center gap-2">
+        <div className="mt-2 flex min-h-5 flex-wrap items-center gap-1.5">
           {trend}
           {caption ? (
-            <span className="text-xs font-semibold leading-5 text-stone-500">{caption}</span>
+            <span className="text-[11px] font-semibold leading-4 text-stone-500">{caption}</span>
           ) : null}
         </div>
       ) : null}
@@ -170,13 +170,13 @@ export function AdminTabs({
   className?: string;
 }>) {
   return (
-    <div className={cn("flex gap-2 overflow-x-auto rounded-lg bg-white p-1 shadow-sm", className)}>
+    <div className={cn("flex gap-1 overflow-x-auto rounded-lg bg-white p-1 shadow-sm", className)}>
       {items.map((item) => (
         <Link
           key={item.href}
           href={item.href}
           className={cn(
-            "inline-flex h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-black transition",
+            "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-black transition",
             item.active
               ? "bg-stone-950 text-white"
               : "text-stone-500 hover:bg-stone-100 hover:text-stone-950",
@@ -231,13 +231,13 @@ export function AdminEmptyState({
   action?: ReactNode;
 }>) {
   return (
-    <div className="rounded-lg border border-dashed border-black/10 bg-stone-50 px-4 py-10 text-center">
-      <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-lg bg-white text-stone-500 shadow-sm">
-        <Icon className="h-5 w-5" />
+    <div className="rounded-lg border border-dashed border-black/10 bg-stone-50 px-3 py-6 text-center">
+      <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg bg-white text-stone-500 shadow-sm">
+        <Icon className="h-4 w-4" />
       </span>
-      <h3 className="mt-4 text-base font-black text-stone-950">{title}</h3>
+      <h3 className="mt-3 text-sm font-black text-stone-950">{title}</h3>
       {description ? (
-        <p className="mx-auto mt-2 max-w-md text-sm font-medium leading-6 text-stone-500">
+        <p className="mx-auto mt-1 max-w-md text-xs font-semibold leading-5 text-stone-500">
           {description}
         </p>
       ) : null}
@@ -265,12 +265,12 @@ export function AdminNotice({
     tone === "success" ? CheckCircle2 : tone === "warning" || tone === "danger" ? CircleAlert : Info;
 
   return (
-    <div className={cn("rounded-lg border px-4 py-3", toneMap[tone])}>
-      <div className="flex gap-3">
-        <Icon className="mt-0.5 h-5 w-5 shrink-0" />
+    <div className={cn("rounded-lg border px-3 py-2", toneMap[tone])}>
+      <div className="flex gap-2">
+        <Icon className="mt-0.5 h-4 w-4 shrink-0" />
         <div className="min-w-0">
-          {title ? <p className="text-sm font-black">{title}</p> : null}
-          <div className="text-sm font-medium leading-6">{children}</div>
+          {title ? <p className="text-xs font-black">{title}</p> : null}
+          <div className="text-xs font-semibold leading-5">{children}</div>
         </div>
       </div>
     </div>
@@ -318,7 +318,7 @@ export function AdminInput({
       {label ? <span className="text-xs font-black uppercase tracking-wide text-stone-500">{label}</span> : null}
       <input
         className={cn(
-          "mt-2 h-11 w-full rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none transition placeholder:text-stone-400 focus:border-stone-950 focus:ring-2 focus:ring-stone-950/10",
+          "mt-1.5 h-9 w-full rounded-lg border border-black/10 bg-white px-2.5 text-sm font-semibold text-stone-950 outline-none transition placeholder:text-stone-400 focus:border-stone-950 focus:ring-2 focus:ring-stone-950/10",
           inputClassName,
         )}
         {...props}
@@ -345,7 +345,7 @@ export function AdminSelect({
       {label ? <span className="text-xs font-black uppercase tracking-wide text-stone-500">{label}</span> : null}
       <select
         className={cn(
-          "mt-2 h-11 w-full rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none transition focus:border-stone-950 focus:ring-2 focus:ring-stone-950/10",
+          "mt-1.5 h-9 w-full rounded-lg border border-black/10 bg-white px-2.5 text-sm font-semibold text-stone-950 outline-none transition focus:border-stone-950 focus:ring-2 focus:ring-stone-950/10",
           selectClassName,
         )}
         {...props}
@@ -373,7 +373,7 @@ export function AdminTextarea({
       {label ? <span className="text-xs font-black uppercase tracking-wide text-stone-500">{label}</span> : null}
       <textarea
         className={cn(
-          "mt-2 min-h-28 w-full rounded-lg border border-black/10 bg-white px-3 py-3 text-sm font-semibold text-stone-950 outline-none transition placeholder:text-stone-400 focus:border-stone-950 focus:ring-2 focus:ring-stone-950/10",
+          "mt-1.5 min-h-20 w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm font-semibold text-stone-950 outline-none transition placeholder:text-stone-400 focus:border-stone-950 focus:ring-2 focus:ring-stone-950/10",
           textareaClassName,
         )}
         {...props}
@@ -471,7 +471,7 @@ export function AdminButtonLink({
     <Link
       href={href}
       className={cn(
-        "inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-black transition",
+        "inline-flex h-9 items-center justify-center rounded-lg px-3 text-xs font-black transition",
         variant === "primary"
           ? "bg-stone-950 text-white hover:bg-stone-800"
           : "border border-black/10 bg-white text-stone-800 hover:border-black/20 hover:text-stone-950",
@@ -479,5 +479,111 @@ export function AdminButtonLink({
     >
       {children}
     </Link>
+  );
+}
+
+export function AdminWorkspaceGrid({
+  children,
+  rail,
+  className,
+}: Readonly<{
+  children: ReactNode;
+  rail?: ReactNode;
+  className?: string;
+}>) {
+  return (
+    <div
+      className={cn(
+        "grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_340px]",
+        className,
+      )}
+    >
+      <div className="min-w-0 space-y-3">{children}</div>
+      {rail ? <div className="min-w-0 space-y-3">{rail}</div> : null}
+    </div>
+  );
+}
+
+export function AdminActionRail({
+  title,
+  description,
+  children,
+  sticky = true,
+}: Readonly<{
+  title?: ReactNode;
+  description?: ReactNode;
+  children: ReactNode;
+  sticky?: boolean;
+}>) {
+  return (
+    <aside className={cn("space-y-3", sticky && "xl:sticky xl:top-[76px] xl:self-start")}>
+      {(title || description) ? (
+        <div className="rounded-lg border border-black/5 bg-white px-3 py-2 shadow-sm">
+          {title ? <h3 className="text-sm font-black text-stone-950">{title}</h3> : null}
+          {description ? (
+            <p className="mt-0.5 text-xs font-semibold leading-5 text-stone-500">
+              {description}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {children}
+    </aside>
+  );
+}
+
+export function AdminCollapsiblePanel({
+  title,
+  summary,
+  children,
+  defaultOpen = false,
+}: Readonly<{
+  title: ReactNode;
+  summary?: ReactNode;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}>) {
+  return (
+    <details
+      className="group rounded-lg border border-black/5 bg-white shadow-sm"
+      open={defaultOpen}
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-black text-stone-950 marker:hidden">
+        <span className="min-w-0">
+          <span className="block truncate">{title}</span>
+          {summary ? (
+            <span className="mt-0.5 block truncate text-xs font-semibold text-stone-500">
+              {summary}
+            </span>
+          ) : null}
+        </span>
+        <span className="rounded-md bg-stone-100 px-2 py-1 text-[11px] font-black text-stone-500 group-open:hidden">
+          Open
+        </span>
+        <span className="hidden rounded-md bg-stone-950 px-2 py-1 text-[11px] font-black text-white group-open:inline">
+          Close
+        </span>
+      </summary>
+      <div className="border-t border-black/5 p-3">{children}</div>
+    </details>
+  );
+}
+
+export function AdminMetricStrip({
+  children,
+  className,
+}: Readonly<{
+  children: ReactNode;
+  className?: string;
+}>) {
+  return (
+    <section
+      className={cn(
+        "grid gap-2 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6",
+        className,
+      )}
+    >
+      {children}
+    </section>
   );
 }

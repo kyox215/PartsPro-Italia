@@ -1,12 +1,14 @@
 import { CheckCircle2, Clock3, RotateCcw, Wrench } from "lucide-react";
 import { StatusSelectForm } from "@/components/admin/status-select-form";
 import {
+  AdminActionRail,
   AdminButtonLink,
   AdminEmptyState,
   AdminMetricCard,
   AdminNotice,
   AdminPageHeader,
   AdminPanel,
+  AdminWorkspaceGrid,
   StatusPill,
 } from "@/components/admin/admin-ui";
 import { getAdminRmaRows } from "@/lib/admin-operations";
@@ -42,7 +44,7 @@ export default async function AdminRmaPage({
   const error = valueOf(query.error);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <AdminPageHeader
         eyebrow={locale === "it" ? "Refund request components" : "售后请求组件"}
         title={locale === "it" ? "Gestione RMA" : "RMA 售后管理"}
@@ -60,112 +62,119 @@ export default async function AdminRmaPage({
 
       <Feedback saved={saved} error={error} locale={locale} />
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <AdminMetricCard
-          icon={Clock3}
-          label={locale === "it" ? "Aperti" : "待处理"}
-          value={rmas.filter((rma) => rma.status !== "completed").length}
-          tone="amber"
-        />
-        <AdminMetricCard
-          icon={Wrench}
-          label={locale === "it" ? "In test" : "检测中"}
-          value={rmas.filter((rma) => rma.status === "testing").length}
-          tone="blue"
-        />
-        <AdminMetricCard
-          icon={CheckCircle2}
-          label={locale === "it" ? "Completati" : "已完成"}
-          value={rmas.filter((rma) => rma.status === "completed").length}
-          tone="green"
-        />
-      </section>
-
-      <AdminPanel
-        title={locale === "it" ? "Ticket RMA" : "RMA 工单"}
-        description={
-          locale === "it"
-            ? "Schede compatte con stato, SKU e azione rapida verso il dettaglio."
-            : "以紧凑卡片展示状态、SKU，并保留详情入口。"
+      <AdminWorkspaceGrid
+        rail={
+          <AdminActionRail
+            title={locale === "it" ? "Stato RMA" : "RMA 状态"}
+            description={locale === "it" ? "Code tecniche" : "售后处理队列"}
+          >
+            <section className="grid gap-2">
+              <AdminMetricCard
+                icon={Clock3}
+                label={locale === "it" ? "Aperti" : "待处理"}
+                value={rmas.filter((rma) => rma.status !== "completed").length}
+                tone="amber"
+              />
+              <AdminMetricCard
+                icon={Wrench}
+                label={locale === "it" ? "In test" : "检测中"}
+                value={rmas.filter((rma) => rma.status === "testing").length}
+                tone="blue"
+              />
+              <AdminMetricCard
+                icon={CheckCircle2}
+                label={locale === "it" ? "Completati" : "已完成"}
+                value={rmas.filter((rma) => rma.status === "completed").length}
+                tone="green"
+              />
+            </section>
+          </AdminActionRail>
         }
       >
-        {rmas.length ? (
-          <div className="grid gap-3">
-            {rmas.map((rma) => (
-              <article
-                key={rma.id}
-                className="grid gap-4 rounded-lg border border-black/5 bg-stone-50 p-4 xl:grid-cols-[1fr_auto]"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="truncate text-lg font-black text-stone-950">
-                      {rma.orderNumber} / {rma.sku}
+        <AdminPanel
+          title={locale === "it" ? "Ticket RMA" : "RMA 工单"}
+          description={
+            locale === "it"
+              ? "Lista operativa con stato, SKU e azione dettaglio."
+              : "紧凑展示状态、SKU 和详情入口。"
+          }
+        >
+          {rmas.length ? (
+            <div className="grid gap-2">
+              {rmas.map((rma) => (
+                <article
+                  key={rma.id}
+                  className="grid gap-3 rounded-lg border border-black/5 bg-stone-50 p-3 xl:grid-cols-[1fr_auto]"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate text-base font-black text-stone-950">
+                        {rma.orderNumber} / {rma.sku}
+                      </p>
+                      <StatusPill status={rma.status} />
+                    </div>
+                    <p className="mt-1 text-sm font-semibold text-stone-600">
+                      {rma.issueType} x {rma.quantity}
                     </p>
-                    <StatusPill status={rma.status} />
+                    <p className="mt-2 line-clamp-2 max-w-3xl text-xs font-medium leading-5 text-stone-600">
+                      {rma.description || "-"}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs font-black text-stone-500">
+                      <span className="rounded-md bg-white px-2 py-1 shadow-sm">
+                        {rma.installationTested
+                          ? locale === "it"
+                            ? "Testato"
+                            : "已测试"
+                          : locale === "it"
+                            ? "Test n/d"
+                            : "未记录测试"}
+                      </span>
+                      <span className="rounded-md bg-white px-2 py-1 shadow-sm">
+                        {rma.installed
+                          ? locale === "it"
+                            ? "Installato"
+                            : "已安装"
+                          : locale === "it"
+                            ? "Non installato"
+                            : "未安装"}
+                      </span>
+                      <span className="rounded-md bg-white px-2 py-1 shadow-sm">
+                        {new Date(rma.createdAt).toLocaleDateString()}
+                      </span>
+                      <span className="font-mono text-stone-400">{rma.id}</span>
+                    </div>
                   </div>
-                  <p className="mt-2 text-sm font-semibold text-stone-600">
-                    {rma.issueType} x {rma.quantity}
-                  </p>
-                  <p className="mt-3 max-w-3xl text-sm font-medium leading-6 text-stone-600">
-                    {rma.description || "-"}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-black text-stone-500">
-                    <span className="rounded-md bg-white px-2 py-1 shadow-sm">
-                      {rma.installationTested
-                        ? locale === "it"
-                          ? "Testato"
-                          : "已测试"
-                        : locale === "it"
-                          ? "Test n/d"
-                          : "未记录测试"}
-                    </span>
-                    <span className="rounded-md bg-white px-2 py-1 shadow-sm">
-                      {rma.installed
-                        ? locale === "it"
-                          ? "Installato"
-                          : "已安装"
-                        : locale === "it"
-                          ? "Non installato"
-                          : "未安装"}
-                    </span>
-                    <span className="rounded-md bg-white px-2 py-1 shadow-sm">
-                      {new Date(rma.createdAt).toLocaleDateString()}
-                    </span>
+                  <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                    <StatusSelectForm
+                      action="/api/admin/rma/status"
+                      currentStatus={rma.status}
+                      id={rma.id}
+                      locale={locale}
+                      statuses={rmaStatuses}
+                    />
+                    <AdminButtonLink
+                      href={localizePath(locale, `/admin/rma/${rma.id}`)}
+                      variant="secondary"
+                    >
+                      {locale === "it" ? "Apri" : "查看"}
+                    </AdminButtonLink>
                   </div>
-                  <p className="mt-3 font-mono text-xs font-semibold text-stone-400">
-                    {rma.id}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-                  <StatusSelectForm
-                    action="/api/admin/rma/status"
-                    currentStatus={rma.status}
-                    id={rma.id}
-                    locale={locale}
-                    statuses={rmaStatuses}
-                  />
-                  <AdminButtonLink
-                    href={localizePath(locale, `/admin/rma/${rma.id}`)}
-                    variant="secondary"
-                  >
-                    {locale === "it" ? "Apri" : "查看"}
-                  </AdminButtonLink>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <AdminEmptyState
-            icon={RotateCcw}
-            title={locale === "it" ? "Nessun RMA aperto" : "暂无 RMA 工单"}
-            description={
-              locale === "it"
-                ? "Le richieste post-vendita appariranno qui."
-                : "售后申请提交后会显示在这里。"
-            }
-          />
-        )}
-      </AdminPanel>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <AdminEmptyState
+              icon={RotateCcw}
+              title={locale === "it" ? "Nessun RMA aperto" : "暂无 RMA 工单"}
+              description={
+                locale === "it"
+                  ? "Le richieste post-vendita appariranno qui."
+                  : "售后申请提交后会显示在这里。"
+              }
+            />
+          )}
+        </AdminPanel>
+      </AdminWorkspaceGrid>
     </div>
   );
 }

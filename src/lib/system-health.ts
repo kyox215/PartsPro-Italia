@@ -107,6 +107,10 @@ const publicTables = ["brands", "categories", "products", "skus"] as const;
 const adminTables = [
   "profiles",
   "companies",
+  "customer_notes",
+  "customer_tasks",
+  "customer_tags",
+  "customer_tag_links",
   "b2b_applications",
   "orders",
   "order_items",
@@ -212,7 +216,7 @@ async function probeTable({
   table: string;
   access: "public" | "admin";
 }): Promise<DatabaseCheck> {
-  const { error } = await client.from(table).select("id").limit(1);
+  const { error } = await client.from(table).select("*").limit(1);
 
   if (error) {
     return {

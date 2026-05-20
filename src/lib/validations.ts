@@ -90,6 +90,29 @@ export const adminProductSchema = z.object({
   attributes: z.string().optional().or(z.literal("")),
 });
 
+export const adminProductUpdateSchema = adminProductSchema.omit({
+  stockOnHand: true,
+  incomingQty: true,
+}).extend({
+  locale: z.enum(["it", "zh"]).default("it"),
+  productId: z.string().min(1),
+  skuId: z.string().min(1),
+  returnTo: z.string().optional().or(z.literal("")),
+});
+
+export const adminProductStateSchema = z.object({
+  locale: z.enum(["it", "zh"]).default("it"),
+  productId: z.string().min(1),
+  skuId: z.string().min(1),
+  returnTo: z.string().optional().or(z.literal("")),
+});
+
+export const adminProductBulkSchema = z.object({
+  locale: z.enum(["it", "zh"]).default("it"),
+  action: z.enum(["publish", "archive"]),
+  ids: z.string().min(1),
+});
+
 export const adminCatalogImportSchema = z.object({
   locale: z.enum(["it", "zh"]).default("it"),
   batchSize: z.coerce.number().int().positive().max(5000).default(500),
@@ -144,6 +167,27 @@ export const adminInventoryReceiveSchema = z.object({
   itemIds: z.string().min(1),
 });
 
+export const adminInventoryAdjustSchema = z.object({
+  locale: z.enum(["it", "zh"]).default("it"),
+  skuId: z.string().min(1),
+  adjustmentType: z.enum([
+    "add_stock",
+    "remove_stock",
+    "set_stock",
+    "add_incoming",
+    "remove_incoming",
+  ]),
+  quantity: z.coerce.number().int().nonnegative(),
+  reason: z.string().min(3, "reason is required"),
+});
+
+export const adminInventoryReorderSettingsSchema = z.object({
+  locale: z.enum(["it", "zh"]).default("it"),
+  inventoryId: z.string().min(1),
+  reorderPoint: z.coerce.number().int().nonnegative(),
+  safetyStock: z.coerce.number().int().nonnegative(),
+});
+
 export const adminOrderStatusSchema = z.object({
   id: z.string().min(1),
   status: z.enum([
@@ -185,6 +229,46 @@ export const adminB2BStatusSchema = z.object({
   status: z.enum(["pending", "approved", "rejected"]),
   priceGroup: z.string().optional().or(z.literal("")),
   locale: z.enum(["it", "zh"]).default("it"),
+});
+
+export const adminCustomerStatusSchema = z.object({
+  id: z.string().min(1),
+  locale: z.enum(["it", "zh"]).default("it"),
+  status: z.enum(["lead", "pending", "active", "paused", "rejected", "archived"]),
+  nextFollowUpAt: z.string().optional().or(z.literal("")),
+});
+
+export const adminCustomerPriceGroupSchema = z.object({
+  id: z.string().min(1),
+  locale: z.enum(["it", "zh"]).default("it"),
+  priceGroup: z.enum(["retail", "b2b_basic", "b2b_silver", "b2b_gold", "distributor"]),
+});
+
+export const adminCustomerNoteSchema = z.object({
+  companyId: z.string().min(1),
+  locale: z.enum(["it", "zh"]).default("it"),
+  body: z.string().min(1),
+});
+
+export const adminCustomerTaskSchema = z.object({
+  companyId: z.string().min(1),
+  locale: z.enum(["it", "zh"]).default("it"),
+  title: z.string().min(1),
+  dueAt: z.string().optional().or(z.literal("")),
+});
+
+export const adminCustomerTaskStatusSchema = z.object({
+  id: z.string().min(1),
+  companyId: z.string().min(1),
+  locale: z.enum(["it", "zh"]).default("it"),
+  status: z.enum(["pending", "completed"]),
+});
+
+export const adminCustomerTagSchema = z.object({
+  companyId: z.string().min(1),
+  locale: z.enum(["it", "zh"]).default("it"),
+  tagName: z.string().min(1),
+  color: z.string().optional().or(z.literal("")),
 });
 
 export const adminRmaStatusSchema = z.object({

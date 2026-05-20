@@ -37,6 +37,33 @@ export type SupplierPurchaseOrderItemRow = {
   createdAt: string;
 };
 
+export type AdminInventoryMovementRow = {
+  id: string;
+  sku: string;
+  movementType: string;
+  quantity: number;
+  stockDelta: number;
+  reservedDelta: number;
+  incomingDelta: number;
+  incomingReservedDelta: number;
+  note: string | null;
+  createdAt: string;
+};
+
+export type AdminInventoryAlertRow = {
+  inventoryId: string;
+  skuId: string;
+  sku: string;
+  name: string;
+  stockOnHand: number;
+  stockReserved: number;
+  incomingQty: number;
+  incomingReserved: number;
+  reorderPoint: number;
+  safetyStock: number;
+  reason: "low_stock" | "below_safety" | "oversold" | "incoming_reserved";
+};
+
 const defaultSettings: InventorySettings = {
   b2bMarkup: 1.5,
   retailMarkup: 2,
@@ -147,4 +174,150 @@ export async function getOpenSupplierPurchaseItems(): Promise<
       createdAt: row.created_at,
     };
   });
+}
+
+export async function getAdminInventoryMovements(
+  limit = 80,
+): Promise<AdminInventoryMovementRow[]> {
+  if (!hasSupabaseAdminConfig()) {
+    return [
+      {
+        id: "demo-movement-1",
+        sku: "APL-IP14-SCR-SO-BLK",
+        movementType: "receive_stock",
+        quantity: 10,
+        stockDelta: 10,
+        reservedDelta: 0,
+        incomingDelta: -10,
+        incomingReservedDelta: 0,
+        note: "Demo supplier stock received",
+        createdAt: new Date().toISOString(),
+      },
+    ];
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("inventory_movements")
+    .select(
+      `
+      id,
+      movement_type,
+      quantity,
+      stock_delta,
+      reserved_delta,
+      incoming_delta,
+      incoming_reserved_delta,
+      note,
+      created_at,
+      skus ( sku )
+    `,
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("Failed to load inventory movements", error);
+    return [];
+  }
+
+  return (data ?? []).map((row) => {
+    const sku = Array.isArray(row.skus) ? row.skus[0] : row.skus;
+
+    return {
+      id: row.id,
+      sku: sku?.sku ?? "-",
+      movementType: row.movement_type,
+      quantity: Number(row.quantity ?? 0),
+      stockDelta: Number(row.stock_delta ?? 0),
+      reservedDelta: Number(row.reserved_delta ?? 0),
+      incomingDelta: Number(row.incoming_delta ?? 0),
+      incomingReservedDelta: Number(row.incoming_reserved_delta ?? 0),
+      note: row.note ?? null,
+      createdAt: row.created_at,
+    };
+  });
+}
+
+export async function getAdminInventoryAlerts(): Promise<AdminInventoryAlertRow[]> {
+  if (!hasSupabaseAdminConfig()) {
+    return [
+      {
+        inventoryId: "demo-inventory-1",
+        skuId: "demo-sku-1",
+        sku: "APL-IP13-BAT-HQ",
+        name: "Batteria iPhone 13 alta qualita",
+        stockOnHand: 3,
+        stockReserved: 1,
+        incomingQty: 0,
+        incomingReserved: 0,
+        reorderPoint: 5,
+        safetyStock: 2,
+        reason: "low_stock",
+      },
+    ];
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("inventory")
+    .select(
+      `
+      id,
+      sku_id,
+      stock_on_hand,
+      stock_reserved,
+      incoming_qty,
+      incoming_reserved,
+      reorder_point,
+      safety_stock,
+      skus (
+        sku,
+        products ( name_it )
+      )
+    `,
+    )
+    .eq("warehouse_code", "MAIN")
+    .limit(300);
+
+  if (error) {
+    console.error("Failed to load inventory alerts", error);
+    return [];
+  }
+
+  return (data ?? [])
+    .map((row) => {
+      const sku = Array.isArray(row.skus) ? row.skus[0] : row.skus;
+      const product = Array.isArray(sku?.products) ? sku?.products[0] : sku?.products;
+      const stockOnHand = Number(row.stock_on_hand ?? 0);
+      const stockReserved = Number(row.stock_reserved ?? 0);
+      const incomingQty = Number(row.incoming_qty ?? 0);
+      const incomingReserved = Number(row.incoming_reserved ?? 0);
+      const available = stockOnHand - stockReserved;
+      const reorderPoint = Number(row.reorder_point ?? 0);
+      const safetyStock = Number(row.safety_stock ?? 0);
+      let reason: AdminInventoryAlertRow["reason"] | null = null;
+
+      if (available < 0) reason = "oversold";
+      else if (safetyStock > 0 && available <= safetyStock) reason = "below_safety";
+      else if (reorderPoint > 0 && available <= reorderPoint) reason = "low_stock";
+      else if (incomingReserved > incomingQty) reason = "incoming_reserved";
+
+      if (!reason) return null;
+
+      return {
+        inventoryId: row.id,
+        skuId: row.sku_id,
+        sku: sku?.sku ?? "-",
+        name: product?.name_it ?? sku?.sku ?? "-",
+        stockOnHand,
+        stockReserved,
+        incomingQty,
+        incomingReserved,
+        reorderPoint,
+        safetyStock,
+        reason,
+      };
+    })
+    .filter((row): row is AdminInventoryAlertRow => Boolean(row));
 }

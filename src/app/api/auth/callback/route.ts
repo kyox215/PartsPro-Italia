@@ -5,6 +5,7 @@ import {
   getRoleAwareAuthRedirect,
   normalizeAuthLocale,
 } from "@/lib/auth-redirect";
+import { linkApprovedCustomerLead } from "@/lib/customer-leads";
 import {
   getSupabaseServerClient,
   hasSupabasePublicConfig,
@@ -55,6 +56,9 @@ export async function GET(request: Request) {
   const role = user
     ? await getRoleForUser({ id: user.id, email: user.email })
     : { isAdmin: false };
+  if (user) {
+    await linkApprovedCustomerLead({ id: user.id, email: user.email });
+  }
   const next = getRoleAwareAuthRedirect({
     value: requestedNext,
     locale,

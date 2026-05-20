@@ -2,12 +2,15 @@ import { notFound } from "next/navigation";
 import { Boxes, ClipboardList, CreditCard, PackageCheck, TimerReset } from "lucide-react";
 import { StatusSelectForm } from "@/components/admin/status-select-form";
 import {
+  AdminActionRail,
   AdminButtonLink,
   AdminDataTable,
   AdminMetricCard,
+  AdminMetricStrip,
   AdminNotice,
   AdminPageHeader,
   AdminPanel,
+  AdminWorkspaceGrid,
   StatusPill,
 } from "@/components/admin/admin-ui";
 import { getAdminOrderById } from "@/lib/admin-operations";
@@ -53,7 +56,7 @@ export default async function AdminOrderDetailPage({
   );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <AdminPageHeader
         eyebrow={locale === "it" ? "Order detail" : "订单详情"}
         title={<span className="break-all font-mono">{order.id}</span>}
@@ -75,7 +78,7 @@ export default async function AdminOrderDetailPage({
       />
       <Feedback saved={valueOf(query.saved)} error={valueOf(query.error)} locale={locale} />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <AdminMetricStrip className="md:grid-cols-2 xl:grid-cols-5">
         <AdminMetricCard icon={ClipboardList} label={locale === "it" ? "Stato" : "状态"} value={<StatusPill status={order.status} />} tone="blue" />
         <AdminMetricCard
           icon={CreditCard}
@@ -93,9 +96,99 @@ export default async function AdminOrderDetailPage({
           tone="violet"
           trend={order.fulfillmentStatus ? <StatusPill status={order.fulfillmentStatus} /> : null}
         />
-      </section>
+      </AdminMetricStrip>
 
-      <section className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+      <AdminWorkspaceGrid
+        rail={
+          <AdminActionRail
+            title={locale === "it" ? "Azioni ordine" : "订单操作"}
+            description={locale === "it" ? "Stato, pagamento e fulfilment" : "状态、收款与履约"}
+          >
+            <AdminPanel
+              title={locale === "it" ? "Aggiorna stato" : "更新状态"}
+              description={
+                locale === "it"
+                  ? "Collegato agli endpoint admin esistenti."
+                  : "仍使用现有后台状态接口。"
+              }
+            >
+              <StatusSelectForm
+                action="/api/admin/orders/status"
+                currentStatus={order.status}
+                extraFields={<input type="hidden" name="returnTo" value={returnTo} />}
+                id={order.id}
+                locale={locale}
+                statuses={orderStatuses}
+              />
+              <div className="mt-3 rounded-lg bg-stone-50 p-3 text-xs font-semibold leading-5 text-stone-700">
+                <p>
+                  {locale === "it" ? "Subtotal" : "小计"}:{" "}
+                  <strong>{formatMoney(order.subtotal ?? 0, locale)}</strong>
+                </p>
+                <p className="mt-1">
+                  IVA/VAT: <strong>{formatMoney(order.vat ?? 0, locale)}</strong>
+                </p>
+                {order.reservationExpiresAt ? (
+                  <p className="mt-1">
+                    {locale === "it" ? "Lock fino a" : "锁库到"}:{" "}
+                    <strong>
+                      {new Date(order.reservationExpiresAt).toLocaleString(
+                        locale === "it" ? "it-IT" : "zh-CN",
+                      )}
+                    </strong>
+                  </p>
+                ) : null}
+              </div>
+            </AdminPanel>
+
+            <AdminPanel
+              title={locale === "it" ? "Chiusura operativa" : "订单闭环"}
+              description={
+                locale === "it"
+                  ? "Incasso, picking, preorder e stock."
+                  : "收款、备货、预购分配和库存释放。"
+              }
+            >
+              <div className="grid gap-2">
+                {order.paymentMethod === "cash" && order.paymentStatus === "pending_cash" ? (
+                  <ActionForm action="/api/admin/orders/payment" id={order.id} locale={locale} returnTo={returnTo} value="confirm_cash">
+                    {locale === "it" ? "Conferma contanti" : "确认现金收款"}
+                  </ActionForm>
+                ) : null}
+                {order.paymentMethod === "bank_transfer" &&
+                order.paymentStatus === "pending_bank_transfer" ? (
+                  <ActionForm action="/api/admin/orders/payment" id={order.id} locale={locale} returnTo={returnTo} value="confirm_bank_transfer">
+                    {locale === "it" ? "Conferma bonifico" : "确认转账到账"}
+                  </ActionForm>
+                ) : null}
+                <ActionForm action="/api/admin/orders/fulfillment" id={order.id} locale={locale} returnTo={returnTo} value="start_picking">
+                  {locale === "it" ? "Inizia picking" : "开始备货"}
+                </ActionForm>
+                {preorderQty > 0 ? (
+                  <ActionForm action="/api/admin/orders/allocate-preorders" id={order.id} locale={locale} returnTo={returnTo}>
+                    {locale === "it" ? "Alloca preorder" : "分配预购到货"}
+                  </ActionForm>
+                ) : null}
+                <ActionForm action="/api/admin/orders/fulfillment" id={order.id} locale={locale} returnTo={returnTo} value="mark_shipped">
+                  {locale === "it" ? "Segna spedito" : "标记发货"}
+                </ActionForm>
+                <ActionForm action="/api/admin/orders/fulfillment" id={order.id} locale={locale} returnTo={returnTo} value="mark_picked_up">
+                  {locale === "it" ? "Ritiro completato" : "已自提完成"}
+                </ActionForm>
+                <ActionForm action="/api/admin/orders/fulfillment" id={order.id} locale={locale} returnTo={returnTo} value="complete">
+                  {locale === "it" ? "Completa" : "完成订单"}
+                </ActionForm>
+                <ActionForm action="/api/admin/orders/extend-reservation" id={order.id} locale={locale} returnTo={returnTo} variant="secondary">
+                  {locale === "it" ? "Estendi 24h" : "延长锁库 24 小时"}
+                </ActionForm>
+                <ActionForm action="/api/admin/orders/release" id={order.id} locale={locale} returnTo={returnTo} variant="danger">
+                  {locale === "it" ? "Annulla e libera" : "取消并释放库存"}
+                </ActionForm>
+              </div>
+            </AdminPanel>
+          </AdminActionRail>
+        }
+      >
         <AdminPanel title={locale === "it" ? "Cliente e fattura" : "客户与发票"}>
           <dl className="grid gap-3 text-sm">
             <InfoRow label="Company" value={order.companyName || "-"} />
@@ -109,140 +202,57 @@ export default async function AdminOrderDetailPage({
         </AdminPanel>
 
         <AdminPanel
-          title={locale === "it" ? "Aggiorna stato" : "更新状态"}
-          description={
-            locale === "it"
-              ? "Lo stato si aggiorna su Supabase quando la service role key e configurata."
-              : "配置 service role key 后，这里会直接更新 Supabase 真实订单状态。"
-          }
+          title={locale === "it" ? "Righe e fulfilment" : "商品与履约"}
+          description={new Date(order.createdAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN")}
         >
-          <StatusSelectForm
-            action="/api/admin/orders/status"
-            currentStatus={order.status}
-            extraFields={<input type="hidden" name="returnTo" value={returnTo} />}
-            id={order.id}
-            locale={locale}
-            statuses={orderStatuses}
-          />
-          <div className="mt-5 rounded-lg bg-stone-50 p-4 text-sm font-semibold text-stone-700">
-            <p>
-              {locale === "it" ? "Subtotal" : "小计"}:{" "}
-              <strong>{formatMoney(order.subtotal ?? 0, locale)}</strong>
-            </p>
-            <p className="mt-2">
-              IVA/VAT: <strong>{formatMoney(order.vat ?? 0, locale)}</strong>
-            </p>
-            {order.reservationExpiresAt ? (
-              <p className="mt-2">
-                {locale === "it" ? "Lock fino a" : "锁库到"}:{" "}
-                <strong>
-                  {new Date(order.reservationExpiresAt).toLocaleString(
-                    locale === "it" ? "it-IT" : "zh-CN",
-                  )}
-                </strong>
-              </p>
-            ) : null}
-          </div>
-        </AdminPanel>
-      </section>
-
-      <AdminPanel
-        title={locale === "it" ? "Azioni operative" : "订单闭环操作"}
-        description={
-          locale === "it"
-            ? "Conferma incasso, assegna preorder arrivati, prepara, spedisce o annulla liberando lo stock."
-            : "用于确认收款、分配已到货预购、备货、发货/自提完成，或取消并释放锁定库存。"
-        }
-      >
-        <div className="flex flex-wrap gap-2">
-          {order.paymentMethod === "cash" && order.paymentStatus === "pending_cash" ? (
-            <ActionForm action="/api/admin/orders/payment" id={order.id} locale={locale} returnTo={returnTo} value="confirm_cash">
-              {locale === "it" ? "Conferma contanti" : "确认现金收款"}
-            </ActionForm>
-          ) : null}
-          {order.paymentMethod === "bank_transfer" &&
-          order.paymentStatus === "pending_bank_transfer" ? (
-            <ActionForm action="/api/admin/orders/payment" id={order.id} locale={locale} returnTo={returnTo} value="confirm_bank_transfer">
-              {locale === "it" ? "Conferma bonifico" : "确认转账到账"}
-            </ActionForm>
-          ) : null}
-          <ActionForm action="/api/admin/orders/fulfillment" id={order.id} locale={locale} returnTo={returnTo} value="start_picking">
-            {locale === "it" ? "Inizia picking" : "开始备货"}
-          </ActionForm>
-          {preorderQty > 0 ? (
-            <ActionForm action="/api/admin/orders/allocate-preorders" id={order.id} locale={locale} returnTo={returnTo}>
-              {locale === "it" ? "Alloca preorder" : "分配预购到货"}
-            </ActionForm>
-          ) : null}
-          <ActionForm action="/api/admin/orders/fulfillment" id={order.id} locale={locale} returnTo={returnTo} value="mark_shipped">
-            {locale === "it" ? "Segna spedito" : "标记发货"}
-          </ActionForm>
-          <ActionForm action="/api/admin/orders/fulfillment" id={order.id} locale={locale} returnTo={returnTo} value="mark_picked_up">
-            {locale === "it" ? "Ritiro completato" : "已自提完成"}
-          </ActionForm>
-          <ActionForm action="/api/admin/orders/fulfillment" id={order.id} locale={locale} returnTo={returnTo} value="complete">
-            {locale === "it" ? "Completa" : "完成订单"}
-          </ActionForm>
-          <ActionForm action="/api/admin/orders/extend-reservation" id={order.id} locale={locale} returnTo={returnTo} variant="secondary">
-            {locale === "it" ? "Estendi 24h" : "延长锁库 24 小时"}
-          </ActionForm>
-          <ActionForm action="/api/admin/orders/release" id={order.id} locale={locale} returnTo={returnTo} variant="danger">
-            {locale === "it" ? "Annulla e libera" : "取消并释放库存"}
-          </ActionForm>
-        </div>
-      </AdminPanel>
-
-      <AdminPanel
-        title={locale === "it" ? "Righe e fulfilment" : "商品与履约"}
-        description={new Date(order.createdAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN")}
-      >
-        <AdminDataTable minWidth={940}>
-          <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase text-stone-400">
-              <tr className="border-b border-black/5">
-                <th className="px-3 py-3">SKU</th>
-                <th className="px-3 py-3">Name</th>
-                <th className="px-3 py-3">Qty</th>
-                <th className="px-3 py-3">Stock</th>
-                <th className="px-3 py-3">Preorder</th>
-                <th className="px-3 py-3">Line total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-black/5">
-              {order.items.map((item) => (
-                <tr key={`${order.id}-${item.sku}`} className="hover:bg-stone-50">
-                  <td className="px-3 py-4 font-mono text-xs font-black text-stone-900">
-                    {item.sku}
-                  </td>
-                  <td className="px-3 py-4 font-semibold text-stone-700">{item.name}</td>
-                  <td className="px-3 py-4 font-black text-stone-950">{item.quantity}</td>
-                  <td className="px-3 py-4">{item.stockQty ?? 0}</td>
-                  <td className="px-3 py-4">
-                    <span>{item.preorderQty ?? 0}</span>
-                    {item.preorderQty &&
-                    item.preorderLeadTimeMinDays &&
-                    item.preorderLeadTimeMaxDays ? (
-                      <span className="ml-2 text-xs font-semibold text-stone-500">
-                        {item.preorderLeadTimeMinDays}-{item.preorderLeadTimeMaxDays}d
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="px-3 py-4 font-black text-stone-950">
-                    {formatMoney(item.unitPrice * item.quantity, locale)}
-                  </td>
+          <AdminDataTable minWidth={940}>
+            <table className="w-full text-left text-sm">
+              <thead className="text-xs uppercase text-stone-400">
+                <tr className="border-b border-black/5">
+                  <th className="px-2.5 py-2">SKU</th>
+                  <th className="px-2.5 py-2">Name</th>
+                  <th className="px-2.5 py-2">Qty</th>
+                  <th className="px-2.5 py-2">Stock</th>
+                  <th className="px-2.5 py-2">Preorder</th>
+                  <th className="px-2.5 py-2">Line total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </AdminDataTable>
-      </AdminPanel>
+              </thead>
+              <tbody className="divide-y divide-black/5">
+                {order.items.map((item) => (
+                  <tr key={`${order.id}-${item.sku}`} className="hover:bg-stone-50">
+                    <td className="px-2.5 py-2.5 font-mono text-xs font-black text-stone-900">
+                      {item.sku}
+                    </td>
+                    <td className="px-2.5 py-2.5 font-semibold text-stone-700">{item.name}</td>
+                    <td className="px-2.5 py-2.5 font-black text-stone-950">{item.quantity}</td>
+                    <td className="px-2.5 py-2.5">{item.stockQty ?? 0}</td>
+                    <td className="px-2.5 py-2.5">
+                      <span>{item.preorderQty ?? 0}</span>
+                      {item.preorderQty &&
+                      item.preorderLeadTimeMinDays &&
+                      item.preorderLeadTimeMaxDays ? (
+                        <span className="ml-2 text-xs font-semibold text-stone-500">
+                          {item.preorderLeadTimeMinDays}-{item.preorderLeadTimeMaxDays}d
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-2.5 py-2.5 font-black text-stone-950">
+                      {formatMoney(item.unitPrice * item.quantity, locale)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </AdminDataTable>
+        </AdminPanel>
+      </AdminWorkspaceGrid>
     </div>
   );
 }
 
 function InfoRow({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
-    <div className="grid gap-1 rounded-lg bg-stone-50 p-3 sm:grid-cols-[120px_1fr]">
+    <div className="grid gap-1 rounded-lg bg-stone-50 p-2.5 sm:grid-cols-[120px_1fr]">
       <dt className="font-black text-stone-500">{label}</dt>
       <dd className="break-words font-semibold text-stone-900">{value}</dd>
     </div>
@@ -280,7 +290,7 @@ function ActionForm({
       <input type="hidden" name="returnTo" value={returnTo} />
       {value ? <input type="hidden" name="action" value={value} /> : null}
       <button
-        className={`inline-flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-black transition ${className}`}
+        className={`inline-flex h-9 w-full items-center justify-center rounded-lg border px-3 text-xs font-black transition ${className}`}
         type="submit"
       >
         {children}

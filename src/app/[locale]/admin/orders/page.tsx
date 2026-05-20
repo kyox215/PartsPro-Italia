@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { StatusSelectForm } from "@/components/admin/status-select-form";
 import {
+  AdminActionRail,
   AdminButtonLink,
   AdminDataTable,
   AdminEmptyState,
@@ -15,6 +16,7 @@ import {
   AdminPageHeader,
   AdminPanel,
   AdminTabs,
+  AdminWorkspaceGrid,
   StatusPill,
 } from "@/components/admin/admin-ui";
 import { getAdminOrderRows } from "@/lib/admin-operations";
@@ -68,7 +70,7 @@ export default async function AdminOrdersPage({
   }));
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <AdminPageHeader
         eyebrow={locale === "it" ? "Income components" : "收入与履约"}
         title={locale === "it" ? "Gestione ordini" : "订单管理"}
@@ -87,55 +89,70 @@ export default async function AdminOrdersPage({
       <SystemNotice configured={auth.configured} isAdmin={auth.isAdmin} locale={locale} />
       <Feedback saved={saved} error={error} locale={locale} />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <AdminMetricCard
-          icon={Banknote}
-          label={locale === "it" ? "Contanti" : "待收现金"}
-          value={orders.filter((order) => order.paymentStatus === "pending_cash").length}
-          tone="amber"
-        />
-        <AdminMetricCard
-          icon={ReceiptText}
-          label={locale === "it" ? "Bonifici" : "待确认转账"}
-          value={
-            orders.filter((order) => order.paymentStatus === "pending_bank_transfer")
-              .length
-          }
-          tone="blue"
-        />
-        <AdminMetricCard
-          icon={CreditCard}
-          label={locale === "it" ? "Stripe pending" : "Stripe 待支付"}
-          value={orders.filter((order) => order.paymentStatus === "pending_card").length}
-          tone="violet"
-        />
-        <AdminMetricCard
-          icon={PackageCheck}
-          label={locale === "it" ? "Preorder" : "待分配预购"}
-          value={
-            orders.filter((order) => order.fulfillmentStatus === "awaiting_preorder")
-              .length
-          }
-          tone="green"
-        />
-        <AdminMetricCard
-          icon={TimerReset}
-          label={locale === "it" ? "Lock in scadenza" : "即将过期锁库"}
-          value={orders.filter(isReservationExpiringSoon).length}
-          tone="red"
-        />
-      </section>
-
-      <AdminTabs items={filterItems} />
-
-      <AdminPanel
-        title={locale === "it" ? "Ordini" : "订单列表"}
-        description={
-          locale === "it"
-            ? "Vista desktop in tabella, vista mobile in schede compatte."
-            : "桌面表格，移动端切换为紧凑卡片。"
+      <AdminWorkspaceGrid
+        rail={
+          <AdminActionRail
+            title={locale === "it" ? "Stato ordini" : "订单状态"}
+            description={locale === "it" ? "Pagamenti e lock" : "付款、锁库、预购"}
+          >
+            <section className="grid gap-2">
+              <AdminMetricCard
+                icon={Banknote}
+                label={locale === "it" ? "Contanti" : "待收现金"}
+                value={orders.filter((order) => order.paymentStatus === "pending_cash").length}
+                tone="amber"
+              />
+              <AdminMetricCard
+                icon={ReceiptText}
+                label={locale === "it" ? "Bonifici" : "待确认转账"}
+                value={
+                  orders.filter((order) => order.paymentStatus === "pending_bank_transfer")
+                    .length
+                }
+                tone="blue"
+              />
+              <AdminMetricCard
+                icon={CreditCard}
+                label={locale === "it" ? "Stripe pending" : "Stripe 待支付"}
+                value={orders.filter((order) => order.paymentStatus === "pending_card").length}
+                tone="violet"
+              />
+              <AdminMetricCard
+                icon={PackageCheck}
+                label={locale === "it" ? "Preorder" : "待分配预购"}
+                value={
+                  orders.filter((order) => order.fulfillmentStatus === "awaiting_preorder")
+                    .length
+                }
+                tone="green"
+              />
+              <AdminMetricCard
+                icon={TimerReset}
+                label={locale === "it" ? "Lock in scadenza" : "即将过期锁库"}
+                value={orders.filter(isReservationExpiringSoon).length}
+                tone="red"
+              />
+            </section>
+            <AdminPanel title={locale === "it" ? "Filtri rapidi" : "快捷筛选"} contentClassName="grid gap-2 p-2">
+              {filterItems.slice(0, 5).map((item) => (
+                <AdminButtonLink key={item.href} href={item.href} variant={item.active ? "primary" : "secondary"}>
+                  {item.label} ({item.count})
+                </AdminButtonLink>
+              ))}
+            </AdminPanel>
+          </AdminActionRail>
         }
       >
+        <AdminTabs items={filterItems} />
+
+        <AdminPanel
+          title={locale === "it" ? "Ordini" : "订单列表"}
+          description={
+            locale === "it"
+              ? "Tabella operativa compatta; su mobile resta in schede."
+              : "紧凑运营表；手机仍为卡片。"
+          }
+        >
         {visibleOrders.length ? (
           <>
             <div className="hidden lg:block">
@@ -143,19 +160,19 @@ export default async function AdminOrdersPage({
                 <table className="w-full text-left text-sm">
                   <thead className="text-xs uppercase text-stone-400">
                     <tr className="border-b border-black/5">
-                      <th className="px-3 py-3">Order</th>
-                      <th className="px-3 py-3">Customer</th>
-                      <th className="px-3 py-3">Items</th>
-                      <th className="px-3 py-3">Payment</th>
-                      <th className="px-3 py-3">Total</th>
-                      <th className="px-3 py-3">Status</th>
-                      <th className="px-3 py-3">Detail</th>
+                      <th className="px-2.5 py-2">Order</th>
+                      <th className="px-2.5 py-2">Customer</th>
+                      <th className="px-2.5 py-2">Items</th>
+                      <th className="px-2.5 py-2">Payment</th>
+                      <th className="px-2.5 py-2">Total</th>
+                      <th className="px-2.5 py-2">Status</th>
+                      <th className="px-2.5 py-2">Detail</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-black/5">
                     {visibleOrders.map((order) => (
                       <tr key={order.id} className="align-top hover:bg-stone-50">
-                        <td className="px-3 py-4">
+                        <td className="px-2.5 py-2.5">
                           <p className="font-mono text-xs font-black text-stone-900">
                             {order.id}
                           </p>
@@ -163,7 +180,7 @@ export default async function AdminOrdersPage({
                             {new Date(order.createdAt).toLocaleString()}
                           </p>
                         </td>
-                        <td className="px-3 py-4">
+                        <td className="px-2.5 py-2.5">
                           <p className="font-black text-stone-950">
                             {order.companyName || order.customerName || "-"}
                           </p>
@@ -171,7 +188,7 @@ export default async function AdminOrdersPage({
                             {order.email}
                           </p>
                         </td>
-                        <td className="px-3 py-4">
+                        <td className="px-2.5 py-2.5">
                           <ul className="space-y-1 text-xs font-semibold text-stone-600">
                             {order.items.map((item) => (
                               <li key={`${order.id}-${item.sku}`}>
@@ -186,16 +203,16 @@ export default async function AdminOrdersPage({
                             ))}
                           </ul>
                         </td>
-                        <td className="px-3 py-4 text-stone-700">
+                        <td className="px-2.5 py-2.5 text-stone-700">
                           <p className="font-black">{order.paymentMethod}</p>
                           <div className="mt-2">
                             <StatusPill status={order.paymentStatus ?? "-"} />
                           </div>
                         </td>
-                        <td className="px-3 py-4 font-black text-stone-950">
+                        <td className="px-2.5 py-2.5 font-black text-stone-950">
                           {formatMoney(order.total, locale)}
                         </td>
-                        <td className="px-3 py-4">
+                        <td className="px-2.5 py-2.5">
                           <StatusSelectForm
                             action="/api/admin/orders/status"
                             currentStatus={order.status}
@@ -209,7 +226,7 @@ export default async function AdminOrdersPage({
                             </p>
                           ) : null}
                         </td>
-                        <td className="px-3 py-4">
+                        <td className="px-2.5 py-2.5">
                           <AdminButtonLink
                             href={localizePath(locale, `/admin/orders/${order.id}`)}
                             variant="secondary"
@@ -280,7 +297,8 @@ export default async function AdminOrdersPage({
             }
           />
         )}
-      </AdminPanel>
+        </AdminPanel>
+      </AdminWorkspaceGrid>
     </div>
   );
 }

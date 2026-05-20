@@ -6,6 +6,7 @@ import {
 
 export type AdminOrderRow = {
   id: string;
+  profileId?: string | null;
   status: string;
   paymentStatus?: string | null;
   fulfillmentStatus?: string | null;
@@ -72,6 +73,7 @@ export async function getAdminOrderRows(): Promise<AdminOrderRow[]> {
       {
         id: "demo-order-1001",
         status: "pending_payment",
+        profileId: "demo-profile",
         paymentStatus: "pending_bank_transfer",
         fulfillmentStatus: "awaiting_preorder",
         paymentMethod: "bank_transfer",
@@ -327,6 +329,7 @@ async function getPreorderIncomingTotal() {
 
 function mapAdminOrder(order: {
   id: string;
+  profile_id?: string | null;
   status: string;
   payment_status?: string | null;
   fulfillment_status?: string | null;
@@ -364,6 +367,7 @@ function mapAdminOrder(order: {
 }): AdminOrderRow {
   return {
     id: order.id,
+    profileId: order.profile_id ?? null,
     status: order.status,
     paymentStatus: order.payment_status ?? null,
     fulfillmentStatus: order.fulfillment_status ?? null,

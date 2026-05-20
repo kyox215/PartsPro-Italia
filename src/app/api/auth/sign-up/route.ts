@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { linkApprovedCustomerLead } from "@/lib/customer-leads";
 import { parseRequestBody } from "@/lib/request";
 import {
   getSupabaseServerClient,
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
   }
 
   const supabase = await getSupabaseServerClient();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -38,6 +39,10 @@ export async function POST(request: Request) {
       new URL(`/${locale}/login?error=${encodeURIComponent(error.message)}`, request.url),
       303,
     );
+  }
+
+  if (data.user) {
+    await linkApprovedCustomerLead({ id: data.user.id, email: data.user.email });
   }
 
   return NextResponse.redirect(new URL(`/${locale}/account?signup=check-email`, request.url), 303);

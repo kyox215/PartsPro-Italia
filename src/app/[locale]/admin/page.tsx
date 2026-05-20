@@ -7,17 +7,21 @@ import {
   ShieldAlert,
   TicketCheck,
   TimerReset,
+  UserCheck,
   type LucideIcon,
   UsersRound,
   Warehouse,
 } from "lucide-react";
 import {
   AdminButtonLink,
+  AdminActionRail,
   AdminMetricCard,
+  AdminMetricStrip,
   AdminNotice,
   AdminPageHeader,
   AdminPanel,
   AdminTrendBadge,
+  AdminWorkspaceGrid,
 } from "@/components/admin/admin-ui";
 import { getAdminDashboardMetrics } from "@/lib/admin-operations";
 import { getAuthContext } from "@/lib/auth";
@@ -151,12 +155,22 @@ export default async function AdminPage({
       tone: "bg-amber-50 text-amber-700",
     },
     {
-      Icon: UsersRound,
-      title: locale === "it" ? "Clienti B2B" : "B2B 客户",
+      Icon: UserCheck,
+      title: locale === "it" ? "Clienti e CRM" : "客户管理 CRM",
       description:
         locale === "it"
-          ? "Approva account wholesale e price group."
-          : "审核批发账户并分配价格组。",
+          ? "Schede cliente, price group, note e follow-up."
+          : "客户档案、价格组、备注、任务和跟进。",
+      href: localizePath(locale, "/admin/customers"),
+      tone: "bg-indigo-50 text-indigo-700",
+    },
+    {
+      Icon: UsersRound,
+      title: locale === "it" ? "Revisioni B2B" : "B2B 审核",
+      description:
+        locale === "it"
+          ? "Approva richieste wholesale e collega lead CRM."
+          : "审核批发申请并同步到客户档案。",
       href: localizePath(locale, "/admin/b2b"),
       tone: "bg-violet-50 text-violet-700",
     },
@@ -183,7 +197,7 @@ export default async function AdminPage({
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <AdminPageHeader
         eyebrow="Core Dashboard Builder 2.0"
         title={dictionary.admin.title}
@@ -216,7 +230,7 @@ export default async function AdminPage({
           : dictionary.admin.warning}
       </AdminNotice>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <AdminMetricStrip className="xl:grid-cols-4 2xl:grid-cols-8">
         {metrics.map(({ Icon, label, value, tone, trend }) => (
           <AdminMetricCard
             key={label}
@@ -227,9 +241,60 @@ export default async function AdminPage({
             trend={<AdminTrendBadge direction="flat" tone={tone}>{trend}</AdminTrendBadge>}
           />
         ))}
-      </div>
+      </AdminMetricStrip>
 
-      <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
+      <AdminWorkspaceGrid
+        rail={
+          <AdminActionRail
+            title={locale === "it" ? "Code operative" : "待处理队列"}
+            description={locale === "it" ? "Priorita live" : "当前优先级"}
+          >
+            <AdminPanel contentClassName="p-2">
+              <div className="space-y-2">
+                <QueueRow
+                  icon={ShieldAlert}
+                  label={locale === "it" ? "Pagamenti" : "待确认付款"}
+                  value={dashboard.pendingPaymentCount}
+                  href={localizePath(locale, "/admin/orders?filter=pending_payment")}
+                />
+                <QueueRow
+                  icon={Warehouse}
+                  label={locale === "it" ? "Preorder" : "待分配预购"}
+                  value={dashboard.preorderAllocationCount}
+                  href={localizePath(locale, "/admin/orders?filter=preorder")}
+                />
+                <QueueRow
+                  icon={UsersRound}
+                  label={locale === "it" ? "B2B review" : "待审核 B2B"}
+                  value={dashboard.pendingB2BCount}
+                  href={localizePath(locale, "/admin/b2b")}
+                />
+                <QueueRow
+                  icon={TicketCheck}
+                  label={locale === "it" ? "RMA" : "待处理 RMA"}
+                  value={dashboard.openRmaCount}
+                  href={localizePath(locale, "/admin/rma")}
+                />
+              </div>
+              <TrendSnapshot values={metrics.slice(0, 6).map((item) => Number(item.value.replace(/\D/g, "")) || 1)} />
+            </AdminPanel>
+            <AdminPanel title={locale === "it" ? "Azioni rapide" : "快捷入口"} contentClassName="grid gap-2 p-2">
+              <AdminButtonLink href={localizePath(locale, "/admin/products")}>
+                {locale === "it" ? "Prodotti" : "商品"}
+              </AdminButtonLink>
+              <AdminButtonLink href={localizePath(locale, "/admin/inventory")} variant="secondary">
+                {locale === "it" ? "Inventario" : "库存"}
+              </AdminButtonLink>
+              <AdminButtonLink href={localizePath(locale, "/admin/customers")} variant="secondary">
+                {locale === "it" ? "Clienti CRM" : "客户管理"}
+              </AdminButtonLink>
+              <AdminButtonLink href="/api/admin/health" variant="secondary">
+                API health
+              </AdminButtonLink>
+            </AdminPanel>
+          </AdminActionRail>
+        }
+      >
         <AdminPanel
           title={locale === "it" ? "Moduli operativi" : "运营模块"}
           description={
@@ -238,21 +303,21 @@ export default async function AdminPage({
               : "按 Figma 中 Product、Income、Customer、System 模式整理的后台入口。"
           }
         >
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {modules.map(({ Icon, title, description, href, tone }) => (
               <a
                 key={title}
-                className="group grid grid-cols-[auto_1fr] gap-3 rounded-lg border border-black/5 bg-stone-50 p-4 text-sm transition hover:border-black/10 hover:bg-white"
+                className="group grid grid-cols-[auto_1fr] gap-2 rounded-lg border border-black/5 bg-stone-50 p-3 text-xs transition hover:border-black/10 hover:bg-white"
                 href={href}
               >
-                <span className={`rounded-lg p-2 ${tone}`}>
-                  <Icon className="h-5 w-5" />
+                <span className={`rounded-md p-1.5 ${tone}`}>
+                  <Icon className="h-4 w-4" />
                 </span>
                 <span className="min-w-0">
                   <span className="block font-black text-stone-950 group-hover:underline">
                     {title}
                   </span>
-                  <span className="mt-1 block text-sm font-medium leading-5 text-stone-500">
+                  <span className="mt-1 block text-xs font-semibold leading-4 text-stone-500">
                     {description}
                   </span>
                 </span>
@@ -260,44 +325,7 @@ export default async function AdminPage({
             ))}
           </div>
         </AdminPanel>
-
-        <AdminPanel
-          title={locale === "it" ? "Code operative" : "待处理队列"}
-          description={
-            locale === "it"
-              ? "Le aree con urgenza piu alta restano in evidenza."
-              : "高优先级事项保持可见。"
-          }
-        >
-          <div className="space-y-3">
-            <QueueRow
-              icon={ShieldAlert}
-              label={locale === "it" ? "Pagamenti in sospeso" : "待确认付款"}
-              value={dashboard.pendingPaymentCount}
-              href={localizePath(locale, "/admin/orders?filter=pending_payment")}
-            />
-            <QueueRow
-              icon={Warehouse}
-              label={locale === "it" ? "Preorder da allocare" : "待分配预购"}
-              value={dashboard.preorderAllocationCount}
-              href={localizePath(locale, "/admin/orders?filter=preorder")}
-            />
-            <QueueRow
-              icon={UsersRound}
-              label={locale === "it" ? "Clienti B2B da rivedere" : "待审核 B2B"}
-              value={dashboard.pendingB2BCount}
-              href={localizePath(locale, "/admin/b2b")}
-            />
-            <QueueRow
-              icon={TicketCheck}
-              label={locale === "it" ? "RMA aperti" : "待处理 RMA"}
-              value={dashboard.openRmaCount}
-              href={localizePath(locale, "/admin/rma")}
-            />
-          </div>
-          <TrendSnapshot values={metrics.slice(0, 6).map((item) => Number(item.value.replace(/\D/g, "")) || 1)} />
-        </AdminPanel>
-      </div>
+      </AdminWorkspaceGrid>
     </div>
   );
 }
@@ -316,15 +344,15 @@ function QueueRow({
   return (
     <a
       href={href}
-      className="flex items-center justify-between gap-3 rounded-lg border border-black/5 bg-stone-50 px-3 py-3 transition hover:border-black/10 hover:bg-white"
+      className="flex items-center justify-between gap-2 rounded-lg border border-black/5 bg-stone-50 px-2 py-2 transition hover:border-black/10 hover:bg-white"
     >
-      <span className="flex min-w-0 items-center gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-stone-600 shadow-sm">
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white text-stone-600 shadow-sm">
           <Icon className="h-4 w-4" />
         </span>
-        <span className="truncate text-sm font-black text-stone-800">{label}</span>
+        <span className="truncate text-xs font-black text-stone-800">{label}</span>
       </span>
-      <span className="rounded-md bg-stone-950 px-2 py-1 text-sm font-black text-white">
+      <span className="rounded-md bg-stone-950 px-2 py-1 text-xs font-black text-white">
         {value}
       </span>
     </a>
@@ -335,7 +363,7 @@ function TrendSnapshot({ values }: Readonly<{ values: number[] }>) {
   const max = Math.max(...values, 1);
 
   return (
-    <div className="mt-5 flex h-28 items-end gap-2 rounded-lg bg-stone-50 p-3">
+    <div className="mt-3 flex h-20 items-end gap-1.5 rounded-lg bg-stone-50 p-2">
       {values.map((value, index) => (
         <span
           key={index}
