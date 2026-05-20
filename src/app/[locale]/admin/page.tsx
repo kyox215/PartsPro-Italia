@@ -30,6 +30,11 @@ export default async function AdminPage({
       : {
           orderCount: 0,
           pendingPaymentCount: 0,
+          pendingCashCount: 0,
+          pendingBankTransferCount: 0,
+          pendingCardCount: 0,
+          expiringReservationCount: 0,
+          preorderAllocationCount: 0,
           pendingB2BCount: 0,
           openRmaCount: 0,
           preorderIncomingTotal: 0,
@@ -49,8 +54,18 @@ export default async function AdminPage({
     },
     {
       Icon: ClipboardList,
-      label: locale === "it" ? "Bonifici pending" : "待付款订单",
-      value: String(dashboard.pendingPaymentCount),
+      label: locale === "it" ? "Contanti / bonifici" : "现金/转账待收",
+      value: `${dashboard.pendingCashCount} / ${dashboard.pendingBankTransferCount}`,
+    },
+    {
+      Icon: ClipboardList,
+      label: locale === "it" ? "Stripe / lock" : "Stripe/锁库临期",
+      value: `${dashboard.pendingCardCount} / ${dashboard.expiringReservationCount}`,
+    },
+    {
+      Icon: Warehouse,
+      label: locale === "it" ? "Preorder da allocare" : "待分配预购",
+      value: String(dashboard.preorderAllocationCount),
     },
     {
       Icon: Warehouse,

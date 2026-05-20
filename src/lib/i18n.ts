@@ -68,7 +68,7 @@ export const dictionaries = {
     checkout: {
       title: "Checkout MVP",
       subtitle:
-        "Questo flusso prepara ordine, pagamento Stripe o bonifico bancario. Le chiavi reali vanno impostate su Vercel.",
+        "Questo flusso crea ordini con carta Stripe, contanti o bonifico. Le chiavi reali vanno impostate su Vercel.",
       customer: "Dati cliente",
       company: "Dati fattura",
       payment: "Pagamento",
@@ -167,7 +167,7 @@ export const dictionaries = {
     checkout: {
       title: "MVP 结账流程",
       subtitle:
-        "此流程用于创建订单，并支持 Stripe 付款或银行转账。真实密钥需要在 Vercel 环境变量中配置。",
+        "此流程用于创建订单，支持 Stripe 银行卡、现金和银行转账。真实密钥需要在 Vercel 环境变量中配置。",
       customer: "客户资料",
       company: "发票资料",
       payment: "付款方式",

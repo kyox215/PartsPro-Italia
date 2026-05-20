@@ -57,14 +57,25 @@ export default async function AccountOrderDetailPage({
         <MetricCard label={locale === "it" ? "Stato" : "订单状态"} value={order.status} />
         <MetricCard
           label={locale === "it" ? "Pagamento" : "付款方式"}
-          value={order.paymentMethod}
+          value={`${order.paymentMethod} / ${order.paymentStatus ?? "-"}`}
         />
         <MetricCard label={locale === "it" ? "Totale" : "订单总额"} value={formatMoney(order.total, locale)} />
         <MetricCard
           label={locale === "it" ? "Fulfilment" : "履约拆分"}
-          value={`${stockQty} stock / ${preorderQty} preorder`}
+          value={`${stockQty} stock / ${preorderQty} preorder / ${order.fulfillmentStatus ?? "-"}`}
         />
       </section>
+
+      {order.reservationExpiresAt && order.paymentStatus !== "paid" ? (
+        <section className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          {locale === "it" ? "Stock riservato fino a" : "库存锁定到"}{" "}
+          <strong>
+            {new Date(order.reservationExpiresAt).toLocaleString(
+              locale === "it" ? "it-IT" : "zh-CN",
+            )}
+          </strong>
+        </section>
+      ) : null}
 
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="border-b border-slate-200 px-5 py-4">

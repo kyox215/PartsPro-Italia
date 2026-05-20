@@ -7,6 +7,7 @@ const requiredProductionKeys = [
   "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
   "STRIPE_WEBHOOK_SECRET",
   "ADMIN_EMAIL",
+  "CRON_SECRET",
 ] as const;
 
 export type RequiredProductionKey = (typeof requiredProductionKeys)[number];

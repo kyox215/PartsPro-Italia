@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const paymentMethodSchema = z.enum(["stripe", "bank_transfer"]);
+export const paymentMethodSchema = z.enum(["stripe", "cash", "bank_transfer"]);
 
 export const orderSchema = z.object({
   locale: z.enum(["it", "zh"]).default("it"),
@@ -158,6 +158,26 @@ export const adminOrderStatusSchema = z.object({
     "refunded",
   ]),
   locale: z.enum(["it", "zh"]).default("it"),
+});
+
+export const adminOrderPaymentSchema = z.object({
+  id: z.string().min(1),
+  action: z.enum(["confirm_cash", "confirm_bank_transfer"]),
+  locale: z.enum(["it", "zh"]).default("it"),
+  returnTo: z.string().optional().or(z.literal("")),
+});
+
+export const adminOrderFulfillmentSchema = z.object({
+  id: z.string().min(1),
+  action: z.enum(["start_picking", "mark_shipped", "mark_picked_up", "complete"]),
+  locale: z.enum(["it", "zh"]).default("it"),
+  returnTo: z.string().optional().or(z.literal("")),
+});
+
+export const adminOrderWorkflowSchema = z.object({
+  id: z.string().min(1),
+  locale: z.enum(["it", "zh"]).default("it"),
+  returnTo: z.string().optional().or(z.literal("")),
 });
 
 export const adminB2BStatusSchema = z.object({

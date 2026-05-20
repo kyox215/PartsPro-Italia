@@ -8,9 +8,13 @@ import {
 export type AccountOrderRow = {
   id: string;
   status: string;
+  paymentStatus?: string | null;
+  fulfillmentStatus?: string | null;
   paymentMethod: string;
   total: number;
   currency: string;
+  reservationExpiresAt?: string | null;
+  paidAt?: string | null;
   createdAt: string;
   items: Array<{
     sku: string;
@@ -53,9 +57,13 @@ export async function getAccountActivity(
         {
           id: "demo-order-1001",
           status: "pending_payment",
+          paymentStatus: "pending_bank_transfer",
+          fulfillmentStatus: "awaiting_preorder",
           paymentMethod: "bank_transfer",
           total: 519.24,
           currency: "EUR",
+          reservationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          paidAt: null,
           createdAt: new Date().toISOString(),
           items: [
             {
@@ -105,7 +113,7 @@ export async function getAccountActivity(
     supabase
       .from("orders")
       .select(
-        "id, status, payment_method, total, currency, created_at, order_items (*)",
+        "id, status, payment_status, fulfillment_status, payment_method, total, currency, reservation_expires_at, paid_at, created_at, order_items (*)",
       )
       .eq("profile_id", auth.user.id)
       .order("created_at", { ascending: false })
@@ -148,7 +156,7 @@ export async function getAccountOrderById(
   const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase
     .from("orders")
-    .select("id, status, payment_method, total, currency, created_at, order_items (*)")
+    .select("id, status, payment_status, fulfillment_status, payment_method, total, currency, reservation_expires_at, paid_at, created_at, order_items (*)")
     .eq("profile_id", auth.user.id)
     .eq("id", orderId)
     .maybeSingle();
@@ -193,9 +201,13 @@ export async function getAccountRmaById(
 function mapAccountOrder(order: {
   id: string;
   status: string;
+  payment_status?: string | null;
+  fulfillment_status?: string | null;
   payment_method: string;
   total: number | string | null;
   currency: string | null;
+  reservation_expires_at?: string | null;
+  paid_at?: string | null;
   created_at: string;
   order_items?: Array<{
     sku: string;
@@ -212,9 +224,13 @@ function mapAccountOrder(order: {
   return {
     id: order.id,
     status: order.status,
+    paymentStatus: order.payment_status ?? null,
+    fulfillmentStatus: order.fulfillment_status ?? null,
     paymentMethod: order.payment_method,
     total: Number(order.total ?? 0),
     currency: order.currency ?? "EUR",
+    reservationExpiresAt: order.reservation_expires_at ?? null,
+    paidAt: order.paid_at ?? null,
     createdAt: order.created_at,
     items: (order.order_items ?? []).map((item) => ({
       sku: item.sku,

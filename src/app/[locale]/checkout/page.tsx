@@ -1,10 +1,16 @@
-import { CreditCard, Landmark } from "lucide-react";
+import { cookies } from "next/headers";
+import { Banknote, CreditCard, Landmark } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
+import {
+  checkoutCartCookieName,
+  decodeCheckoutCart,
+} from "@/lib/checkout-cart-cookie";
 import { loadCheckoutLines } from "@/lib/checkout-lines";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { localizePath } from "@/lib/i18n";
 import { formatMoney } from "@/lib/pricing";
+import { hasStripeConfig } from "@/lib/stripe";
 
 export default async function CheckoutPage({
   params,
@@ -17,10 +23,15 @@ export default async function CheckoutPage({
   const query = (await searchParams) ?? {};
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "it";
   const dictionary = getDictionary(locale);
+  const cookieStore = await cookies();
   const selectedItems = itemsFromSearchParams(query);
-  const checkout = await loadCheckoutLines({ locale, items: selectedItems });
+  const checkoutItems = selectedItems.length
+    ? selectedItems
+    : decodeCheckoutCart(cookieStore.get(checkoutCartCookieName)?.value);
+  const checkout = await loadCheckoutLines({ locale, items: checkoutItems });
   const error = valueOf(query.error);
   const cartLines = checkout.lines;
+  const stripeReady = hasStripeConfig();
   const itemsJson = JSON.stringify(
     cartLines.map((line) => ({ sku: line.sku, quantity: line.quantity })),
   );
@@ -49,8 +60,22 @@ export default async function CheckoutPage({
             {locale === "it"
               ? "Accedi per vedere prezzi e creare preordini."
               : "请先登录，才能查看价格并创建预购订单。"}
-            <ButtonLink href={localizePath(locale, "/login")} className="mt-4 w-fit">
+            <ButtonLink
+              href={`${localizePath(locale, "/login")}?next=${encodeURIComponent(localizePath(locale, "/checkout"))}`}
+              className="mt-4 w-fit"
+            >
               {locale === "it" ? "Login" : "登录"}
+            </ButtonLink>
+          </div>
+        ) : null}
+
+        {!checkout.requiresLogin && cartLines.length === 0 ? (
+          <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-6 text-sm text-slate-700">
+            {locale === "it"
+              ? "Il carrello checkout e vuoto. Torna al catalogo e aggiungi SKU."
+              : "当前没有可结账商品。请返回商品目录加入商品。"}
+            <ButtonLink href={localizePath(locale, "/products")} className="mt-4 w-fit">
+              {locale === "it" ? "Catalogo" : "商品目录"}
             </ButtonLink>
           </div>
         ) : null}
@@ -77,9 +102,34 @@ export default async function CheckoutPage({
 
           <Fieldset title={dictionary.checkout.payment as string}>
             <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-4">
-              <input name="paymentMethod" type="radio" value="stripe" defaultChecked />
+              <input
+                name="paymentMethod"
+                type="radio"
+                value="stripe"
+                defaultChecked={stripeReady}
+                disabled={!stripeReady}
+              />
               <CreditCard className="h-5 w-5 text-blue-600" />
-              <span className="font-semibold">{dictionary.checkout.stripe}</span>
+              <span className="font-semibold">
+                {dictionary.checkout.stripe}
+                {!stripeReady ? (
+                  <span className="ml-2 text-xs text-slate-500">
+                    {locale === "it" ? "non configurato" : "未配置"}
+                  </span>
+                ) : null}
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-4">
+              <input
+                name="paymentMethod"
+                type="radio"
+                value="cash"
+                defaultChecked={!stripeReady}
+              />
+              <Banknote className="h-5 w-5 text-orange-600" />
+              <span className="font-semibold">
+                {locale === "it" ? "Contanti alla consegna/ritiro" : "现金支付（到店/送货）"}
+              </span>
             </label>
             <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-4">
               <input name="paymentMethod" type="radio" value="bank_transfer" />

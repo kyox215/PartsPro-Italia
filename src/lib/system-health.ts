@@ -95,6 +95,12 @@ const envKeys: EnvCheck[] = [
     scope: "server",
     required: true,
   },
+  {
+    key: "CRON_SECRET",
+    configured: Boolean(process.env.CRON_SECRET),
+    scope: "server",
+    required: true,
+  },
 ];
 
 const publicTables = ["brands", "categories", "products", "skus"] as const;

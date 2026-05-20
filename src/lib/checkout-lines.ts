@@ -108,15 +108,16 @@ export async function loadCheckoutLines({
     }
   }
 
-  const fallbackItems = items.length
-    ? items
-    : [
-        { sku: products[0].sku, quantity: 5 },
-        { sku: products[1].sku, quantity: 10 },
-      ];
+  if (items.length === 0) {
+    return {
+      lines: [],
+      requiresLogin: false,
+      isSupabaseBacked: false,
+    };
+  }
 
   return {
-    lines: fallbackItems.flatMap((item) => {
+    lines: items.flatMap((item) => {
       const product = products.find((candidate) => candidate.sku === item.sku);
       if (!product) return [];
       const totals = calculateLineTotal(product, item.quantity, useB2BPrice);

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { AlertTriangle, CheckCircle2, Lock, ShoppingCart } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Lock } from "lucide-react";
+import { QuantityAddToCart } from "@/components/cart/add-to-cart-button";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { products } from "@/lib/catalog";
@@ -143,24 +144,33 @@ export default async function ProductDetailPage({
         </div>
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          {detail.isPriceVisible ? (
-            <ButtonLink
-              href={`${localizePath(locale, "/checkout")}?sku=${encodeURIComponent(item.sku)}&qty=${item.moq}`}
-              className="flex-1"
-            >
-              <ShoppingCart className="h-4 w-4" />
-              {(item.availableStock ?? 0) > 0
-                ? dictionary.common.addToCart
-                : locale === "it"
-                  ? "Preordina"
-                  : "预购"}
-            </ButtonLink>
-          ) : (
-            <ButtonLink href={localizePath(locale, "/login")} className="flex-1">
-              <Lock className="h-4 w-4" />
-              {locale === "it" ? "Login per ordinare" : "登录后下单"}
-            </ButtonLink>
-          )}
+          <div className="flex-1">
+            <QuantityAddToCart
+              sku={item.sku}
+              minQuantity={item.moq}
+              label={
+                detail.isPriceVisible && (item.availableStock ?? 0) <= 0
+                  ? locale === "it"
+                    ? "Preordina"
+                    : "预购"
+                  : (dictionary.common.addToCart as string)
+              }
+              addedLabel={locale === "it" ? "Aggiunto" : "已加入购物车"}
+              disabled={
+                detail.isPriceVisible &&
+                (item.availableStock ?? 0) <= 0 &&
+                (item.incomingAvailable ?? item.incomingQty ?? 0) <= 0
+              }
+            />
+            {!detail.isPriceVisible ? (
+              <p className="mt-2 text-xs font-semibold text-amber-700">
+                <Lock className="mr-1 inline h-3.5 w-3.5" />
+                {locale === "it"
+                  ? "Puoi aggiungere al carrello; il checkout richiede login."
+                  : "可先加入购物车；结账时需要登录。"}
+              </p>
+            ) : null}
+          </div>
           <ButtonLink href={localizePath(locale, "/b2b")} variant="secondary">
             {dictionary.common.requestB2b}
           </ButtonLink>

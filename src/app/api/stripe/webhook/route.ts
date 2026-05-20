@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { markOrderPaid, releaseOrderReservations } from "@/lib/order-workflow";
 import { getStripe, hasStripeConfig } from "@/lib/stripe";
-import { getSupabaseAdminClient, hasSupabaseAdminConfig } from "@/lib/supabase/admin";
+import { hasSupabaseAdminConfig } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
@@ -40,15 +41,31 @@ export async function POST(request: Request) {
     const orderId = session.metadata?.orderId ?? session.client_reference_id;
 
     if (orderId && hasSupabaseAdminConfig()) {
-      const supabase = getSupabaseAdminClient();
-      await supabase
-        .from("orders")
-        .update({
-          status: "paid",
-          stripe_checkout_session_id: session.id,
-          paid_at: new Date().toISOString(),
-        })
-        .eq("id", orderId);
+      await markOrderPaid({
+        orderId,
+        stripeCheckoutSessionId: session.id,
+        note: "Stripe checkout completed",
+      });
+    }
+  }
+
+  if (
+    event.type === "checkout.session.expired" ||
+    event.type === "checkout.session.async_payment_failed"
+  ) {
+    const session = event.data.object;
+    const orderId = session.metadata?.orderId ?? session.client_reference_id;
+
+    if (orderId && hasSupabaseAdminConfig()) {
+      await releaseOrderReservations({
+        orderId,
+        paymentStatus: "failed",
+        status: "cancelled",
+        note:
+          event.type === "checkout.session.expired"
+            ? "Stripe checkout expired"
+            : "Stripe async payment failed",
+      });
     }
   }
 

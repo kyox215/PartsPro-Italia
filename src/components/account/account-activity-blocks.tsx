@@ -124,7 +124,12 @@ export function AccountOrdersTable({
                   ))}
                 </ul>
               </td>
-              <td className="px-4 py-3 text-slate-700">{order.paymentMethod}</td>
+              <td className="px-4 py-3 text-slate-700">
+                <p className="font-semibold">{order.paymentMethod}</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {order.paymentStatus ?? "-"}
+                </p>
+              </td>
               <td className="px-4 py-3 font-bold text-slate-950">
                 {formatMoney(order.total, locale)}
               </td>
@@ -132,6 +137,11 @@ export function AccountOrdersTable({
                 <Badge className="border-slate-300 bg-slate-100 text-slate-800">
                   {order.status}
                 </Badge>
+                {order.fulfillmentStatus ? (
+                  <p className="mt-2 text-xs font-semibold text-slate-500">
+                    {order.fulfillmentStatus}
+                  </p>
+                ) : null}
               </td>
               <td className="px-4 py-3">
                 <ButtonLink

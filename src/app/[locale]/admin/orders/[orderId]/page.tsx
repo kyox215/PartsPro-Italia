@@ -77,13 +77,13 @@ export default async function AdminOrderDetailPage({
         <MetricCard label={locale === "it" ? "Stato" : "状态"} value={order.status} />
         <MetricCard
           label={locale === "it" ? "Pagamento" : "付款"}
-          value={order.paymentMethod}
+          value={`${order.paymentMethod} / ${order.paymentStatus ?? "-"}`}
         />
         <MetricCard label={locale === "it" ? "Totale" : "总额"} value={formatMoney(order.total, locale)} />
         <MetricCard label={locale === "it" ? "Stock" : "现货履约"} value={String(stockQty)} />
         <MetricCard
           label={locale === "it" ? "Preorder" : "预购履约"}
-          value={String(preorderQty)}
+          value={`${preorderQty} / ${order.fulfillmentStatus ?? "-"}`}
         />
       </section>
 
@@ -130,8 +130,118 @@ export default async function AdminOrderDetailPage({
             <p className="mt-2">
               IVA/VAT: <strong>{formatMoney(order.vat ?? 0, locale)}</strong>
             </p>
+            {order.reservationExpiresAt ? (
+              <p className="mt-2">
+                {locale === "it" ? "Lock fino a" : "锁库到"}:{" "}
+                <strong>
+                  {new Date(order.reservationExpiresAt).toLocaleString(
+                    locale === "it" ? "it-IT" : "zh-CN",
+                  )}
+                </strong>
+              </p>
+            ) : null}
           </div>
         </article>
+      </section>
+
+      <section className="rounded-lg border border-slate-200 bg-white p-5">
+        <h2 className="text-lg font-bold text-slate-950">
+          {locale === "it" ? "Azioni operative" : "订单闭环操作"}
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          {locale === "it"
+            ? "Conferma incasso, assegna preorder arrivati, prepara, spedisce o annulla liberando lo stock."
+            : "用于确认收款、分配已到货预购、备货、发货/自提完成，或取消并释放锁定库存。"}
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {order.paymentMethod === "cash" && order.paymentStatus === "pending_cash" ? (
+            <ActionForm
+              action="/api/admin/orders/payment"
+              id={order.id}
+              locale={locale}
+              returnTo={returnTo}
+              value="confirm_cash"
+            >
+              {locale === "it" ? "Conferma contanti" : "确认现金收款"}
+            </ActionForm>
+          ) : null}
+          {order.paymentMethod === "bank_transfer" &&
+          order.paymentStatus === "pending_bank_transfer" ? (
+            <ActionForm
+              action="/api/admin/orders/payment"
+              id={order.id}
+              locale={locale}
+              returnTo={returnTo}
+              value="confirm_bank_transfer"
+            >
+              {locale === "it" ? "Conferma bonifico" : "确认转账到账"}
+            </ActionForm>
+          ) : null}
+          <ActionForm
+            action="/api/admin/orders/fulfillment"
+            id={order.id}
+            locale={locale}
+            returnTo={returnTo}
+            value="start_picking"
+          >
+            {locale === "it" ? "Inizia picking" : "开始备货"}
+          </ActionForm>
+          {preorderQty > 0 ? (
+            <ActionForm
+              action="/api/admin/orders/allocate-preorders"
+              id={order.id}
+              locale={locale}
+              returnTo={returnTo}
+            >
+              {locale === "it" ? "Alloca preorder" : "分配预购到货"}
+            </ActionForm>
+          ) : null}
+          <ActionForm
+            action="/api/admin/orders/fulfillment"
+            id={order.id}
+            locale={locale}
+            returnTo={returnTo}
+            value="mark_shipped"
+          >
+            {locale === "it" ? "Segna spedito" : "标记发货"}
+          </ActionForm>
+          <ActionForm
+            action="/api/admin/orders/fulfillment"
+            id={order.id}
+            locale={locale}
+            returnTo={returnTo}
+            value="mark_picked_up"
+          >
+            {locale === "it" ? "Ritiro completato" : "已自提完成"}
+          </ActionForm>
+          <ActionForm
+            action="/api/admin/orders/fulfillment"
+            id={order.id}
+            locale={locale}
+            returnTo={returnTo}
+            value="complete"
+          >
+            {locale === "it" ? "Completa" : "完成订单"}
+          </ActionForm>
+          <ActionForm
+            action="/api/admin/orders/extend-reservation"
+            id={order.id}
+            locale={locale}
+            returnTo={returnTo}
+            variant="secondary"
+          >
+            {locale === "it" ? "Estendi 24h" : "延长锁库 24 小时"}
+          </ActionForm>
+          <ActionForm
+            action="/api/admin/orders/release"
+            id={order.id}
+            locale={locale}
+            returnTo={returnTo}
+            variant="danger"
+          >
+            {locale === "it" ? "Annulla e libera" : "取消并释放库存"}
+          </ActionForm>
+        </div>
       </section>
 
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -216,6 +326,46 @@ function InfoRow({
       <dt className="font-semibold text-slate-500">{label}</dt>
       <dd className="break-words text-slate-900">{value}</dd>
     </div>
+  );
+}
+
+function ActionForm({
+  action,
+  id,
+  locale,
+  returnTo,
+  value,
+  variant = "primary",
+  children,
+}: Readonly<{
+  action: string;
+  id: string;
+  locale: Locale;
+  returnTo: string;
+  value?: string;
+  variant?: "primary" | "secondary" | "danger";
+  children: React.ReactNode;
+}>) {
+  const className =
+    variant === "danger"
+      ? "border-rose-200 bg-rose-50 text-rose-700 hover:border-rose-300"
+      : variant === "secondary"
+        ? "border-slate-300 bg-white text-slate-900 hover:border-blue-300 hover:text-blue-700"
+        : "border-blue-600 bg-blue-600 text-white hover:bg-blue-700";
+
+  return (
+    <form action={action} method="post">
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="locale" value={locale} />
+      <input type="hidden" name="returnTo" value={returnTo} />
+      {value ? <input type="hidden" name="action" value={value} /> : null}
+      <button
+        className={`inline-flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-bold transition ${className}`}
+        type="submit"
+      >
+        {children}
+      </button>
+    </form>
   );
 }
 

@@ -7,6 +7,8 @@ import {
 export type AdminOrderRow = {
   id: string;
   status: string;
+  paymentStatus?: string | null;
+  fulfillmentStatus?: string | null;
   paymentMethod: string;
   email: string | null;
   customerName: string | null;
@@ -20,6 +22,12 @@ export type AdminOrderRow = {
   vat?: number;
   total: number;
   currency: string;
+  reservationExpiresAt?: string | null;
+  releasedAt?: string | null;
+  paidAt?: string | null;
+  cancelledAt?: string | null;
+  fulfilledAt?: string | null;
+  adminNote?: string | null;
   createdAt: string;
   items: Array<{
     sku: string;
@@ -64,6 +72,8 @@ export async function getAdminOrderRows(): Promise<AdminOrderRow[]> {
       {
         id: "demo-order-1001",
         status: "pending_payment",
+        paymentStatus: "pending_bank_transfer",
+        fulfillmentStatus: "awaiting_preorder",
         paymentMethod: "bank_transfer",
         email: "riparatore@example.it",
         customerName: "Marco Rossi",
@@ -74,6 +84,12 @@ export async function getAdminOrderRows(): Promise<AdminOrderRow[]> {
         vat: 93.63,
         total: 519.24,
         currency: "EUR",
+        reservationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        releasedAt: null,
+        paidAt: null,
+        cancelledAt: null,
+        fulfilledAt: null,
+        adminNote: null,
         createdAt: new Date().toISOString(),
         items: [
           {
@@ -258,6 +274,23 @@ export async function getAdminDashboardMetrics() {
     orderCount: orders.length,
     pendingPaymentCount: orders.filter((order) => order.status === "pending_payment")
       .length,
+    pendingCashCount: orders.filter((order) => order.paymentStatus === "pending_cash")
+      .length,
+    pendingBankTransferCount: orders.filter(
+      (order) => order.paymentStatus === "pending_bank_transfer",
+    ).length,
+    pendingCardCount: orders.filter((order) => order.paymentStatus === "pending_card")
+      .length,
+    expiringReservationCount: orders.filter((order) => {
+      if (!order.reservationExpiresAt || order.releasedAt || order.paymentStatus === "paid") {
+        return false;
+      }
+      const expiresAt = new Date(order.reservationExpiresAt).getTime();
+      return expiresAt <= Date.now() + 6 * 60 * 60 * 1000;
+    }).length,
+    preorderAllocationCount: orders.filter(
+      (order) => order.fulfillmentStatus === "awaiting_preorder",
+    ).length,
     pendingB2BCount: b2bApplications.filter((item) => item.status === "pending")
       .length,
     openRmaCount: rmas.filter((item) => item.status !== "completed").length,
@@ -295,6 +328,8 @@ async function getPreorderIncomingTotal() {
 function mapAdminOrder(order: {
   id: string;
   status: string;
+  payment_status?: string | null;
+  fulfillment_status?: string | null;
   payment_method: string;
   email: string | null;
   customer_name: string | null;
@@ -308,6 +343,12 @@ function mapAdminOrder(order: {
   vat?: number | string | null;
   total: number | string | null;
   currency: string | null;
+  reservation_expires_at?: string | null;
+  released_at?: string | null;
+  paid_at?: string | null;
+  cancelled_at?: string | null;
+  fulfilled_at?: string | null;
+  admin_note?: string | null;
   created_at: string;
   order_items?: Array<{
     sku: string;
@@ -324,6 +365,8 @@ function mapAdminOrder(order: {
   return {
     id: order.id,
     status: order.status,
+    paymentStatus: order.payment_status ?? null,
+    fulfillmentStatus: order.fulfillment_status ?? null,
     paymentMethod: order.payment_method,
     email: order.email,
     customerName: order.customer_name,
@@ -337,6 +380,12 @@ function mapAdminOrder(order: {
     vat: Number(order.vat ?? 0),
     total: Number(order.total ?? 0),
     currency: order.currency ?? "EUR",
+    reservationExpiresAt: order.reservation_expires_at ?? null,
+    releasedAt: order.released_at ?? null,
+    paidAt: order.paid_at ?? null,
+    cancelledAt: order.cancelled_at ?? null,
+    fulfilledAt: order.fulfilled_at ?? null,
+    adminNote: order.admin_note ?? null,
     createdAt: order.created_at,
     items: (order.order_items ?? []).map((item) => ({
       sku: item.sku,

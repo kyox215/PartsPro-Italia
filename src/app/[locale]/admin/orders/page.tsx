@@ -30,6 +30,8 @@ export default async function AdminOrdersPage({
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "it";
   const auth = await getAuthContext();
   const orders = !auth.configured || auth.isAdmin ? await getAdminOrderRows() : [];
+  const filter = valueOf(query.filter) ?? "all";
+  const visibleOrders = filterAdminOrders(orders, filter);
   const saved = valueOf(query.saved);
   const error = valueOf(query.error);
 
@@ -56,6 +58,57 @@ export default async function AdminOrdersPage({
         </div>
       </section>
 
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <OrderMetric
+          label={locale === "it" ? "Contanti da incassare" : "待收现金"}
+          value={orders.filter((order) => order.paymentStatus === "pending_cash").length}
+        />
+        <OrderMetric
+          label={locale === "it" ? "Bonifici da confermare" : "待确认转账"}
+          value={
+            orders.filter((order) => order.paymentStatus === "pending_bank_transfer")
+              .length
+          }
+        />
+        <OrderMetric
+          label={locale === "it" ? "Stripe pending" : "Stripe 待支付"}
+          value={orders.filter((order) => order.paymentStatus === "pending_card").length}
+        />
+        <OrderMetric
+          label={locale === "it" ? "Preorder da allocare" : "待分配预购"}
+          value={
+            orders.filter((order) => order.fulfillmentStatus === "awaiting_preorder")
+              .length
+          }
+        />
+        <OrderMetric
+          label={locale === "it" ? "Lock in scadenza" : "即将过期锁库"}
+          value={orders.filter(isReservationExpiringSoon).length}
+        />
+      </section>
+
+      <nav className="flex flex-wrap gap-2">
+        {[
+          ["all", locale === "it" ? "Tutti" : "全部"],
+          ["pending_payment", locale === "it" ? "Da pagare" : "待付款"],
+          ["paid", locale === "it" ? "Pagati" : "已付款"],
+          ["preorder", locale === "it" ? "Preorder" : "预购待分配"],
+          ["processing", locale === "it" ? "In lavorazione" : "处理中"],
+          ["shipped", locale === "it" ? "Spediti" : "已发货"],
+          ["completed", locale === "it" ? "Completati" : "已完成"],
+          ["cancelled", locale === "it" ? "Annullati" : "已取消"],
+        ].map(([value, label]) => (
+          <ButtonLink
+            key={value}
+            href={`${localizePath(locale, "/admin/orders")}${value === "all" ? "" : `?filter=${value}`}`}
+            variant={filter === value ? "dark" : "secondary"}
+            className="h-9 px-3 text-xs"
+          >
+            {label}
+          </ButtonLink>
+        ))}
+      </nav>
+
       <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-left text-sm">
@@ -71,7 +124,7 @@ export default async function AdminOrdersPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {orders.map((order) => (
+              {visibleOrders.map((order) => (
                 <tr key={order.id}>
                   <td className="px-4 py-3">
                     <p className="font-mono text-xs font-bold text-slate-900">
@@ -102,7 +155,12 @@ export default async function AdminOrdersPage({
                       ))}
                     </ul>
                   </td>
-                  <td className="px-4 py-3 text-slate-700">{order.paymentMethod}</td>
+                  <td className="px-4 py-3 text-slate-700">
+                    <p className="font-semibold">{order.paymentMethod}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {order.paymentStatus ?? "-"}
+                    </p>
+                  </td>
                   <td className="px-4 py-3 font-bold text-slate-950">
                     {formatMoney(order.total, locale)}
                   </td>
@@ -114,6 +172,11 @@ export default async function AdminOrdersPage({
                       locale={locale}
                       statuses={orderStatuses}
                     />
+                    {order.fulfillmentStatus ? (
+                      <p className="mt-2 text-xs font-semibold text-slate-500">
+                        {order.fulfillmentStatus}
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3">
                     <ButtonLink
@@ -186,6 +249,55 @@ function Feedback({
           : "状态已更新。"}
     </div>
   );
+}
+
+function OrderMetric({
+  label,
+  value,
+}: Readonly<{ label: string; value: number }>) {
+  return (
+    <article className="rounded-lg border border-slate-200 bg-white p-4">
+      <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
+      <p className="mt-2 text-2xl font-bold text-slate-950">{value}</p>
+    </article>
+  );
+}
+
+function filterAdminOrders(
+  orders: Awaited<ReturnType<typeof getAdminOrderRows>>,
+  filter: string,
+) {
+  if (filter === "pending_payment") {
+    return orders.filter((order) =>
+      ["pending_card", "pending_cash", "pending_bank_transfer"].includes(
+        order.paymentStatus ?? "",
+      ),
+    );
+  }
+  if (filter === "paid") return orders.filter((order) => order.paymentStatus === "paid");
+  if (filter === "preorder") {
+    return orders.filter((order) => order.fulfillmentStatus === "awaiting_preorder");
+  }
+  if (filter === "processing") {
+    return orders.filter((order) => order.status === "processing");
+  }
+  if (filter === "shipped") return orders.filter((order) => order.status === "shipped");
+  if (filter === "completed") {
+    return orders.filter((order) => order.status === "completed");
+  }
+  if (filter === "cancelled") {
+    return orders.filter((order) => order.status === "cancelled");
+  }
+  return orders;
+}
+
+function isReservationExpiringSoon(
+  order: Awaited<ReturnType<typeof getAdminOrderRows>>[number],
+) {
+  if (!order.reservationExpiresAt || order.releasedAt || order.paymentStatus === "paid") {
+    return false;
+  }
+  return new Date(order.reservationExpiresAt).getTime() <= Date.now() + 6 * 60 * 60 * 1000;
 }
 
 function valueOf(value: string | string[] | undefined) {

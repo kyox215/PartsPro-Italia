@@ -4,10 +4,10 @@ import {
   ChevronRight,
   Lock,
   PackageSearch,
-  ShoppingCart,
   SlidersHorizontal,
   X,
 } from "lucide-react";
+import { AddToCartButton } from "@/components/cart/add-to-cart-button";
 import { Badge } from "@/components/ui/badge";
 import {
   catalogStateToParams,
@@ -450,7 +450,7 @@ function CatalogProductCard({
 }>) {
   const available = item.availableStock ?? 0;
   const incoming = item.incomingAvailable ?? item.incomingQty ?? 0;
-  const canOrder = isPriceVisible && (available > 0 || incoming > 0);
+  const canOrder = !isPriceVisible || available > 0 || incoming > 0;
   const detailHref = localizePath(locale, `/products/${item.slug}`);
 
   return (
@@ -530,19 +530,24 @@ function CatalogProductCard({
 
       <div className="mt-auto pt-3">
         {canOrder ? (
-          <Link
-            href={checkoutHref(locale, item)}
-            className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-blue-600 bg-blue-600 px-3 text-sm font-bold text-white hover:bg-blue-700"
-          >
-            <ShoppingCart className="h-4 w-4" />
-            {available > 0
+          <AddToCartButton
+            sku={item.sku}
+            quantity={item.moq}
+            addedLabel={locale === "it" ? "Aggiunto" : "已加入"}
+            label={
+              !isPriceVisible
+                ? locale === "it"
+                  ? "Aggiungi"
+                  : "加入购物车"
+                : available > 0
               ? locale === "it"
-                ? "Ordina"
-                : "下单"
-              : locale === "it"
-                ? "Preordina"
-                : "预购"}
-          </Link>
+                  ? "Aggiungi"
+                  : "加入购物车"
+                : locale === "it"
+                  ? "Preordina"
+                  : "预购"
+            }
+          />
         ) : isPriceVisible ? (
           <span className="inline-flex h-9 w-full items-center justify-center rounded-lg border border-slate-200 bg-slate-100 px-3 text-sm font-bold text-slate-400">
             {locale === "it" ? "Non disponibile" : "暂不可下单"}
@@ -735,12 +740,4 @@ function facetOptionHref(
 function productsHref(locale: Locale, params: URLSearchParams) {
   const query = params.toString();
   return `${localizePath(locale, "/products")}${query ? `?${query}` : ""}`;
-}
-
-function checkoutHref(locale: Locale, item: CatalogItem) {
-  const params = new URLSearchParams({
-    sku: item.sku,
-    qty: String(item.moq),
-  });
-  return `${localizePath(locale, "/checkout")}?${params.toString()}`;
 }
