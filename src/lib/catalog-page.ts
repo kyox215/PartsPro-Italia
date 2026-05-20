@@ -73,9 +73,18 @@ export type CatalogFacet = {
   options: CatalogFacetOption[];
 };
 
+export type BrandModelGroup = {
+  value: string;
+  label: string;
+  count: number;
+  active: boolean;
+  models: CatalogFacetOption[];
+};
+
 export type CatalogPageData = {
   items: CatalogItem[];
   facets: CatalogFacet[];
+  brandModelGroups: BrandModelGroup[];
   total: number;
   page: number;
   pageSize: number;
@@ -155,6 +164,10 @@ type CatalogQueryBuilder = {
     error: Error | null;
     count: number | null;
   }>;
+};
+
+type CatalogFilterOptions = {
+  includeDevice?: boolean;
 };
 
 export async function loadCatalogPage({
@@ -333,7 +346,23 @@ async function loadSupabaseCatalogPage(
 
   if (facetError) throw facetError;
 
+  const deviceQuery = applyCatalogFilters(
+    selectCatalogView(supabase, viewName),
+    state,
+    isPriceVisible,
+    attrSkuIds,
+    { includeDevice: false },
+  );
+  applySort(deviceQuery, "brand_asc", isPriceVisible);
+  const { data: deviceData, error: deviceError } = await deviceQuery.range(
+    0,
+    maxFacetRows - 1,
+  );
+
+  if (deviceError) throw deviceError;
+
   const facetRows = (facetData ?? []) as CatalogRow[];
+  const deviceRows = (deviceData ?? []) as CatalogRow[];
   const rows = (data ?? []) as CatalogRow[];
   const attributeRows = await loadAttributeRows(facetRows.map((row) => row.sku_id));
   const total = count ?? rows.length;
@@ -341,6 +370,7 @@ async function loadSupabaseCatalogPage(
   return {
     items: rows.map((row) => mapCatalogRow(row, locale, isPriceVisible)),
     facets: buildFacets(facetRows, attributeRows, locale, state, isPriceVisible),
+    brandModelGroups: buildBrandModelGroups(deviceRows, state),
     total,
     page: state.page,
     pageSize,
@@ -402,11 +432,14 @@ function applyCatalogFilters(
   state: CatalogSearchState,
   isPriceVisible: boolean,
   attrSkuIds: Set<string> | null,
+  options: CatalogFilterOptions = {},
 ) {
   let nextQuery = query;
 
-  if (state.brand) nextQuery = query.eq("brand", state.brand);
-  if (state.model) nextQuery = nextQuery.eq("model", state.model);
+  if (options.includeDevice !== false) {
+    if (state.brand) nextQuery = query.eq("brand", state.brand);
+    if (state.model) nextQuery = nextQuery.eq("model", state.model);
+  }
   if (state.category) nextQuery = nextQuery.eq("category", state.category);
   if (state.quality) nextQuery = nextQuery.eq("quality_grade", state.quality);
 
@@ -497,6 +530,9 @@ function loadLocalCatalogPage(
   isPriceVisible: boolean,
 ): CatalogPageData {
   const filtered = products.filter((product) => matchesLocalProduct(product, state));
+  const deviceRows = products
+    .filter((product) => matchesLocalProduct(product, state, { includeDevice: false }))
+    .map((product) => localProductToCatalogRow(product));
   const sorted = sortLocalProducts(filtered, state.sort, isPriceVisible);
   const offset = (state.page - 1) * pageSize;
   const pageItems = sorted.slice(offset, offset + pageSize);
@@ -504,6 +540,7 @@ function loadLocalCatalogPage(
   return {
     items: pageItems.map((product) => mapLocalProduct(product, locale, isPriceVisible)),
     facets: buildLocalFacets(filtered, state, locale, isPriceVisible),
+    brandModelGroups: buildBrandModelGroups(deviceRows, state),
     total: filtered.length,
     page: state.page,
     pageSize,
@@ -522,18 +559,6 @@ function buildFacets(
   isPriceVisible: boolean,
 ) {
   const facets: CatalogFacet[] = [
-    {
-      key: "brand",
-      label: locale === "it" ? "Brand" : "品牌",
-      kind: "single",
-      options: countOptions(rows, "brand", state.brand),
-    },
-    {
-      key: "model",
-      label: locale === "it" ? "Modello" : "型号",
-      kind: "single",
-      options: countOptions(rows, "model", state.model),
-    },
     {
       key: "category",
       label: locale === "it" ? "Categoria" : "品类",
@@ -568,31 +593,49 @@ function buildLocalFacets(
   locale: Locale,
   isPriceVisible: boolean,
 ) {
-  const rows = filtered.map((product) => ({
-    sku_id: product.sku,
-    product_id: product.slug,
-    slug: product.slug,
-    sku: product.sku,
-    barcode_ean13: null,
-    brand: product.brand,
-    model: product.model,
-    category: product.category,
-    category_name_it: product.category,
-    category_name_zh: product.category,
-    quality_grade: product.quality,
-    name_it: product.names.it,
-    name_zh: product.names.zh,
-    moq: product.moq,
-    available_stock: product.stock,
-    incoming_qty: product.incoming ?? 0,
-    incoming_reserved: 0,
-    incoming_available: product.incoming ?? 0,
-    preorder_lead_time_min_days: 7,
-    preorder_lead_time_max_days: 14,
-    is_preorderable: (product.incoming ?? 0) > 0,
-  }));
+  const rows = filtered.map((product) => localProductToCatalogRow(product));
 
   return buildFacets(rows, [], locale, state, isPriceVisible);
+}
+
+function buildBrandModelGroups(
+  rows: CatalogRow[],
+  state: CatalogSearchState,
+): BrandModelGroup[] {
+  const grouped = new Map<
+    string,
+    {
+      count: number;
+      models: Map<string, number>;
+    }
+  >();
+
+  rows.forEach((row) => {
+    if (!row.brand) return;
+    const group = grouped.get(row.brand) ?? { count: 0, models: new Map() };
+    group.count += 1;
+    if (row.model) {
+      group.models.set(row.model, (group.models.get(row.model) ?? 0) + 1);
+    }
+    grouped.set(row.brand, group);
+  });
+
+  return [...grouped.entries()]
+    .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
+    .map(([brand, group]) => ({
+      value: brand,
+      label: brand,
+      count: group.count,
+      active: state.brand === brand,
+      models: [...group.models.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .map(([model, count]) => ({
+          value: model,
+          label: model,
+          count,
+          active: state.brand === brand && state.model === model,
+        })),
+    }));
 }
 
 function buildAttributeFacets(
@@ -788,7 +831,37 @@ function mapLocalProduct(
   };
 }
 
-function matchesLocalProduct(product: Product, state: CatalogSearchState) {
+function localProductToCatalogRow(product: Product): CatalogRow {
+  return {
+    sku_id: product.sku,
+    product_id: product.slug,
+    slug: product.slug,
+    sku: product.sku,
+    barcode_ean13: null,
+    brand: product.brand,
+    model: product.model,
+    category: product.category,
+    category_name_it: product.category,
+    category_name_zh: product.category,
+    quality_grade: product.quality,
+    name_it: product.names.it,
+    name_zh: product.names.zh,
+    moq: product.moq,
+    available_stock: product.stock,
+    incoming_qty: product.incoming ?? 0,
+    incoming_reserved: 0,
+    incoming_available: product.incoming ?? 0,
+    preorder_lead_time_min_days: 7,
+    preorder_lead_time_max_days: 14,
+    is_preorderable: (product.incoming ?? 0) > 0,
+  };
+}
+
+function matchesLocalProduct(
+  product: Product,
+  state: CatalogSearchState,
+  options: CatalogFilterOptions = {},
+) {
   const q = sanitizeSearchTerm(state.q);
   const matchesQuery =
     !q ||
@@ -800,8 +873,8 @@ function matchesLocalProduct(product: Product, state: CatalogSearchState) {
 
   return (
     matchesQuery &&
-    (!state.brand || product.brand === state.brand) &&
-    (!state.model || product.model === state.model) &&
+    (options.includeDevice === false || !state.brand || product.brand === state.brand) &&
+    (options.includeDevice === false || !state.model || product.model === state.model) &&
     (!state.category || product.category === state.category) &&
     (!state.quality || product.quality === state.quality)
   );

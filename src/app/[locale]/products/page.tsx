@@ -111,8 +111,11 @@ export default async function ProductsPage({
 
           {catalog.items.length > 0 ? (
             <>
-              <DesktopCatalogTable items={catalog.items} locale={locale} catalog={catalog} />
-              <MobileCatalogCards items={catalog.items} locale={locale} catalog={catalog} />
+              <CatalogProductCardGrid
+                items={catalog.items}
+                locale={locale}
+                catalog={catalog}
+              />
               <Pagination catalog={catalog} locale={locale} />
             </>
           ) : (
@@ -158,6 +161,11 @@ function FilterPanel({
           {locale === "it" ? "Reset" : "清空"}
         </Link>
       </div>
+
+      <DeviceMenu catalog={catalog} locale={locale} />
+
+      <input type="hidden" name="brand" value={catalog.state.brand} />
+      <input type="hidden" name="model" value={catalog.state.model} />
 
       <label className="mt-4 grid gap-2 text-xs font-bold uppercase text-slate-500">
         {locale === "it" ? "Cerca modello o SKU" : "搜索型号或 SKU"}
@@ -228,6 +236,119 @@ function FilterPanel({
         {locale === "it" ? "Applica filtri" : "应用筛选"}
       </button>
     </form>
+  );
+}
+
+function DeviceMenu({
+  catalog,
+  locale,
+}: Readonly<{ catalog: CatalogPageData; locale: Locale }>) {
+  if (catalog.brandModelGroups.length === 0) return null;
+
+  return (
+    <section className="mt-5 border-t border-slate-200 pt-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-bold text-slate-950">
+          {locale === "it" ? "Brand & Model" : "选择设备"}
+        </h3>
+        {(catalog.state.brand || catalog.state.model) ? (
+          <Link
+            href={productsHref(
+              locale,
+              catalogStateToParams(catalog.state, {
+                brand: "",
+                model: "",
+                page: 1,
+              }),
+            )}
+            className="text-xs font-bold text-blue-700 hover:text-blue-900"
+          >
+            {locale === "it" ? "Tutti" : "全部"}
+          </Link>
+        ) : null}
+      </div>
+
+      <div className="mt-3 max-h-[420px] space-y-1 overflow-auto pr-1">
+        {catalog.brandModelGroups.map((group, index) => {
+          const expanded = group.active || (!catalog.state.brand && index === 0);
+
+          return (
+            <div key={group.value} className="rounded-lg">
+              <Link
+                href={productsHref(
+                  locale,
+                  catalogStateToParams(catalog.state, {
+                    brand: group.value,
+                    model: "",
+                    page: 1,
+                  }),
+                )}
+                aria-current={group.active ? "true" : undefined}
+                className={cn(
+                  "grid min-h-10 grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold transition",
+                  group.active
+                    ? "bg-blue-50 text-blue-800 ring-1 ring-blue-200"
+                    : "text-slate-700 hover:bg-slate-50 hover:text-blue-700",
+                )}
+              >
+                <span className="truncate">{group.label}</span>
+                <span className="rounded-md bg-white px-1.5 py-0.5 text-xs font-semibold text-slate-500 ring-1 ring-slate-200">
+                  {group.count}
+                </span>
+                <ChevronRight
+                  className={cn(
+                    "h-3.5 w-3.5 text-slate-400 transition",
+                    expanded && "rotate-90 text-blue-500",
+                  )}
+                />
+              </Link>
+
+              {expanded && group.models.length > 0 ? (
+                <div className="ml-3 mt-1 space-y-1 border-l border-slate-200 pl-2">
+                  {group.models.slice(0, 18).map((model) => (
+                    <Link
+                      key={model.value}
+                      href={productsHref(
+                        locale,
+                        catalogStateToParams(catalog.state, {
+                          brand: group.value,
+                          model: model.value,
+                          page: 1,
+                        }),
+                      )}
+                      aria-current={model.active ? "true" : undefined}
+                      className={cn(
+                        "grid min-h-9 grid-cols-[1fr_auto] items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition",
+                        model.active
+                          ? "bg-slate-900 font-bold text-white"
+                          : "text-slate-600 hover:bg-slate-50 hover:text-blue-700",
+                      )}
+                    >
+                      <span className="truncate">{model.label}</span>
+                      <span
+                        className={cn(
+                          "rounded-md px-1.5 py-0.5 text-xs font-semibold",
+                          model.active
+                            ? "bg-white/15 text-white"
+                            : "bg-slate-100 text-slate-500",
+                        )}
+                      >
+                        {model.count}
+                      </span>
+                    </Link>
+                  ))}
+                  {group.models.length > 18 ? (
+                    <p className="px-2.5 py-1 text-xs font-semibold text-slate-400">
+                      +{group.models.length - 18}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -339,167 +460,133 @@ function ActiveChips({
   );
 }
 
-function DesktopCatalogTable({
+function CatalogProductCardGrid({
   items,
   locale,
   catalog,
 }: Readonly<{ items: CatalogItem[]; locale: Locale; catalog: CatalogPageData }>) {
   return (
-    <div className="mt-5 hidden overflow-hidden rounded-lg border border-slate-200 bg-white lg:block">
-      <table className="w-full min-w-[920px] text-left text-sm">
-        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-          <tr>
-            <th className="px-4 py-3">SKU</th>
-            <th className="px-4 py-3">{locale === "it" ? "Ricambio" : "配件"}</th>
-            <th className="px-4 py-3">Brand / Model</th>
-            <th className="px-4 py-3">{locale === "it" ? "Qualita" : "质量"}</th>
-            <th className="px-4 py-3">{locale === "it" ? "MOQ" : "起订"}</th>
-            {catalog.isPriceVisible ? (
-              <>
-                <th className="px-4 py-3">{locale === "it" ? "B2B" : "批发价"}</th>
-                <th className="px-4 py-3">{locale === "it" ? "Stock" : "库存"}</th>
-                <th className="px-4 py-3"></th>
-              </>
-            ) : null}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-200">
-          {items.map((item) => (
-            <tr key={item.skuId} className="hover:bg-slate-50">
-              <td className="px-4 py-4 align-top">
-                <Link
-                  href={localizePath(locale, `/products/${item.slug}`)}
-                  className="font-mono text-xs font-bold text-slate-900 hover:text-blue-700"
-                >
-                  {item.sku}
-                </Link>
-              </td>
-              <td className="px-4 py-4 align-top">
-                <Link
-                  href={localizePath(locale, `/products/${item.slug}`)}
-                  className="font-bold text-slate-950 hover:text-blue-700"
-                >
-                  {item.name}
-                </Link>
-                <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-600">
-                  {item.description}
-                </p>
-                {item.compatibility.length > 0 ? (
-                  <p className="mt-2 text-xs text-slate-500">
-                    {item.compatibility.slice(0, 3).join(" / ")}
-                  </p>
-                ) : null}
-              </td>
-              <td className="px-4 py-4 align-top text-slate-700">
-                <p className="font-semibold text-slate-900">{item.brand}</p>
-                <p className="text-xs text-slate-500">{item.model}</p>
-                <p className="mt-1 text-xs text-slate-500">{item.categoryLabel}</p>
-              </td>
-              <td className="px-4 py-4 align-top">
-                <Badge className="border-slate-200 bg-slate-50 text-slate-700">
-                  {item.quality}
-                </Badge>
-              </td>
-              <td className="px-4 py-4 align-top font-semibold text-slate-900">
-                {item.moq}
-              </td>
-              {catalog.isPriceVisible ? (
-                <>
-                  <td className="px-4 py-4 align-top">
-                    <p className="font-bold text-blue-700">
-                      {formatMoney(item.b2bPrice ?? 0, locale)}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {formatMoney(item.retailPrice ?? 0, locale)} retail
-                    </p>
-                  </td>
-                  <td className="px-4 py-4 align-top">
-                    <StockLabel item={item} locale={locale} />
-                  </td>
-                  <td className="px-4 py-4 align-top">
-                    <Link
-                      href={checkoutHref(locale, item)}
-                      className="inline-flex h-9 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-3 text-sm font-bold text-white hover:bg-blue-700"
-                    >
-                      <ShoppingCart className="h-4 w-4" />
-                    </Link>
-                  </td>
-                </>
-              ) : null}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {items.map((item) => (
+        <CatalogProductCard
+          key={item.skuId}
+          item={item}
+          locale={locale}
+          isPriceVisible={catalog.isPriceVisible}
+        />
+      ))}
     </div>
   );
 }
 
-function MobileCatalogCards({
-  items,
+function CatalogProductCard({
+  item,
   locale,
-  catalog,
-}: Readonly<{ items: CatalogItem[]; locale: Locale; catalog: CatalogPageData }>) {
+  isPriceVisible,
+}: Readonly<{ item: CatalogItem; locale: Locale; isPriceVisible: boolean }>) {
+  const available = item.availableStock ?? 0;
+  const incoming = item.incomingAvailable ?? item.incomingQty ?? 0;
+  const canOrder = isPriceVisible && (available > 0 || incoming > 0);
+  const detailHref = localizePath(locale, `/products/${item.slug}`);
+
   return (
-    <div className="mt-5 grid gap-3 lg:hidden">
-      {items.map((item) => (
-        <article key={item.skuId} className="rounded-lg border border-slate-200 bg-white p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="font-mono text-xs font-bold text-slate-500">{item.sku}</p>
-              <Link
-                href={localizePath(locale, `/products/${item.slug}`)}
-                className="mt-1 block text-base font-bold text-slate-950 hover:text-blue-700"
-              >
-                {item.name}
-              </Link>
-            </div>
-            <Badge className="shrink-0 border-slate-200 bg-slate-50 text-slate-700">
-              {item.quality}
-            </Badge>
+    <article className="flex h-full min-h-[310px] flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-100 transition hover:border-blue-200 hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <Link
+            href={detailHref}
+            className="font-mono text-xs font-bold text-slate-500 hover:text-blue-700"
+          >
+            {item.sku}
+          </Link>
+          <Link
+            href={detailHref}
+            className="mt-1 line-clamp-2 block max-h-12 min-h-12 overflow-hidden text-base font-bold leading-6 text-slate-950 hover:text-blue-700"
+          >
+            {item.name}
+          </Link>
+        </div>
+        <Badge className="shrink-0 border-slate-200 bg-slate-50 text-slate-700">
+          {item.quality}
+        </Badge>
+      </div>
+
+      <div className="mt-3 min-h-12 text-sm leading-6 text-slate-600">
+        <p className="font-semibold text-slate-800">{item.brand} / {item.model}</p>
+        <p className="text-xs text-slate-500">{item.categoryLabel}</p>
+      </div>
+
+      {item.compatibility.length > 0 ? (
+        <p className="mt-2 line-clamp-1 text-xs text-slate-500">
+          {locale === "it" ? "Compatibile" : "兼容"}:{" "}
+          {item.compatibility.slice(0, 3).join(" / ")}
+        </p>
+      ) : null}
+
+      <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 text-sm">
+        <div>
+          <p className="text-xs text-slate-500">MOQ</p>
+          <p className="font-bold text-slate-900">{item.moq}</p>
+        </div>
+        {isPriceVisible ? (
+          <div>
+            <p className="text-xs text-slate-500">{locale === "it" ? "B2B" : "批发价"}</p>
+            <p className="font-bold text-blue-700">
+              {formatMoney(item.b2bPrice ?? 0, locale)}
+            </p>
+            <p className="text-xs text-slate-500">
+              {formatMoney(item.retailPrice ?? 0, locale)}
+            </p>
           </div>
-          <p className="mt-2 text-sm text-slate-600">
-            {item.brand} / {item.model} / {item.categoryLabel}
-          </p>
-          <div className="mt-3 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 text-sm">
-            <div>
-              <p className="text-xs text-slate-500">MOQ</p>
-              <p className="font-bold text-slate-900">{item.moq}</p>
-            </div>
-            {catalog.isPriceVisible ? (
-              <>
-                <div>
-                  <p className="text-xs text-slate-500">{locale === "it" ? "B2B" : "批发价"}</p>
-                  <p className="font-bold text-blue-700">
-                    {formatMoney(item.b2bPrice ?? 0, locale)}
-                  </p>
-                </div>
-                <div className="col-span-2">
-                  <StockLabel item={item} locale={locale} />
-                </div>
-                <Link
-                  href={checkoutHref(locale, item)}
-                  className="col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-blue-600 bg-blue-600 px-3 text-sm font-bold text-white hover:bg-blue-700"
-                >
-                  <ShoppingCart className="h-4 w-4" />
-                  {item.availableStock && item.availableStock > 0
-                    ? locale === "it"
-                      ? "Ordina"
-                      : "下单"
-                    : locale === "it"
-                      ? "Preordina"
-                      : "预购"}
-                </Link>
-              </>
-            ) : (
-              <div>
-                <p className="text-xs text-slate-500">{locale === "it" ? "Prezzo" : "价格"}</p>
-                <p className="font-bold text-slate-500">{locale === "it" ? "Login" : "登录可见"}</p>
-              </div>
-            )}
+        ) : (
+          <div>
+            <p className="text-xs text-slate-500">{locale === "it" ? "Prezzo" : "价格"}</p>
+            <p className="font-bold text-slate-500">
+              {locale === "it" ? "Login" : "登录可见"}
+            </p>
           </div>
-        </article>
-      ))}
-    </div>
+        )}
+        <div className="col-span-2 border-t border-slate-200 pt-3">
+          {isPriceVisible ? (
+            <StockLabel item={item} locale={locale} />
+          ) : (
+            <p className="text-sm font-bold text-amber-700">
+              {locale === "it" ? "Login per prezzo e stock" : "登录查看价格/库存"}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-auto pt-4">
+        {canOrder ? (
+          <Link
+            href={checkoutHref(locale, item)}
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-blue-600 bg-blue-600 px-3 text-sm font-bold text-white hover:bg-blue-700"
+          >
+            <ShoppingCart className="h-4 w-4" />
+            {available > 0
+              ? locale === "it"
+                ? "Ordina"
+                : "下单"
+              : locale === "it"
+                ? "Preordina"
+                : "预购"}
+          </Link>
+        ) : isPriceVisible ? (
+          <span className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-slate-200 bg-slate-100 px-3 text-sm font-bold text-slate-400">
+            {locale === "it" ? "Non disponibile" : "暂不可下单"}
+          </span>
+        ) : (
+          <Link
+            href={localizePath(locale, "/login")}
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 text-sm font-bold text-amber-900 hover:border-amber-400"
+          >
+            <Lock className="h-4 w-4" />
+            {locale === "it" ? "Login per ordinare" : "登录后下单"}
+          </Link>
+        )}
+      </div>
+    </article>
   );
 }
 
