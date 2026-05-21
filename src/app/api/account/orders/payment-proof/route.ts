@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    await submitAccountOrderPaymentProof({
+    const result = await submitAccountOrderPaymentProof({
       orderId: parsed.data.id,
       user: auth.user,
       providerReference: parsed.data.providerReference,
@@ -41,6 +41,9 @@ export async function POST(request: Request) {
       proofLabel: parsed.data.proofLabel,
       note: parsed.data.note,
     });
+    if (result.orderNumber) {
+      redirectUrl.pathname = `/${locale}/account/orders/${encodeURIComponent(result.orderNumber)}`;
+    }
     redirectUrl.searchParams.set("saved", "payment-proof");
   } catch (error) {
     redirectUrl.searchParams.set(

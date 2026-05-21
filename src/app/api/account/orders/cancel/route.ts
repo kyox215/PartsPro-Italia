@@ -30,7 +30,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    await cancelAccountOrder({ orderId: parsed.data.id, user: auth.user });
+    const result = await cancelAccountOrder({ orderId: parsed.data.id, user: auth.user });
+    if (result.orderNumber) {
+      redirectUrl.pathname = `/${locale}/account/orders/${encodeURIComponent(result.orderNumber)}`;
+    }
     redirectUrl.searchParams.set("saved", "cancelled");
   } catch (error) {
     redirectUrl.searchParams.set(

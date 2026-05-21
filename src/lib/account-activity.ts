@@ -5,9 +5,11 @@ import {
   getSupabaseServerClient,
   hasSupabasePublicConfig,
 } from "@/lib/supabase/server";
+import { isUuid } from "@/lib/order-number";
 
 export type AccountOrderRow = {
   id: string;
+  orderNumber?: string | null;
   status: string;
   paymentStatus?: string | null;
   fulfillmentStatus?: string | null;
@@ -97,6 +99,7 @@ export async function getAccountActivity(
       orders: [
         {
           id: "demo-order-1001",
+          orderNumber: "PP-260521-0001",
           status: "pending_payment",
           paymentStatus: "pending_bank_transfer",
           fulfillmentStatus: "awaiting_preorder",
@@ -172,7 +175,7 @@ export async function getAccountActivity(
     supabase
       .from("orders")
       .select(
-        "id, status, payment_status, fulfillment_status, payment_method, total, refund_total, currency, reservation_expires_at, paid_at, created_at, order_items (*)",
+        "*, order_items (*)",
       )
       .eq("profile_id", auth.user.id)
       .order("created_at", { ascending: false })
@@ -201,11 +204,16 @@ export async function getAccountActivity(
 
 export async function getAccountOrderById(
   auth: AuthContext,
-  orderId: string,
+  orderIdOrNumber: string,
 ): Promise<AccountOrderRow | null> {
   if (!auth.configured) {
     const activity = await getAccountActivity(auth);
-    return activity.orders.find((order) => order.id === orderId) ?? null;
+    return (
+      activity.orders.find(
+        (order) =>
+          order.id === orderIdOrNumber || order.orderNumber === orderIdOrNumber,
+      ) ?? null
+    );
   }
 
   if (!auth.user || !hasSupabasePublicConfig()) {
@@ -213,12 +221,14 @@ export async function getAccountOrderById(
   }
 
   const supabase = await getSupabaseServerClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("orders")
-    .select("id, status, payment_status, fulfillment_status, payment_method, total, refund_total, currency, reservation_expires_at, paid_at, shipping_carrier, tracking_number, tracking_url, shipment_note, shipped_at, customer_note, created_at, order_items (*), order_payment_records (*), order_refunds (*), order_timeline_events (*)")
-    .eq("profile_id", auth.user.id)
-    .eq("id", orderId)
-    .maybeSingle();
+    .select("*, order_items (*), order_payment_records (*), order_refunds (*), order_timeline_events (*)")
+    .eq("profile_id", auth.user.id);
+  query = isUuid(orderIdOrNumber)
+    ? query.eq("id", orderIdOrNumber)
+    : query.eq("order_number", orderIdOrNumber);
+  const { data, error } = await query.maybeSingle();
 
   if (error) {
     console.error("Failed to load account order detail", error);
@@ -230,6 +240,7 @@ export async function getAccountOrderById(
 
 function mapAccountOrder(order: {
   id: string;
+  order_number?: string | null;
   status: string;
   payment_status?: string | null;
   fulfillment_status?: string | null;
@@ -293,6 +304,7 @@ function mapAccountOrder(order: {
 }): AccountOrderRow {
   return {
     id: order.id,
+    orderNumber: order.order_number ?? null,
     status: order.status,
     paymentStatus: order.payment_status ?? null,
     fulfillmentStatus: order.fulfillment_status ?? null,

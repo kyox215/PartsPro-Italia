@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { Boxes, ClipboardList, CreditCard, PackageCheck, RotateCcw, TimerReset } from "lucide-react";
 import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
+import { OrderSubnav } from "@/components/admin/order-subnav";
 import { StatusSelectForm } from "@/components/admin/status-select-form";
 import {
   AdminActionRail,
@@ -18,6 +19,7 @@ import { formatAdminStatus, type AdminStatusKind } from "@/lib/admin-display";
 import { getAdminOrderById } from "@/lib/admin-operations";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
+import { displayOrderNumber, orderRouteId, shortInternalOrderId } from "@/lib/order-number";
 import { formatMoney } from "@/lib/pricing";
 
 const orderStatuses = [
@@ -50,7 +52,7 @@ export default async function AdminOrderDetailPage({
     notFound();
   }
 
-  const returnTo = localizePath(locale, `/admin/orders/${order.id}`);
+  const returnTo = localizePath(locale, `/admin/orders/${orderRouteId(order)}`);
   const stockQty = order.items.reduce((sum, item) => sum + (item.stockQty ?? 0), 0);
   const preorderQty = order.items.reduce(
     (sum, item) => sum + (item.preorderQty ?? 0),
@@ -66,16 +68,24 @@ export default async function AdminOrderDetailPage({
     <div className="space-y-3">
       <AdminPageHeader
         eyebrow={locale === "it" ? "Order detail" : "订单详情"}
-        title={<span className="break-all font-mono">{order.id}</span>}
+        title={<span className="font-mono">{displayOrderNumber(order)}</span>}
         description={
-          locale === "it"
-            ? "Dettaglio operativo con pagamento, cliente, righe SKU e fulfilment stock/preorder."
-            : "后台订单处理详情，包含付款、客户、SKU 明细和现货/预购履约。"
+          <span>
+            {locale === "it"
+              ? "Dettaglio operativo con pagamento, cliente, righe SKU e fulfilment stock/preorder."
+              : "后台订单处理详情，包含付款、客户、SKU 明细和现货/预购履约。"}
+            <span className="mt-1 block font-mono text-[11px] text-stone-400">
+              {locale === "it" ? "ID interno" : "内部 ID"}: {shortInternalOrderId(order.id)}
+            </span>
+          </span>
         }
         actions={
           <>
             <AdminButtonLink href={localizePath(locale, "/admin/orders")} variant="secondary">
               {locale === "it" ? "Torna ordini" : "返回订单"}
+            </AdminButtonLink>
+            <AdminButtonLink href={localizePath(locale, "/admin/orders/payments")} variant="secondary">
+              {locale === "it" ? "Pagamenti" : "付款处理"}
             </AdminButtonLink>
             <AdminButtonLink href={localizePath(locale, "/admin/inventory")} variant="secondary">
               {locale === "it" ? "Inventario" : "库存"}
@@ -84,6 +94,7 @@ export default async function AdminOrderDetailPage({
         }
       />
       <Feedback saved={valueOf(query.saved)} error={valueOf(query.error)} locale={locale} />
+      <OrderSubnav active="overview" locale={locale} />
 
       <AdminMetricStrip className="md:grid-cols-2 xl:grid-cols-6">
         <AdminMetricCard icon={ClipboardList} label={locale === "it" ? "Stato" : "状态"} value={<StatusPill status={orderStatus.label} tone={orderStatus.tone} />} tone="blue" />

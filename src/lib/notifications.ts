@@ -38,7 +38,7 @@ export async function notifyOrderCustomer({
   const { data: order, error } = await supabase
     .from("orders")
     .select(
-      "id, profile_id, email, customer_name, status, payment_status, fulfillment_status, total, currency, shipping_carrier, tracking_number, tracking_url, customer_note",
+      "*",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -51,6 +51,7 @@ export async function notifyOrderCustomer({
     locale: normalizeLocale(locale),
     order: {
       id: order.id,
+      orderNumber: order.order_number,
       status: order.status,
       paymentStatus: order.payment_status,
       fulfillmentStatus: order.fulfillment_status,
@@ -203,6 +204,7 @@ function buildOrderNotification({
   locale: NotificationLocale;
   order: {
     id: string;
+    orderNumber?: string | null;
     status?: string | null;
     paymentStatus?: string | null;
     fulfillmentStatus?: string | null;
@@ -215,7 +217,8 @@ function buildOrderNotification({
   };
   metadata?: Record<string, unknown>;
 }) {
-  const url = `${getSiteUrl()}/${locale}/account/orders/${order.id}`;
+  const displayNumber = order.orderNumber || shortId(order.id);
+  const url = `${getSiteUrl()}/${locale}/account/orders/${encodeURIComponent(order.orderNumber || order.id)}`;
   const refundAmount =
     typeof metadata.refundAmount === "number" ? metadata.refundAmount : null;
   const refundCurrency =
@@ -224,60 +227,60 @@ function buildOrderNotification({
   if (locale === "zh") {
     if (type === "payment_paid") {
       return {
-        subject: `PartsPro 订单已确认收款 ${shortId(order.id)}`,
-        body: `您的订单已确认收款。\n\n订单：${order.id}\n金额：${order.total.toFixed(2)} ${order.currency}\n\n查看订单：${url}`,
+        subject: `PartsPro 订单已确认收款 ${displayNumber}`,
+        body: `您的订单已确认收款。\n\n订单：${displayNumber}\n金额：${order.total.toFixed(2)} ${order.currency}\n\n查看订单：${url}`,
       };
     }
     if (type === "shipment_updated") {
       return {
-        subject: `PartsPro 订单物流已更新 ${shortId(order.id)}`,
+        subject: `PartsPro 订单物流已更新 ${displayNumber}`,
         body: `您的订单物流信息已更新。\n\n物流公司：${order.shippingCarrier || "-"}\n物流单号：${order.trackingNumber || "-"}\n跟踪链接：${order.trackingUrl || "-"}\n${order.customerNote ? `\n备注：${order.customerNote}\n` : ""}\n查看订单：${url}`,
       };
     }
     if (type === "payment_proof_added") {
       return {
-        subject: `PartsPro 订单付款记录已更新 ${shortId(order.id)}`,
-        body: `您的订单付款记录已更新。\n\n订单：${order.id}\n付款状态：${order.paymentStatus || "-"}\n\n查看订单：${url}`,
+        subject: `PartsPro 订单付款记录已更新 ${displayNumber}`,
+        body: `您的订单付款记录已更新。\n\n订单：${displayNumber}\n付款状态：${order.paymentStatus || "-"}\n\n查看订单：${url}`,
       };
     }
     if (type === "refund_recorded") {
       return {
-        subject: `PartsPro 订单退款已更新 ${shortId(order.id)}`,
-        body: `您的订单退款记录已更新。\n\n订单：${order.id}\n退款金额：${refundAmount === null ? "-" : `${refundAmount.toFixed(2)} ${refundCurrency}`}\n付款状态：${order.paymentStatus || "-"}\n\n查看订单：${url}`,
+        subject: `PartsPro 订单退款已更新 ${displayNumber}`,
+        body: `您的订单退款记录已更新。\n\n订单：${displayNumber}\n退款金额：${refundAmount === null ? "-" : `${refundAmount.toFixed(2)} ${refundCurrency}`}\n付款状态：${order.paymentStatus || "-"}\n\n查看订单：${url}`,
       };
     }
     return {
-      subject: `PartsPro 订单状态已更新 ${shortId(order.id)}`,
+      subject: `PartsPro 订单状态已更新 ${displayNumber}`,
       body: `您的订单状态已更新。\n\n订单状态：${order.status || "-"}\n履约状态：${order.fulfillmentStatus || "-"}\n\n查看订单：${url}`,
     };
   }
 
   if (type === "payment_paid") {
     return {
-      subject: `PartsPro pagamento confermato ${shortId(order.id)}`,
-      body: `Abbiamo confermato il pagamento del tuo ordine.\n\nOrdine: ${order.id}\nTotale: ${order.total.toFixed(2)} ${order.currency}\n\nApri ordine: ${url}`,
+      subject: `PartsPro pagamento confermato ${displayNumber}`,
+      body: `Abbiamo confermato il pagamento del tuo ordine.\n\nOrdine: ${displayNumber}\nTotale: ${order.total.toFixed(2)} ${order.currency}\n\nApri ordine: ${url}`,
     };
   }
   if (type === "shipment_updated") {
     return {
-      subject: `PartsPro tracking aggiornato ${shortId(order.id)}`,
+      subject: `PartsPro tracking aggiornato ${displayNumber}`,
       body: `Il tracking del tuo ordine e stato aggiornato.\n\nCorriere: ${order.shippingCarrier || "-"}\nTracking: ${order.trackingNumber || "-"}\nLink: ${order.trackingUrl || "-"}\n${order.customerNote ? `\nNota: ${order.customerNote}\n` : ""}\nApri ordine: ${url}`,
     };
   }
   if (type === "payment_proof_added") {
     return {
-      subject: `PartsPro registro pagamento aggiornato ${shortId(order.id)}`,
-      body: `Il registro pagamento del tuo ordine e stato aggiornato.\n\nOrdine: ${order.id}\nStato pagamento: ${order.paymentStatus || "-"}\n\nApri ordine: ${url}`,
+      subject: `PartsPro registro pagamento aggiornato ${displayNumber}`,
+      body: `Il registro pagamento del tuo ordine e stato aggiornato.\n\nOrdine: ${displayNumber}\nStato pagamento: ${order.paymentStatus || "-"}\n\nApri ordine: ${url}`,
     };
   }
   if (type === "refund_recorded") {
     return {
-      subject: `PartsPro rimborso aggiornato ${shortId(order.id)}`,
-      body: `Il registro rimborso del tuo ordine e stato aggiornato.\n\nOrdine: ${order.id}\nImporto rimborso: ${refundAmount === null ? "-" : `${refundAmount.toFixed(2)} ${refundCurrency}`}\nStato pagamento: ${order.paymentStatus || "-"}\n\nApri ordine: ${url}`,
+      subject: `PartsPro rimborso aggiornato ${displayNumber}`,
+      body: `Il registro rimborso del tuo ordine e stato aggiornato.\n\nOrdine: ${displayNumber}\nImporto rimborso: ${refundAmount === null ? "-" : `${refundAmount.toFixed(2)} ${refundCurrency}`}\nStato pagamento: ${order.paymentStatus || "-"}\n\nApri ordine: ${url}`,
     };
   }
   return {
-    subject: `PartsPro stato ordine aggiornato ${shortId(order.id)}`,
+    subject: `PartsPro stato ordine aggiornato ${displayNumber}`,
     body: `Lo stato del tuo ordine e stato aggiornato.\n\nStato ordine: ${order.status || "-"}\nFulfilment: ${order.fulfillmentStatus || "-"}\n\nApri ordine: ${url}`,
   };
 }

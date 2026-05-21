@@ -27,6 +27,7 @@ import {
 import type { AuthContext } from "@/lib/auth";
 import type { Locale } from "@/lib/i18n";
 import { localizePath } from "@/lib/i18n";
+import { displayOrderNumber, orderRouteId } from "@/lib/order-number";
 import { formatMoney } from "@/lib/pricing";
 
 export function AccountMetricCards({
@@ -102,7 +103,7 @@ export function AccountTodoPanel({
         locale === "it"
           ? `${formatPaymentMethod(order.paymentMethod, locale)} / ${formatMoney(order.total, locale)}`
           : `${formatPaymentMethod(order.paymentMethod, locale)} / ${formatMoney(order.total, locale)}`,
-      href: localizePath(locale, `/account/orders/${order.id}`),
+      href: localizePath(locale, `/account/orders/${orderRouteId(order)}`),
       tone: "amber" as const,
     })),
     ...expiringReservations.slice(0, 2).map((order) => ({
@@ -111,21 +112,21 @@ export function AccountTodoPanel({
       description: order.reservationExpiresAt
         ? formatDateTime(order.reservationExpiresAt, locale)
         : "-",
-      href: localizePath(locale, `/account/orders/${order.id}`),
+      href: localizePath(locale, `/account/orders/${orderRouteId(order)}`),
       tone: "orange" as const,
     })),
     ...preorderOrders.slice(0, 2).map((order) => ({
       key: `preorder-${order.id}`,
       title: locale === "it" ? "Preorder in attesa" : "预购等待到货",
       description: formatFulfillmentStatus(order.fulfillmentStatus, locale).description,
-      href: localizePath(locale, `/account/orders/${order.id}`),
+      href: localizePath(locale, `/account/orders/${orderRouteId(order)}`),
       tone: "blue" as const,
     })),
     ...shippedOrders.slice(0, 2).map((order) => ({
       key: `shipment-${order.id}`,
       title: locale === "it" ? "Tracking disponibile" : "物流可查看",
-      description: order.trackingNumber ?? order.shippingCarrier ?? order.id,
-      href: localizePath(locale, `/account/orders/${order.id}`),
+      description: order.trackingNumber ?? order.shippingCarrier ?? displayOrderNumber(order),
+      href: localizePath(locale, `/account/orders/${orderRouteId(order)}`),
       tone: "blue" as const,
     })),
   ];
@@ -292,7 +293,7 @@ export function AccountOrdersTable({
           {orders.map((order) => (
             <tr key={order.id}>
               <td className="px-4 py-3">
-                <p className="font-mono text-xs font-bold text-slate-900">{order.id}</p>
+                <p className="font-mono text-xs font-bold text-slate-900">{displayOrderNumber(order)}</p>
                 <p className="mt-1 text-xs text-slate-500">
                   {new Date(order.createdAt).toLocaleString(
                     locale === "it" ? "it-IT" : "zh-CN",
@@ -340,7 +341,7 @@ export function AccountOrdersTable({
               </td>
               <td className="px-4 py-3">
                 <ButtonLink
-                  href={localizePath(locale, `/account/orders/${order.id}`)}
+                  href={localizePath(locale, `/account/orders/${orderRouteId(order)}`)}
                   variant="secondary"
                   className="h-9 px-3 text-xs"
                 >

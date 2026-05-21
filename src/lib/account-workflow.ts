@@ -13,6 +13,7 @@ type AccountAuthUser = {
 
 type OwnedOrder = {
   id: string;
+  order_number?: string | null;
   profile_id: string | null;
   status: string;
   payment_method: string;
@@ -41,7 +42,7 @@ export async function cancelAccountOrder({
     throw new Error("Paid orders cannot be cancelled from the account area.");
   }
   if (order.status === "cancelled") {
-    return { cancelled: true, alreadyCancelled: true };
+    return { cancelled: true, alreadyCancelled: true, orderNumber: order.order_number ?? null };
   }
   if (order.released_at) {
     throw new Error("This order reservation has already been released.");
@@ -55,7 +56,7 @@ export async function cancelAccountOrder({
     actorProfileId: user.id,
   });
 
-  return { cancelled: true, alreadyCancelled: false };
+  return { cancelled: true, alreadyCancelled: false, orderNumber: order.order_number ?? null };
 }
 
 export async function submitAccountOrderPaymentProof({
@@ -121,7 +122,7 @@ export async function submitAccountOrderPaymentProof({
     },
   });
 
-  return { submitted: true };
+  return { submitted: true, orderNumber: order.order_number ?? null };
 }
 
 export async function recordAccountOrderMessage({
@@ -148,7 +149,7 @@ export async function recordAccountOrderMessage({
     },
   });
 
-  return { recorded: true };
+  return { recorded: true, orderNumber: order.order_number ?? null };
 }
 
 export async function markAccountNotificationsRead({
@@ -178,7 +179,7 @@ export async function loadOwnedOrder(orderId: string, userId: string) {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, profile_id, status, payment_method, payment_status, fulfillment_status, total, currency, released_at, order_items ( sku, quantity, name )",
+      "*, order_items ( sku, quantity, name )",
     )
     .eq("id", orderId)
     .maybeSingle();

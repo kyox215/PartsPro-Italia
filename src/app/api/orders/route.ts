@@ -102,8 +102,9 @@ export async function POST(request: Request) {
   const vat = lines.reduce((sum, line) => sum + line.totals.vat, 0);
   const total = subtotal + vat;
 
+  let createdOrder: Awaited<ReturnType<typeof createSupabaseOrderWithReservations>>;
   try {
-    await createSupabaseOrderWithReservations({
+    createdOrder = await createSupabaseOrderWithReservations({
       supabase,
       orderId,
       profileId: auth.user.id,
@@ -137,13 +138,15 @@ export async function POST(request: Request) {
     );
   }
 
+  const orderNumber = createdOrder.order_number ?? orderId;
+
   if (paymentMethod === "stripe") {
     try {
       const stripe = getStripe();
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
-        success_url: `${getSiteUrl()}/${parsed.data.locale}/account/orders/${orderId}?checkout=success`,
-        cancel_url: `${getSiteUrl()}/${parsed.data.locale}/cart?checkout=cancelled&order=${orderId}`,
+        success_url: `${getSiteUrl()}/${parsed.data.locale}/account/orders/${encodeURIComponent(orderNumber)}?checkout=success`,
+        cancel_url: `${getSiteUrl()}/${parsed.data.locale}/cart?checkout=cancelled&order=${encodeURIComponent(orderNumber)}`,
         client_reference_id: orderId,
         customer_email: auth.user.email || undefined,
         line_items: lines.map((line) => ({
@@ -179,6 +182,7 @@ export async function POST(request: Request) {
 
       const response = NextResponse.json({
         orderId,
+        orderNumber,
         status: "checkout_created",
         checkoutUrl: session.url,
       });
@@ -202,6 +206,7 @@ export async function POST(request: Request) {
 
   const result = {
     orderId,
+    orderNumber,
     status: "pending_payment",
     paymentStatus: getPaymentStatus(paymentMethod),
     total,
@@ -213,7 +218,7 @@ export async function POST(request: Request) {
 
   if (wantsRedirect(request)) {
     const accountUrl = new URL(
-      `/${parsed.data.locale}/account/orders/${orderId}`,
+      `/${parsed.data.locale}/account/orders/${encodeURIComponent(orderNumber)}`,
       request.url,
     );
     accountUrl.searchParams.set("status", result.paymentStatus);

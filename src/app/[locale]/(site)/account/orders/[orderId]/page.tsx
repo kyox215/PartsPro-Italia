@@ -15,6 +15,7 @@ import {
 } from "@/lib/account-display";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
+import { displayOrderNumber, shortInternalOrderId } from "@/lib/order-number";
 import { formatMoney } from "@/lib/pricing";
 
 export default async function AccountOrderDetailPage({
@@ -56,8 +57,11 @@ export default async function AccountOrderDetailPage({
         <div className="mt-4 grid gap-5 lg:grid-cols-[1fr_auto] lg:items-start">
           <div className="min-w-0">
             <h1 className="break-all font-mono text-2xl font-bold text-slate-950">
-              {order.id}
+              {displayOrderNumber(order)}
             </h1>
+            <p className="mt-2 font-mono text-xs font-semibold text-slate-400">
+              {locale === "it" ? "ID interno" : "内部 ID"}: {shortInternalOrderId(order.id)}
+            </p>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               {locale === "it"
                 ? "Stato, pagamento, stock riservato, preorder e spedizione collegati a questo ordine."

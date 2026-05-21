@@ -36,6 +36,7 @@ import { getAdminCustomerDetail, type AdminCustomerDetail } from "@/lib/admin-cu
 import { hasAdminPermission, staffRoleLabels, staffRoleOptions } from "@/lib/admin-permissions";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
+import { displayOrderNumber, orderRouteId } from "@/lib/order-number";
 import { formatMoney } from "@/lib/pricing";
 
 export default async function AdminAccountCustomerDetailPage({
@@ -303,14 +304,14 @@ export default async function AdminAccountCustomerDetailPage({
               return (
                 <article key={order.id} className="grid gap-2 rounded-lg bg-stone-50 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
                   <div className="min-w-0">
-                    <p className="break-words font-mono text-xs font-black text-stone-900">{order.id}</p>
+                    <p className="break-words font-mono text-xs font-black text-stone-900">{displayOrderNumber(order)}</p>
                     <div className="mt-2 flex flex-wrap gap-1">
                       <StatusPill status={orderStatus.label} tone={orderStatus.tone} />
                       <StatusPill status={paymentStatus.label} tone={paymentStatus.tone} />
                       <StatusPill status={formatMoney(order.total, locale)} tone="slate" />
                     </div>
                   </div>
-                  <AdminButtonLink href={localizePath(locale, `/admin/orders/${order.id}`)} variant="secondary">
+                  <AdminButtonLink href={localizePath(locale, `/admin/orders/${orderRouteId(order)}`)} variant="secondary">
                     {locale === "it" ? "Apri" : "查看"}
                   </AdminButtonLink>
                 </article>
@@ -387,7 +388,7 @@ function buildTimeline(
     ...customer.orders.map((order) => ({
       id: `order-${order.id}`,
       title: locale === "it" ? "Ordine creato" : "订单创建",
-      body: `${order.id} / ${formatMoney(order.total, locale)}`,
+      body: `${displayOrderNumber(order)} / ${formatMoney(order.total, locale)}`,
       createdAt: order.createdAt,
     })),
   ].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));

@@ -4,9 +4,11 @@ import {
   getSupabaseAdminClient,
   hasSupabaseAdminConfig,
 } from "@/lib/supabase/admin";
+import { isUuid } from "@/lib/order-number";
 
 export type AdminOrderRow = {
   id: string;
+  orderNumber?: string | null;
   profileId?: string | null;
   status: string;
   paymentStatus?: string | null;
@@ -96,11 +98,27 @@ export type AdminOrderRow = {
   }>;
 };
 
+export type AdminOrderTimelineRow = {
+  id: string;
+  orderId: string;
+  orderNumber?: string | null;
+  eventType: string;
+  title: string;
+  body?: string | null;
+  actorProfileId?: string | null;
+  customerVisible?: boolean;
+  createdAt: string;
+  customerName?: string | null;
+  companyName?: string | null;
+  email?: string | null;
+};
+
 export async function getAdminOrderRows(): Promise<AdminOrderRow[]> {
   if (!hasSupabaseAdminConfig()) {
     return [
       {
         id: "demo-order-1001",
+        orderNumber: "PP-260521-0001",
         status: "pending_payment",
         profileId: "demo-profile",
         paymentStatus: "pending_bank_transfer",
@@ -256,19 +274,26 @@ export async function getAdminOrderRowsForCustomer({
 }
 
 export async function getAdminOrderById(
-  orderId: string,
+  orderIdOrNumber: string,
 ): Promise<AdminOrderRow | null> {
   if (!hasSupabaseAdminConfig()) {
     const rows = await getAdminOrderRows();
-    return rows.find((order) => order.id === orderId) ?? null;
+    return (
+      rows.find(
+        (order) =>
+          order.id === orderIdOrNumber || order.orderNumber === orderIdOrNumber,
+      ) ?? null
+    );
   }
 
   const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("orders")
-    .select("*, order_items (*), order_payment_records (*), order_refunds (*), order_timeline_events (*), notification_events (*)")
-    .eq("id", orderId)
-    .maybeSingle();
+    .select("*, order_items (*), order_payment_records (*), order_refunds (*), order_timeline_events (*), notification_events (*)");
+  query = isUuid(orderIdOrNumber)
+    ? query.eq("id", orderIdOrNumber)
+    : query.eq("order_number", orderIdOrNumber);
+  const { data, error } = await query.maybeSingle();
 
   if (error) {
     console.error("Failed to load admin order detail", error);
@@ -276,6 +301,54 @@ export async function getAdminOrderById(
   }
 
   return data ? mapAdminOrder(data) : null;
+}
+
+export async function getAdminOrderTimelineRows(
+  limit = 200,
+): Promise<AdminOrderTimelineRow[]> {
+  if (!hasSupabaseAdminConfig()) {
+    const orders = await getAdminOrderRows();
+    return orders.flatMap((order) =>
+      order.timelineEvents.map((event) => ({
+        ...event,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        companyName: order.companyName,
+        customerName: order.customerName,
+        email: order.email,
+      })),
+    );
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("order_timeline_events")
+    .select("id, order_id, event_type, title, body, actor_profile_id, customer_visible, created_at, orders (*)")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("Failed to load admin order timeline", error);
+    return [];
+  }
+
+  return (data ?? []).map((event) => {
+    const order = Array.isArray(event.orders) ? event.orders[0] : event.orders;
+    return {
+      id: event.id,
+      orderId: event.order_id,
+      orderNumber: order?.order_number ?? null,
+      eventType: event.event_type,
+      title: event.title,
+      body: event.body ?? null,
+      actorProfileId: event.actor_profile_id ?? null,
+      customerVisible: event.customer_visible ?? true,
+      createdAt: event.created_at,
+      customerName: order?.customer_name ?? null,
+      companyName: order?.company_name ?? null,
+      email: order?.email ?? null,
+    };
+  });
 }
 
 export async function getAdminDashboardMetrics() {
@@ -440,6 +513,7 @@ async function getPreorderIncomingTotal() {
 
 function mapAdminOrder(order: {
   id: string;
+  order_number?: string | null;
   profile_id?: string | null;
   status: string;
   payment_status?: string | null;
@@ -530,6 +604,7 @@ function mapAdminOrder(order: {
 }): AdminOrderRow {
   return {
     id: order.id,
+    orderNumber: order.order_number ?? null,
     profileId: order.profile_id ?? null,
     status: order.status,
     paymentStatus: order.payment_status ?? null,

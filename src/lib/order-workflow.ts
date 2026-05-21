@@ -341,6 +341,7 @@ export async function createSupabaseOrderWithReservations({
   if (error) throw new Error(error.message);
   return data as {
     order_id: string;
+    order_number?: string;
     subtotal: number;
     vat: number;
     total: number;

@@ -33,11 +33,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    await recordAccountOrderMessage({
+    const result = await recordAccountOrderMessage({
       orderId: parsed.data.id,
       user: auth.user,
       message: parsed.data.message,
     });
+    if (result.orderNumber) {
+      redirectUrl.pathname = `/${locale}/account/orders/${encodeURIComponent(result.orderNumber)}`;
+    }
     redirectUrl.searchParams.set("saved", "message");
   } catch (error) {
     redirectUrl.searchParams.set(

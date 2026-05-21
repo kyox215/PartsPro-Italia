@@ -89,6 +89,32 @@ export default async function AdminLayout({
       description: locale === "it" ? "Fulfilment e stati" : "履约与状态",
       icon: "clipboard",
       permission: "orders:write",
+      children: [
+        {
+          href: localizePath(locale, "/admin/orders"),
+          label: locale === "it" ? "Panoramica" : "订单总览",
+          icon: "clipboard",
+          permission: "orders:write",
+        },
+        {
+          href: localizePath(locale, "/admin/orders/payments"),
+          label: locale === "it" ? "Pagamenti" : "付款处理",
+          icon: "settings",
+          permission: "payments:confirm",
+        },
+        {
+          href: localizePath(locale, "/admin/orders/fulfillment"),
+          label: locale === "it" ? "Fulfilment" : "履约处理",
+          icon: "warehouse",
+          permission: "orders:write",
+        },
+        {
+          href: localizePath(locale, "/admin/orders/timeline"),
+          label: locale === "it" ? "Timeline" : "订单时间线",
+          icon: "activity",
+          permission: "orders:write",
+        },
+      ],
     },
     {
       href: localizePath(locale, "/admin/accounts"),
