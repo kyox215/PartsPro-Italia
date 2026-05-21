@@ -17,7 +17,7 @@ export default async function LoginPage({
   const next = valueOf(query.next) ?? "";
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-2 lg:px-8">
+    <div className="mx-auto grid max-w-3xl gap-6 px-4 py-8 sm:px-6 lg:px-8">
       <section className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
         <Badge className="border-blue-200 bg-blue-50 text-blue-700">Auth</Badge>
         <h1 className="mt-4 text-3xl font-bold text-slate-950">
@@ -85,12 +85,12 @@ export default async function LoginPage({
           {locale === "it" ? "Nuovo account" : "新账户"}
         </Badge>
         <h2 className="mt-4 text-2xl font-bold text-slate-950">
-          {locale === "it" ? "Crea account retail" : "创建零售账户"}
+          {locale === "it" ? "Crea account acquisti" : "创建采购账号"}
         </h2>
         <p className="mt-3 text-sm leading-6 text-slate-600">
           {locale === "it"
-            ? "Per prezzo wholesale invia la richiesta wholesale dopo la registrazione."
-            : "注册后如需批发价，请继续提交批发开户申请。"}
+            ? "Dopo la registrazione puoi completare dati aziendali, P.IVA e indirizzi nell'area account."
+            : "注册后进入账户中心，继续填写公司名称、P.IVA 和收货地址。"}
         </p>
         <form className="mt-6 grid gap-4" action="/api/auth/sign-up" method="post">
           <input type="hidden" name="locale" value={locale} />

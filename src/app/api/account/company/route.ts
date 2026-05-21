@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { saveAccountCompany } from "@/lib/account-company";
+import { getSafeAuthRedirect } from "@/lib/auth-redirect";
 import { getAuthContext } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
 import { accountCompanySchema } from "@/lib/validations";
@@ -10,6 +11,8 @@ export async function POST(request: Request) {
   const rawBody = await parseRequestBody(request);
   const locale = rawBody.locale === "zh" ? "zh" : "it";
   const backUrl = new URL(`/${locale}/account/company`, request.url);
+  const next = String(rawBody.next ?? "");
+  if (next) backUrl.searchParams.set("next", next);
   const parsed = accountCompanySchema.safeParse(rawBody);
 
   if (!parsed.success) {
@@ -36,9 +39,9 @@ export async function POST(request: Request) {
     return NextResponse.redirect(backUrl, 303);
   }
 
-  backUrl.searchParams.set(
-    "saved",
-    result.demoMode ? "demo" : parsed.data.intent === "submitB2B" ? "b2b" : "1",
-  );
-  return NextResponse.redirect(backUrl, 303);
+  const destination = next
+    ? new URL(getSafeAuthRedirect(next, locale), request.url)
+    : backUrl;
+  destination.searchParams.set("saved", result.demoMode ? "demo" : "1");
+  return NextResponse.redirect(destination, 303);
 }

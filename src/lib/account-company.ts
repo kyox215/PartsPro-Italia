@@ -3,10 +3,6 @@ import {
   getSupabaseServerClient,
   hasSupabasePublicConfig,
 } from "@/lib/supabase/server";
-import {
-  getSupabaseAdminClient,
-  hasSupabaseAdminConfig,
-} from "@/lib/supabase/admin";
 
 export type AccountCompany = {
   id: string;
@@ -44,6 +40,19 @@ export type AccountCompanyInput = {
   interestedCategories?: string;
   intent?: string;
 };
+
+export const checkoutCompanyRequiredFields = [
+  "companyName",
+  "vatNumber",
+  "shippingAddress",
+] as const;
+
+export function getCheckoutCompanyMissingFields(company: AccountCompany | null) {
+  if (!company) return [...checkoutCompanyRequiredFields];
+  return checkoutCompanyRequiredFields.filter(
+    (field) => !String(company[field] ?? "").trim(),
+  );
+}
 
 export async function getAccountCompany(auth: AuthContext): Promise<{
   company: AccountCompany | null;
@@ -129,8 +138,6 @@ export async function saveAccountCompany(
     return { ok: false as const, demoMode: false, error: loadError.message };
   }
 
-  let companyId = existing?.id ?? null;
-
   if (existing?.id) {
     const { error } = await supabase
       .from("companies")
@@ -149,39 +156,19 @@ export async function saveAccountCompany(
       };
     }
   } else {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("companies")
       .insert({
         owner_id: auth.user.id,
         contact_email: auth.user.email ?? null,
         ...payload,
       })
-      .select("id")
-      .maybeSingle();
 
     if (error) {
       return {
         ok: false as const,
         demoMode: false,
         error: error.message,
-      };
-    }
-
-    companyId = data?.id ?? null;
-  }
-
-  if (input.intent === "submitB2B") {
-    const application = await submitB2BApplication({
-      input,
-      companyId,
-      email: auth.user.email ?? null,
-    });
-
-    if (!application.ok) {
-      return {
-        ok: false as const,
-        demoMode: false,
-        error: application.error,
       };
     }
   }
@@ -191,96 +178,6 @@ export async function saveAccountCompany(
     demoMode: false,
     error: null,
   };
-}
-
-async function submitB2BApplication({
-  input,
-  companyId,
-  email,
-}: {
-  input: AccountCompanyInput;
-  companyId?: string | null;
-  email?: string | null;
-}) {
-  if (!hasSupabaseAdminConfig()) {
-    return { ok: true as const, error: null };
-  }
-
-  const supabase = getSupabaseAdminClient();
-  const payload = {
-    companyName: input.companyName,
-    vatNumber: clean(input.vatNumber),
-    fiscalCode: clean(input.fiscalCode),
-    sdi: clean(input.sdi),
-    pec: clean(input.pec),
-    contactName: clean(input.contactName),
-    email,
-    phone: clean(input.phone),
-    whatsapp: clean(input.whatsapp),
-    monthlyVolume: clean(input.monthlyVolume),
-    interestedCategories: clean(input.interestedCategories),
-    source: "account_company",
-    companyId: companyId ?? null,
-  };
-
-  const cleanVat = clean(input.vatNumber);
-  let existing: { id: string } | null = null;
-  if (email || cleanVat) {
-    const filters = [
-      email ? `email.eq.${email}` : null,
-      cleanVat ? `vat_number.eq.${cleanVat}` : null,
-    ].filter(Boolean);
-    const { data } = await supabase
-      .from("b2b_applications")
-      .select("id")
-      .eq("status", "pending")
-      .or(filters.join(","))
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    existing = data;
-  }
-
-  const applicationPayload = {
-    status: "pending",
-    company_name: input.companyName,
-    vat_number: cleanVat,
-    email,
-    payload,
-  };
-
-  const { data, error } = existing?.id
-    ? await supabase
-        .from("b2b_applications")
-        .update(applicationPayload)
-        .eq("id", existing.id)
-        .select("id")
-        .maybeSingle()
-    : await supabase
-        .from("b2b_applications")
-        .insert({
-          id: crypto.randomUUID(),
-          ...applicationPayload,
-        })
-        .select("id")
-        .maybeSingle();
-
-  if (error) return { ok: false as const, error: error.message };
-
-  if (companyId && data?.id) {
-    await supabase
-      .from("companies")
-      .update({
-        status: "pending",
-        crm_status: "pending",
-        source_application_id: data.id,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", companyId)
-      .neq("status", "active");
-  }
-
-  return { ok: true as const, error: null };
 }
 
 function toCompanyPayload(input: AccountCompanyInput) {

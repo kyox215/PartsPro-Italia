@@ -380,10 +380,10 @@ function CatalogToolbar({
         </p>
       </div>
       <Link
-        href={localizePath(locale, "/b2b")}
+        href={localizePath(locale, "/account/company")}
         className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 px-3 text-sm font-bold text-slate-900 hover:border-blue-300 hover:text-blue-700"
       >
-        {locale === "it" ? "Apri conto wholesale" : "申请批发账户"}
+        {locale === "it" ? "Profilo aziendale" : "完善账户资料"}
       </Link>
     </div>
   );

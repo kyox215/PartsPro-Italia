@@ -1,9 +1,10 @@
 import Image from "next/image";
-import { ArrowRight, CheckCircle2, Clock3, PackageSearch, ShieldCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock3, PackageSearch, ShieldCheck, UserRound } from "lucide-react";
 import { ProductCard } from "@/components/product-card";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { categories, products } from "@/lib/catalog";
+import { getAuthContext } from "@/lib/auth";
 import { getDictionary, isLocale, type Locale, localizePath } from "@/lib/i18n";
 
 export default async function LocaleHome({
@@ -12,6 +13,7 @@ export default async function LocaleHome({
   const { locale: rawLocale } = await params;
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "it";
   const dictionary = getDictionary(locale);
+  const auth = await getAuthContext();
   const featuredProducts = products.slice(0, 3);
 
   return (
@@ -33,7 +35,7 @@ export default async function LocaleHome({
                 {dictionary.home.primaryCta}
                 <ArrowRight className="h-4 w-4" />
               </ButtonLink>
-              <ButtonLink href={localizePath(locale, "/b2b")} variant="secondary">
+              <ButtonLink href={localizePath(locale, auth.user ? "/account/company" : "/login")} variant="secondary">
                 {dictionary.home.secondaryCta}
               </ButtonLink>
             </div>
@@ -87,6 +89,8 @@ export default async function LocaleHome({
         </div>
       </section>
 
+      {!auth.user ? <HomeAuthPanel locale={locale} /> : null}
+
       <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="flex items-end justify-between gap-4">
           <div>
@@ -135,5 +139,72 @@ export default async function LocaleHome({
         </div>
       </section>
     </div>
+  );
+}
+
+function HomeAuthPanel({ locale }: Readonly<{ locale: Locale }>) {
+  return (
+    <section className="border-b border-slate-200 bg-slate-50">
+      <div className="mx-auto grid max-w-7xl gap-4 px-4 py-8 sm:px-6 lg:grid-cols-[0.75fr_1.25fr] lg:px-8">
+        <div className="flex flex-col justify-center">
+          <UserRound className="h-7 w-7 text-blue-600" />
+          <h2 className="mt-3 text-2xl font-bold text-slate-950">
+            {locale === "it" ? "Accedi o crea il tuo account" : "登录或创建采购账号"}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {locale === "it"
+              ? "Un solo account: dopo il login completi dati aziendali, P.IVA e indirizzo nell'area account."
+              : "只需要一个账号：登录后在账户中心填写公司名称、P.IVA 和收货地址。"}
+          </p>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <form className="rounded-lg border border-slate-200 bg-white p-4" action="/api/auth/sign-in" method="post">
+            <input type="hidden" name="locale" value={locale} />
+            <h3 className="text-sm font-bold text-slate-950">
+              {locale === "it" ? "Login" : "登录"}
+            </h3>
+            <div className="mt-4 grid gap-3">
+              <HomeAuthInput label="Email" name="email" type="email" />
+              <HomeAuthInput label={locale === "it" ? "Password" : "密码"} name="password" type="password" />
+              <button className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700">
+                {locale === "it" ? "Entra" : "登录"}
+              </button>
+            </div>
+          </form>
+          <form className="rounded-lg border border-slate-200 bg-white p-4" action="/api/auth/sign-up" method="post">
+            <input type="hidden" name="locale" value={locale} />
+            <h3 className="text-sm font-bold text-slate-950">
+              {locale === "it" ? "Registrazione" : "注册"}
+            </h3>
+            <div className="mt-4 grid gap-3">
+              <HomeAuthInput label={locale === "it" ? "Nome completo" : "姓名"} name="fullName" />
+              <HomeAuthInput label="Email" name="email" type="email" />
+              <HomeAuthInput label={locale === "it" ? "Password" : "密码"} name="password" type="password" />
+              <button className="h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-950 hover:border-blue-300 hover:text-blue-700">
+                {locale === "it" ? "Crea account" : "创建账号"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HomeAuthInput({
+  label,
+  name,
+  type = "text",
+}: Readonly<{ label: string; name: string; type?: string }>) {
+  return (
+    <label className="grid gap-1.5 text-xs font-bold text-slate-600">
+      {label}
+      <input
+        className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+        name={name}
+        required
+        type={type}
+      />
+    </label>
   );
 }

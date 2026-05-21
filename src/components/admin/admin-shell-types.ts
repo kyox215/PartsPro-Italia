@@ -6,7 +6,6 @@ export type AdminIcon =
   | "file"
   | "home"
   | "package"
-  | "rma"
   | "settings"
   | "shopping"
   | "user"

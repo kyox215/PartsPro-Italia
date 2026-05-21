@@ -69,38 +69,6 @@ export type AccountOrderRow = {
   }>;
 };
 
-export type AccountRmaRow = {
-  id: string;
-  rmaNumber?: string | null;
-  orderId?: string | null;
-  status: string;
-  orderNumber: string;
-  sku: string;
-  quantity: number;
-  issueType: string;
-  description: string | null;
-  resolutionType?: string | null;
-  resolutionNote?: string | null;
-  refundAmount?: number | null;
-  replacementSku?: string | null;
-  closedAt?: string | null;
-  attachments: Array<{
-    id: string;
-    label: string;
-    url: string;
-    note?: string | null;
-    createdAt: string;
-  }>;
-  createdAt: string;
-  events: Array<{
-    id: string;
-    eventType: string;
-    title: string;
-    body?: string | null;
-    createdAt: string;
-  }>;
-};
-
 export type AccountNotificationRow = {
   id: string;
   channel: string;
@@ -108,18 +76,15 @@ export type AccountNotificationRow = {
   body: string;
   status: string;
   orderId?: string | null;
-  rmaId?: string | null;
   readAt?: string | null;
   createdAt: string;
 };
 
 export type AccountActivity = {
   orders: AccountOrderRow[];
-  rmas: AccountRmaRow[];
   notifications: AccountNotificationRow[];
   generatedAt: string;
   orderCount: number;
-  openRmaCount: number;
   totalSpend: number;
   unreadNotificationCount: number;
 };
@@ -183,44 +148,14 @@ export async function getAccountActivity(
           ],
         },
       ],
-      rmas: [
-        {
-          id: "demo-rma-1",
-          rmaNumber: "RMA-DEMO-001",
-          orderId: "demo-order-1001",
-          status: "submitted",
-          orderNumber: "demo-order-1001",
-          sku: products[0].sku,
-          quantity: 1,
-          issueType: "touch_issue",
-          description: "Touch intermittente prima dell'installazione.",
-          resolutionType: null,
-          resolutionNote: null,
-          refundAmount: null,
-          replacementSku: null,
-          closedAt: null,
-          attachments: [],
-          createdAt: new Date().toISOString(),
-          events: [
-            {
-              id: "demo-rma-event-1",
-              eventType: "rma_submitted",
-              title: "Demo RMA submitted",
-              body: "The after-sales team will update this timeline.",
-              createdAt: new Date().toISOString(),
-            },
-          ],
-        },
-      ],
       notifications: [
         {
           id: "demo-notification-1",
           channel: "email",
           subject: "PartsPro demo notification",
-          body: "Order and RMA updates will also appear in this workspace.",
+          body: "Order updates will also appear in this workspace.",
           status: "skipped",
           orderId: "demo-order-1001",
-          rmaId: null,
           readAt: null,
           createdAt: new Date().toISOString(),
         },
@@ -229,11 +164,11 @@ export async function getAccountActivity(
   }
 
   if (!auth.user || !hasSupabasePublicConfig()) {
-    return summarizeActivity({ orders: [], rmas: [] });
+    return summarizeActivity({ orders: [] });
   }
 
   const supabase = await getSupabaseServerClient();
-  const [ordersResult, rmasResult, notificationsResult] = await Promise.all([
+  const [ordersResult, notificationsResult] = await Promise.all([
     supabase
       .from("orders")
       .select(
@@ -243,16 +178,8 @@ export async function getAccountActivity(
       .order("created_at", { ascending: false })
       .limit(100),
     supabase
-      .from("rmas")
-      .select(
-        "id, rma_number, order_id, status, order_number, sku, quantity, issue_type, description, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, attachments, created_at",
-      )
-      .eq("profile_id", auth.user.id)
-      .order("created_at", { ascending: false })
-      .limit(100),
-    supabase
       .from("notification_events")
-      .select("id, channel, subject, body, status, order_id, rma_id, read_at, created_at")
+      .select("id, channel, subject, body, status, order_id, read_at, created_at")
       .eq("profile_id", auth.user.id)
       .order("created_at", { ascending: false })
       .limit(20),
@@ -262,17 +189,12 @@ export async function getAccountActivity(
     console.error("Failed to load account orders", ordersResult.error);
   }
 
-  if (rmasResult.error) {
-    console.error("Failed to load account RMAs", rmasResult.error);
-  }
-
   if (notificationsResult.error) {
     console.error("Failed to load account notifications", notificationsResult.error);
   }
 
   return summarizeActivity({
     orders: (ordersResult.data ?? []).map(mapAccountOrder),
-    rmas: (rmasResult.data ?? []).map(mapAccountRma),
     notifications: (notificationsResult.data ?? []).map(mapAccountNotification),
   });
 }
@@ -304,37 +226,6 @@ export async function getAccountOrderById(
   }
 
   return data ? mapAccountOrder(data) : null;
-}
-
-export async function getAccountRmaById(
-  auth: AuthContext,
-  rmaId: string,
-): Promise<AccountRmaRow | null> {
-  if (!auth.configured) {
-    const activity = await getAccountActivity(auth);
-    return activity.rmas.find((rma) => rma.id === rmaId) ?? null;
-  }
-
-  if (!auth.user || !hasSupabasePublicConfig()) {
-    return null;
-  }
-
-  const supabase = await getSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("rmas")
-    .select(
-      "id, rma_number, order_id, status, order_number, sku, quantity, issue_type, description, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, attachments, created_at, rma_events (*)",
-    )
-    .eq("profile_id", auth.user.id)
-    .eq("id", rmaId)
-    .maybeSingle();
-
-  if (error) {
-    console.error("Failed to load account RMA detail", error);
-    return null;
-  }
-
-  return data ? mapAccountRma(data) : null;
 }
 
 function mapAccountOrder(order: {
@@ -471,65 +362,6 @@ function mapAccountOrder(order: {
   };
 }
 
-function mapAccountRma(rma: {
-  id: string;
-  rma_number?: string | null;
-  order_id?: string | null;
-  status: string;
-  order_number: string;
-  sku: string;
-  quantity: number;
-  issue_type: string;
-  description: string | null;
-  resolution_type?: string | null;
-  resolution_note?: string | null;
-  refund_amount?: number | string | null;
-  replacement_sku?: string | null;
-  closed_at?: string | null;
-  attachments?: unknown;
-  created_at: string;
-  rma_events?: Array<{
-    id: string;
-    event_type: string;
-    title: string;
-    body?: string | null;
-    customer_visible?: boolean | null;
-    created_at: string;
-  }> | null;
-}): AccountRmaRow {
-  return {
-    id: rma.id,
-    rmaNumber: rma.rma_number ?? null,
-    orderId: rma.order_id ?? null,
-    status: rma.status,
-    orderNumber: rma.order_number,
-    sku: rma.sku,
-    quantity: rma.quantity,
-    issueType: rma.issue_type,
-    description: rma.description,
-    resolutionType: rma.resolution_type ?? null,
-    resolutionNote: rma.resolution_note ?? null,
-    refundAmount:
-      rma.refund_amount === null || rma.refund_amount === undefined
-        ? null
-        : Number(rma.refund_amount),
-    replacementSku: rma.replacement_sku ?? null,
-    closedAt: rma.closed_at ?? null,
-    attachments: normalizeRmaAttachments(rma.attachments),
-    createdAt: rma.created_at,
-    events: (rma.rma_events ?? [])
-      .filter((event) => event.customer_visible ?? true)
-      .map((event) => ({
-        id: event.id,
-        eventType: event.event_type,
-        title: event.title,
-        body: event.body ?? null,
-        createdAt: event.created_at,
-      }))
-      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
-  };
-}
-
 function mapAccountNotification(notification: {
   id: string;
   channel: string;
@@ -537,7 +369,6 @@ function mapAccountNotification(notification: {
   body: string;
   status: string;
   order_id?: string | null;
-  rma_id?: string | null;
   read_at?: string | null;
   created_at: string;
 }): AccountNotificationRow {
@@ -548,44 +379,23 @@ function mapAccountNotification(notification: {
     body: notification.body,
     status: notification.status,
     orderId: notification.order_id ?? null,
-    rmaId: notification.rma_id ?? null,
     readAt: notification.read_at ?? null,
     createdAt: notification.created_at,
   };
 }
 
-function normalizeRmaAttachments(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
-    .map((item) => ({
-      id: String(item.id ?? ""),
-      label: String(item.label ?? item.name ?? "Attachment"),
-      url: toAttachmentHref(String(item.url ?? "")) ?? "",
-      note: typeof item.note === "string" ? item.note : null,
-      createdAt: String(item.createdAt ?? item.created_at ?? ""),
-    }))
-    .filter((item) => item.id && item.url);
-}
-
 function summarizeActivity({
   orders,
-  rmas,
   notifications = [],
 }: {
   orders: AccountOrderRow[];
-  rmas: AccountRmaRow[];
   notifications?: AccountNotificationRow[];
 }): AccountActivity {
   return {
     orders,
-    rmas,
     notifications,
     generatedAt: new Date().toISOString(),
     orderCount: orders.length,
-    openRmaCount: rmas.filter(
-      (rma) => !["completed", "rejected"].includes(rma.status),
-    ).length,
     totalSpend: orders.reduce(
       (sum, order) => sum + order.total - (order.refundTotal ?? 0),
       0,

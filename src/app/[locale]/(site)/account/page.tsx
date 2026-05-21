@@ -1,4 +1,4 @@
-import { FileText, RotateCcw, ShoppingBag, type LucideIcon } from "lucide-react";
+import { FileText, ShoppingBag, type LucideIcon } from "lucide-react";
 import {
   AccountFeedback,
   AccountMetricCards,
@@ -43,7 +43,6 @@ export default async function AccountPage({
         <div className="mt-5">
           <AccountFeedback
             orderId={valueOf(query.order)}
-            rmaId={valueOf(query.rma)}
             status={valueOf(query.status)}
             error={valueOf(query.error)}
             locale={locale}
@@ -84,7 +83,7 @@ export default async function AccountPage({
         </section>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className="grid gap-4 lg:grid-cols-2">
         <ActionCard
           Icon={ShoppingBag}
           title={locale === "it" ? "Storico ordini" : "历史订单"}
@@ -95,17 +94,6 @@ export default async function AccountPage({
           }
           href={localizePath(locale, "/account/orders")}
           cta={locale === "it" ? "Apri ordini" : "查看订单"}
-        />
-        <ActionCard
-          Icon={RotateCcw}
-          title={locale === "it" ? "RMA e resi" : "退货管理"}
-          description={
-            locale === "it"
-              ? "Controlla pratiche aperte, sostituzioni e richieste tecniche."
-              : "查看售后、退货、换货和检测处理记录。"
-          }
-          href={localizePath(locale, "/account/rma")}
-          cta={locale === "it" ? "Apri RMA" : "管理售后"}
         />
         <ActionCard
           Icon={FileText}

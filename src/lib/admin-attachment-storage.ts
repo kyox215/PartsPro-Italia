@@ -25,7 +25,7 @@ export async function uploadAdminAttachmentFile({
   entityId,
 }: {
   file: FormDataEntryValue | null;
-  scope: "order-payment-proofs" | "rma-attachments";
+  scope: "order-payment-proofs";
   entityId: string;
 }): Promise<UploadedAdminAttachment | null> {
   if (!(file instanceof File) || file.size <= 0) return null;

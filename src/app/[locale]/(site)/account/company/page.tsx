@@ -47,21 +47,22 @@ export default async function AccountCompanyPage({
   const status = formatCompanyStatus(draft.status, locale);
   const completion = getCompanyCompletion(company);
   const saved = valueOf(query.saved);
+  const next = valueOf(query.next) ?? "";
   const formError = valueOf(query.error) ?? error;
 
   return (
     <div className="space-y-6">
       <section className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
         <Badge className="border-blue-200 bg-blue-50 text-blue-700">
-          {locale === "it" ? "Profilo wholesale" : "批发公司资料"}
+          {locale === "it" ? "Profilo aziendale" : "公司资料"}
         </Badge>
         <h1 className="mt-4 text-3xl font-bold text-slate-950">
           {locale === "it" ? "Dati aziendali" : "公司与发票资料"}
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
           {locale === "it"
-            ? "Mantieni aggiornati dati fattura, indirizzi, contatti e categorie di interesse. Stato e price group restano gestiti dal team admin."
-            : "维护发票资料、地址、联系人和采购品类。审核状态和价格组由后台管理员管理。"}
+            ? "Mantieni aggiornati dati fattura, indirizzi, contatti e categorie di interesse. Il tipo cliente resta gestito dal team admin."
+            : "维护发票资料、地址、联系人和采购品类。客户类型和价格权限由后台管理员管理。"}
         </p>
 
         <div className="mt-5 grid gap-3 lg:grid-cols-3">
@@ -83,8 +84,8 @@ export default async function AccountCompanyPage({
             </p>
             <p className="mt-2 text-xs leading-5 text-slate-600">
               {locale === "it"
-                ? "Il prezzo wholesale si applica dopo approvazione admin."
-                : "后台审核通过后，前台会显示批发价格。"}
+                ? "Il team admin abilita il prezzo wholesale dal pannello account."
+                : "管理员可在账号管理中为此账号开通批发价权限。"}
             </p>
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -119,7 +120,7 @@ export default async function AccountCompanyPage({
         <Feedback saved={saved} error={formError} locale={locale} />
 
         {!auth.configured || auth.user ? (
-          <CompanyForm company={draft} locale={locale} completionPercent={completion.percent} />
+          <CompanyForm company={draft} locale={locale} next={next} />
         ) : (
           <div className="mt-8 rounded-lg border border-orange-200 bg-orange-50 p-5">
             <CircleAlert className="h-6 w-6 text-orange-700" />
@@ -145,12 +146,12 @@ export default async function AccountCompanyPage({
           <ShieldCheck className="h-6 w-6 text-blue-600" />
           <div>
             <h2 className="font-bold text-slate-950">
-              {locale === "it" ? "Controllo admin" : "后台审核"}
+              {locale === "it" ? "Permessi gestiti dal team" : "后台分配价格权限"}
             </h2>
             <p className="mt-1 text-sm leading-6 text-slate-600">
               {locale === "it"
-                ? "Gli admin aggiornano stato e tipo cliente dal pannello clienti. I clienti possono aggiornare solo dati operativi e fattura."
-                : "管理员在客户管理中更新审核状态和客户类型。客户只能维护运营和发票资料。"}
+                ? "Gli admin aggiornano tipo cliente e price group dal pannello clienti. I clienti possono aggiornare solo dati operativi, fattura e indirizzi."
+                : "管理员在客户管理中更新客户类型和价格组。客户只能维护公司、发票和收货资料。"}
             </p>
           </div>
           <ButtonLink href={localizePath(locale, "/account")} variant="secondary">
@@ -165,8 +166,8 @@ export default async function AccountCompanyPage({
 function CompanyForm({
   company,
   locale,
-  completionPercent,
-}: Readonly<{ company: AccountCompany; locale: Locale; completionPercent: number }>) {
+  next,
+}: Readonly<{ company: AccountCompany; locale: Locale; next: string }>) {
   const fields = [
     ["companyName", locale === "it" ? "Ragione sociale" : "公司名称", company.companyName],
     ["vatNumber", "P.IVA / VAT", company.vatNumber],
@@ -183,6 +184,7 @@ function CompanyForm({
   return (
     <form action="/api/account/company" method="post" className="mt-8 grid gap-4 md:grid-cols-2">
       <input type="hidden" name="locale" value={locale} />
+      <input type="hidden" name="next" value={next} />
       {fields.map(([name, label, value]) => (
         <label key={name} className="grid gap-2 text-sm font-medium text-slate-700">
           {label}
@@ -220,9 +222,9 @@ function CompanyForm({
           placeholder="display, battery, charging"
         />
       </label>
-      <div className="grid gap-3 md:col-span-2 md:grid-cols-2">
+      <div className="md:col-span-2">
         <button
-          className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-blue-600 bg-blue-600 px-5 text-sm font-bold text-white hover:bg-blue-700"
+          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-blue-600 bg-blue-600 px-5 text-sm font-bold text-white hover:bg-blue-700"
           name="intent"
           type="submit"
           value="save"
@@ -230,24 +232,7 @@ function CompanyForm({
           <Save className="h-4 w-4" />
           {locale === "it" ? "Salva profilo" : "保存资料"}
         </button>
-        <button
-          className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-slate-900 bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={completionPercent < 60}
-          name="intent"
-          type="submit"
-          value="submitB2B"
-        >
-          <ShieldCheck className="h-4 w-4" />
-          {locale === "it" ? "Invia revisione wholesale" : "提交批发审核"}
-        </button>
       </div>
-      {completionPercent < 60 ? (
-        <p className="text-xs leading-5 text-amber-700 md:col-span-2">
-          {locale === "it"
-            ? "Completa almeno i dati principali prima di inviare la revisione wholesale."
-            : "请先补齐主要公司资料，再提交批发审核。"}
-        </p>
-      ) : null}
     </form>
   );
 }
@@ -273,11 +258,7 @@ function Feedback({
         ? locale === "it"
           ? "Demo: profilo ricevuto, collega Supabase per salvare."
           : "演示：已接收公司资料，连接 Supabase 后可保存。"
-        : saved === "b2b"
-          ? locale === "it"
-            ? "Profilo salvato e revisione wholesale inviata."
-            : "公司资料已保存，并已提交批发审核。"
-          : locale === "it"
+        : locale === "it"
             ? "Profilo aziendale salvato."
             : "公司资料已保存。"}
     </div>

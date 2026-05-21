@@ -14,8 +14,6 @@ export function SiteHeader({
 }: Readonly<{ locale: Locale; dictionary: Dictionary; auth: AuthContext }>) {
   const rawNavItems: Array<[string, string] | null> = [
     ["products", dictionary.nav.products as string],
-    ["b2b", dictionary.nav.b2b as string],
-    ["rma", dictionary.nav.rma as string],
     auth.user
       ? ["account", dictionary.nav.account as string]
       : ["login", locale === "it" ? "Login" : "登录"],

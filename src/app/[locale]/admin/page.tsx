@@ -5,11 +5,9 @@ import {
   ClipboardList,
   PackagePlus,
   ShieldAlert,
-  TicketCheck,
   TimerReset,
-  UserCheck,
   type LucideIcon,
-  UsersRound,
+  UserCheck,
   Warehouse,
 } from "lucide-react";
 import {
@@ -46,8 +44,6 @@ export default async function AdminPage({
           pendingCardCount: 0,
           expiringReservationCount: 0,
           preorderAllocationCount: 0,
-          pendingB2BCount: 0,
-          openRmaCount: 0,
           preorderIncomingTotal: 0,
           revenueTotal: 0,
         };
@@ -101,20 +97,6 @@ export default async function AdminPage({
       tone: "green",
       trend: locale === "it" ? "Supply" : "补货池",
     },
-    {
-      Icon: UsersRound,
-      label: locale === "it" ? "Wholesale pending" : "待处理批发",
-      value: String(dashboard.pendingB2BCount),
-      tone: "blue",
-      trend: locale === "it" ? "Customer queue" : "客户队列",
-    },
-    {
-      Icon: TicketCheck,
-      label: locale === "it" ? "RMA aperti" : "待处理 RMA",
-      value: String(dashboard.openRmaCount),
-      tone: "amber",
-      trend: locale === "it" ? "Post-vendita" : "售后队列",
-    },
   ];
 
   const modules: Array<{
@@ -163,26 +145,6 @@ export default async function AdminPage({
           : "客户档案、价格组、备注、任务和跟进。",
       href: localizePath(locale, "/admin/accounts"),
       tone: "bg-indigo-50 text-indigo-700",
-    },
-    {
-      Icon: UsersRound,
-      title: locale === "it" ? "Richieste wholesale" : "批发申请",
-      description:
-        locale === "it"
-          ? "Gestisci richieste wholesale dentro clienti."
-          : "在客户管理中处理批发申请。",
-      href: localizePath(locale, "/admin/accounts/customers?filter=wholesale_pending"),
-      tone: "bg-violet-50 text-violet-700",
-    },
-    {
-      Icon: TicketCheck,
-      title: locale === "it" ? "RMA e resi" : "RMA 与退货",
-      description:
-        locale === "it"
-          ? "Gestisci resi, sostituzioni e rimborsi."
-          : "管理退货、换货和退款。",
-      href: localizePath(locale, "/admin/rma"),
-      tone: "bg-rose-50 text-rose-700",
     },
     {
       Icon: Activity,
@@ -264,18 +226,6 @@ export default async function AdminPage({
                   label={locale === "it" ? "Preorder" : "待分配预购"}
                   value={dashboard.preorderAllocationCount}
                   href={localizePath(locale, "/admin/orders?filter=preorder")}
-                />
-                <QueueRow
-                  icon={UsersRound}
-                  label={locale === "it" ? "Wholesale" : "批发申请"}
-                  value={dashboard.pendingB2BCount}
-                  href={localizePath(locale, "/admin/accounts/customers?filter=wholesale_pending")}
-                />
-                <QueueRow
-                  icon={TicketCheck}
-                  label={locale === "it" ? "RMA" : "待处理 RMA"}
-                  value={dashboard.openRmaCount}
-                  href={localizePath(locale, "/admin/rma")}
                 />
               </div>
               <TrendSnapshot values={metrics.slice(0, 6).map((item) => Number(item.value.replace(/\D/g, "")) || 1)} />

@@ -4,7 +4,6 @@ import {
   FileText,
   Inbox,
   PackageCheck,
-  RotateCcw,
   UserRound,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +12,6 @@ import type {
   AccountActivity,
   AccountNotificationRow,
   AccountOrderRow,
-  AccountRmaRow,
 } from "@/lib/account-activity";
 import type { AccountCompany } from "@/lib/account-company";
 import {
@@ -23,9 +21,6 @@ import {
   formatOrderStatus,
   formatPaymentMethod,
   formatPaymentStatus,
-  formatResolutionType,
-  formatRmaIssueType,
-  formatRmaStatus,
   getCompanyCompletion,
   statusBadgeClass,
 } from "@/lib/account-display";
@@ -53,11 +48,6 @@ export function AccountMetricCards({
       Icon: FileText,
       label: locale === "it" ? "Totale ordini" : "历史订单总金额",
       value: formatMoney(activity.totalSpend, locale),
-    },
-    {
-      Icon: RotateCcw,
-      label: locale === "it" ? "RMA aperti" : "待处理售后",
-      value: String(activity.openRmaCount),
     },
     {
       Icon: Building2,
@@ -104,7 +94,6 @@ export function AccountTodoPanel({
     (order) => order.fulfillmentStatus === "awaiting_preorder",
   );
   const shippedOrders = activity.orders.filter((order) => order.status === "shipped");
-  const waitingRmas = activity.rmas.filter((rma) => rma.status === "waiting_information");
   const todos = [
     ...pendingPayments.slice(0, 3).map((order) => ({
       key: `payment-${order.id}`,
@@ -139,13 +128,6 @@ export function AccountTodoPanel({
       href: localizePath(locale, `/account/orders/${order.id}`),
       tone: "blue" as const,
     })),
-    ...waitingRmas.slice(0, 2).map((rma) => ({
-      key: `rma-${rma.id}`,
-      title: locale === "it" ? "RMA richiede informazioni" : "售后等待补充",
-      description: `${rma.rmaNumber ?? rma.id} / ${rma.sku}`,
-      href: localizePath(locale, `/account/rma/${rma.id}`),
-      tone: "orange" as const,
-    })),
   ];
 
   if (completion.percent < 100) {
@@ -168,8 +150,8 @@ export function AccountTodoPanel({
         title={locale === "it" ? "Nessuna azione urgente" : "暂无待处理事项"}
         description={
           locale === "it"
-            ? "Pagamenti, preorder, RMA e profilo aziendale sono sotto controllo."
-            : "付款、预购、售后和公司资料目前没有紧急处理项。"
+            ? "Pagamenti, preorder e profilo aziendale sono sotto controllo."
+            : "付款、预购和公司资料目前没有紧急处理项。"
         }
       />
     );
@@ -212,8 +194,8 @@ export function AccountNotificationsPanel({
         title={locale === "it" ? "Nessuna notifica" : "暂无通知"}
         description={
           locale === "it"
-            ? "Aggiornamenti su pagamenti, spedizioni, rimborsi e RMA appariranno qui."
-            : "付款、物流、退款和售后的更新会显示在这里。"
+            ? "Aggiornamenti su pagamenti, spedizioni e rimborsi appariranno qui."
+            : "付款、物流和退款的更新会显示在这里。"
         }
       />
     );
@@ -265,14 +247,6 @@ export function AccountNotificationsPanel({
                 className="h-8 px-2 text-xs"
               >
                 {locale === "it" ? "Ordine" : "查看订单"}
-              </ButtonLink>
-            ) : notification.rmaId ? (
-              <ButtonLink
-                href={localizePath(locale, `/account/rma/${notification.rmaId}`)}
-                variant="secondary"
-                className="h-8 px-2 text-xs"
-              >
-                RMA
               </ButtonLink>
             ) : null}
           </div>
@@ -381,68 +355,6 @@ export function AccountOrdersTable({
   );
 }
 
-export function AccountRmaGrid({
-  rmas,
-  locale,
-  emptyDescription,
-}: Readonly<{
-  rmas: AccountRmaRow[];
-  locale: Locale;
-  emptyDescription: string;
-}>) {
-  if (!rmas.length) {
-    return (
-      <AccountEmptyState
-        icon={<RotateCcw className="h-6 w-6 text-blue-600" />}
-        title={locale === "it" ? "Nessun RMA" : "暂无售后"}
-        description={emptyDescription}
-      />
-    );
-  }
-
-  return (
-    <div className="grid gap-4 p-5 md:grid-cols-2">
-      {rmas.map((rma) => (
-        <article key={rma.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="font-mono text-xs font-bold text-slate-900">
-              {rma.rmaNumber ?? rma.id}
-            </p>
-            <Badge className={statusBadgeClass(formatRmaStatus(rma.status, locale).tone)}>
-              {formatRmaStatus(rma.status, locale).label}
-            </Badge>
-          </div>
-          <h3 className="mt-4 font-bold text-slate-950">
-            {rma.orderNumber} / {rma.sku}
-          </h3>
-          <p className="mt-1 text-sm text-slate-600">
-            {formatRmaIssueType(rma.issueType, locale)} x {rma.quantity}
-          </p>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            {rma.description || (locale === "it" ? "Nessuna descrizione." : "无描述。")}
-          </p>
-          {rma.resolutionType ? (
-            <p className="mt-3 rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700">
-              {locale === "it" ? "Esito" : "处理结果"}:{" "}
-              {formatResolutionType(rma.resolutionType, locale)}
-            </p>
-          ) : null}
-          <p className="mt-3 text-xs text-slate-500">
-            {new Date(rma.createdAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN")}
-          </p>
-          <ButtonLink
-            href={localizePath(locale, `/account/rma/${rma.id}`)}
-            variant="secondary"
-            className="mt-4 h-9 px-3 text-xs"
-          >
-            {locale === "it" ? "Apri dettaglio" : "查看详情"}
-          </ButtonLink>
-        </article>
-      ))}
-    </div>
-  );
-}
-
 export function AccountProfileCta({ locale }: Readonly<{ locale: Locale }>) {
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5">
@@ -486,13 +398,11 @@ export function AccountEmptyState({
 
 export function AccountFeedback({
   orderId,
-  rmaId,
   status,
   error,
   locale,
 }: Readonly<{
   orderId?: string;
-  rmaId?: string;
   status?: string;
   error?: string;
   locale: Locale;
@@ -505,7 +415,7 @@ export function AccountFeedback({
     );
   }
 
-  if (!orderId && !rmaId) return null;
+  if (!orderId) return null;
 
   return (
     <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
@@ -513,11 +423,6 @@ export function AccountFeedback({
         ? locale === "it"
           ? `Ordine ${orderId} creato. Stato: ${formatPaymentStatus(status, locale).label}.`
           : `订单 ${orderId} 已创建。状态：${formatPaymentStatus(status, locale).label}。`
-        : null}
-      {rmaId
-        ? locale === "it"
-          ? `RMA ${rmaId} inviato.`
-          : `售后 ${rmaId} 已提交。`
         : null}
     </div>
   );

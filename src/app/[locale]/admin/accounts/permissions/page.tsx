@@ -1,4 +1,4 @@
-import { ShieldCheck, UserCog, UsersRound } from "lucide-react";
+import { ChevronDown, ShieldCheck, UserCog, UsersRound } from "lucide-react";
 import { redirect } from "next/navigation";
 import { AccountManagementTabs } from "@/components/admin/account-management-nav";
 import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
@@ -11,13 +11,14 @@ import {
   AdminPageHeader,
   AdminPanel,
   AdminRecordList,
-  AdminToggle,
   AdminWorkspaceGrid,
   StatusPill,
 } from "@/components/admin/admin-ui";
 import { formatAdminStatus, formatCustomerType, formatPermissionLabel } from "@/lib/admin-display";
 import { getAdminStaffRows, getStaffRoleSummaries } from "@/lib/admin-accounts";
 import {
+  type AdminPermission,
+  type StaffRole,
   getConfigurableAdminPermissions,
   hasAdminPermission,
   staffRoleLabels,
@@ -84,42 +85,17 @@ export default async function AdminAccountPermissionsPage({
         </section>
 
         <AdminPanel title={locale === "it" ? "Matrice ruoli" : "角色权限矩阵"}>
-          <div className="grid gap-2 xl:grid-cols-2">
+          <div className="space-y-2">
             {summaries.map((summary) => (
-              <article key={summary.role} className="rounded-lg border border-black/5 bg-stone-50 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-black text-stone-950">{summary.label}</h3>
-                  <StatusPill status={summary.label} tone={summary.role === "owner" ? "violet" : "blue"} />
-                </div>
-                <p className="mt-2 text-xs font-semibold leading-5 text-stone-500">{summary.description}</p>
-                {summary.role === "owner" ? (
-                  <div className="mt-3 flex flex-wrap gap-1">
-                    {summary.permissions.map((permission) => (
-                      <StatusPill key={permission} status={formatPermissionLabel(permission, locale)} tone="slate" />
-                    ))}
-                  </div>
-                ) : (
-                  <form action="/api/admin/accounts/permissions/matrix" method="post" className="mt-3 grid gap-2">
-                    <AdminCsrfField />
-                    <input type="hidden" name="locale" value={locale} />
-                    <input type="hidden" name="returnTo" value={localizePath(locale, "/admin/accounts/permissions")} />
-                    <input type="hidden" name="role" value={summary.role} />
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {configurablePermissions.map((permission) => (
-                        <AdminToggle
-                          key={permission}
-                          name={`permission:${permission}`}
-                          label={formatPermissionLabel(permission, locale)}
-                          defaultChecked={summary.permissions.includes(permission)}
-                        />
-                      ))}
-                    </div>
-                    <button className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white" type="submit">
-                      {locale === "it" ? "Salva matrice" : "保存权限矩阵"}
-                    </button>
-                  </form>
-                )}
-              </article>
+              <RolePermissionRow
+                key={summary.role}
+                locale={locale}
+                label={summary.label}
+                description={summary.description}
+                role={summary.role}
+                permissions={summary.permissions}
+                configurablePermissions={configurablePermissions}
+              />
             ))}
           </div>
         </AdminPanel>
@@ -170,6 +146,103 @@ export default async function AdminAccountPermissionsPage({
         </AdminPanel>
       </AdminWorkspaceGrid>
     </div>
+  );
+}
+
+function RolePermissionRow({
+  locale,
+  label,
+  description,
+  role,
+  permissions,
+  configurablePermissions,
+}: Readonly<{
+  locale: Locale;
+  label: string;
+  description: string;
+  role: StaffRole;
+  permissions: AdminPermission[];
+  configurablePermissions: AdminPermission[];
+}>) {
+  const permissionSet = new Set(permissions);
+  const previewPermissions = permissions.slice(0, 4);
+  const hiddenCount = Math.max(permissions.length - previewPermissions.length, 0);
+  const totalCount = configurablePermissions.length;
+  const isOwner = role === "owner";
+
+  return (
+    <details className="group rounded-lg border border-black/5 bg-stone-50">
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-3 py-2.5 [&::-webkit-details-marker]:hidden">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-black text-stone-950">{label}</h3>
+            <StatusPill
+              status={isOwner ? (locale === "it" ? "Solo lettura" : "只读") : `${permissions.length}/${totalCount}`}
+              tone={isOwner ? "violet" : "blue"}
+            />
+            {previewPermissions.map((permission) => (
+              <StatusPill key={permission} status={formatPermissionLabel(permission, locale)} tone="slate" />
+            ))}
+            {hiddenCount > 0 ? <span className="text-xs font-black text-stone-400">+{hiddenCount}</span> : null}
+          </div>
+          <p className="mt-1 line-clamp-1 text-xs font-semibold text-stone-500">{description}</p>
+        </div>
+        <ChevronDown className="h-4 w-4 shrink-0 text-stone-400 transition group-open:rotate-180" />
+      </summary>
+
+      <div className="border-t border-black/5 px-3 pb-3 pt-2">
+        {isOwner ? (
+          <div className="flex flex-wrap gap-1.5">
+            {permissions.map((permission) => (
+              <StatusPill key={permission} status={formatPermissionLabel(permission, locale)} tone="slate" />
+            ))}
+          </div>
+        ) : (
+          <form action="/api/admin/accounts/permissions/matrix" method="post" className="grid gap-2">
+            <AdminCsrfField />
+            <input type="hidden" name="locale" value={locale} />
+            <input type="hidden" name="returnTo" value={localizePath(locale, "/admin/accounts/permissions")} />
+            <input type="hidden" name="role" value={role} />
+            <div className="grid gap-1.5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+              {configurablePermissions.map((permission) => (
+                <CompactPermissionToggle
+                  key={permission}
+                  name={`permission:${permission}`}
+                  label={formatPermissionLabel(permission, locale)}
+                  defaultChecked={permissionSet.has(permission)}
+                />
+              ))}
+            </div>
+            <button className="h-8 rounded-lg bg-stone-950 px-3 text-xs font-black text-white sm:justify-self-start" type="submit">
+              {locale === "it" ? "Salva matrice" : "保存权限矩阵"}
+            </button>
+          </form>
+        )}
+      </div>
+    </details>
+  );
+}
+
+function CompactPermissionToggle({
+  label,
+  name,
+  defaultChecked,
+}: Readonly<{
+  label: string;
+  name: string;
+  defaultChecked: boolean;
+}>) {
+  return (
+    <label className="flex h-8 min-w-0 items-center gap-2 rounded-full border border-black/10 bg-white px-2.5 text-xs font-black text-stone-700">
+      <input
+        type="checkbox"
+        name={name}
+        value="true"
+        defaultChecked={defaultChecked}
+        className="h-3.5 w-3.5 shrink-0 accent-stone-950"
+      />
+      <span className="truncate">{label}</span>
+    </label>
   );
 }
 

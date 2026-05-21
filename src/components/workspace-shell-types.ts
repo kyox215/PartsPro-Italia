@@ -6,7 +6,6 @@ export type WorkspaceIcon =
   | "file"
   | "home"
   | "package"
-  | "rma"
   | "settings"
   | "shopping"
   | "user"

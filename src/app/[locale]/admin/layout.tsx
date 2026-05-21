@@ -92,13 +92,6 @@ export default async function AdminLayout({
       ],
     },
     {
-      href: localizePath(locale, "/admin/rma"),
-      label: locale === "it" ? "RMA e resi" : "RMA 退货",
-      description: locale === "it" ? "Post-vendita" : "售后处理",
-      icon: "rma",
-      permission: "rma:write",
-    },
-    {
       href: localizePath(locale, "/admin/system"),
       label: locale === "it" ? "Sistema" : "系统状态",
       description: locale === "it" ? "Env e database" : "环境与数据库",

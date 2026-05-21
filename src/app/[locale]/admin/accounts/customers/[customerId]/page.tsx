@@ -1,10 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import {
-  BadgeCheck,
   Building2,
   Clock3,
   ClipboardList,
-  Link2,
+  History,
   MessageSquareText,
   ShieldCheck,
   UserRound,
@@ -12,7 +11,6 @@ import {
 import { AccountManagementTabs } from "@/components/admin/account-management-nav";
 import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
 import {
-  AdminActionRail,
   AdminButtonLink,
   AdminInput,
   AdminMetricCard,
@@ -22,7 +20,6 @@ import {
   AdminRecordList,
   AdminSelect,
   AdminTextarea,
-  AdminWorkspaceGrid,
   StatusPill,
 } from "@/components/admin/admin-ui";
 import {
@@ -30,11 +27,13 @@ import {
   crmStatusOptions,
   customerTypeOptions,
   formatAdminStatus,
+  formatAuditDataSummary,
   formatCustomerType,
   normalizeCustomerType,
 } from "@/lib/admin-display";
-import { hasAdminPermission, staffRoleLabels, staffRoleOptions } from "@/lib/admin-permissions";
+import { getCustomerAuditEvents, type CustomerAuditEventRow } from "@/lib/admin-accounts";
 import { getAdminCustomerDetail, type AdminCustomerDetail } from "@/lib/admin-customers";
+import { hasAdminPermission, staffRoleLabels, staffRoleOptions } from "@/lib/admin-permissions";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
 import { formatMoney } from "@/lib/pricing";
@@ -53,6 +52,7 @@ export default async function AdminAccountCustomerDetailPage({
   if (auth.configured && !hasAdminPermission(auth, "accounts:read")) {
     redirect(localizePath(locale, "/admin/accounts?error=permission-denied"));
   }
+
   const customerId = decodeURIComponent(rawCustomerId);
   const customer =
     !auth.configured || hasAdminPermission(auth, "accounts:read")
@@ -61,22 +61,24 @@ export default async function AdminAccountCustomerDetailPage({
 
   if (!customer) notFound();
 
+  const auditEvents = auth.configured ? await getCustomerAuditEvents(120) : [];
   const customerPath = localizePath(locale, `/admin/accounts/customers/${customer.id}`);
   const source = formatAdminStatus("customerSource", customer.source, locale);
   const account = formatAdminStatus("account", customer.accountStatus, locale);
   const crm = formatAdminStatus("crm", customer.crmStatus, locale);
   const customerType = normalizeCustomerType(customer.priceGroup);
   const priceGroup = formatCustomerType(customer.priceGroup, locale);
+  const staffRole =
+    customer.staffRole && customer.staffStatus === "active"
+      ? formatAdminStatus("staffRole", customer.staffRole, locale)
+      : null;
   const role = customer.profileRole
     ? customer.profileRole === "admin"
       ? formatAdminStatus("staffRole", "admin", locale)
       : formatCustomerType(customer.profileRole, locale)
     : null;
-  const staffRole = customer.staffRole && customer.staffStatus === "active"
-    ? formatAdminStatus("staffRole", customer.staffRole, locale)
-    : null;
-  const crmOptions = getSelectOptions(crmStatusOptions, customer.crmStatus);
   const canManageStaff = !auth.configured || hasAdminPermission(auth, "staff:manage");
+  const timeline = buildTimeline(customer, auditEvents, locale);
 
   return (
     <div className="space-y-3">
@@ -85,8 +87,8 @@ export default async function AdminAccountCustomerDetailPage({
         title={customer.companyName}
         description={
           locale === "it"
-            ? "Tipo cliente, accesso staff, azienda, ordini, RMA, note e follow-up."
-            : "集中维护客户类型、员工权限、公司资料、订单、RMA、备注和跟进任务。"
+            ? "Scheda unica per cliente, azienda, permessi, note, ordini e timeline."
+            : "客户、公司、权限、备注、订单和操作时间线集中在一个页面维护。"
         }
         actions={
           <AdminButtonLink href={localizePath(locale, "/admin/accounts/customers")} variant="secondary">
@@ -98,212 +100,174 @@ export default async function AdminAccountCustomerDetailPage({
       <AccountManagementTabs auth={auth} locale={locale} active="customers" />
       <Feedback query={query} locale={locale} />
 
-      <AdminWorkspaceGrid
-        rail={
-          <AdminActionRail
-            title={locale === "it" ? "Azioni account" : "账号操作"}
-            description={locale === "it" ? "Cliente, staff e CRM" : "客户类型、员工角色与跟进"}
-          >
-            <AdminPanel title={locale === "it" ? "Identita account" : "身份与权限"}>
-              <form action="/api/admin/accounts/customers/access" method="post" className="grid gap-2">
-                <AdminCsrfField />
-                <input type="hidden" name="locale" value={locale} />
-                <input type="hidden" name="returnTo" value={customerPath} />
-                <input type="hidden" name="id" value={customer.id} />
-                <input type="hidden" name="source" value={customer.source === "company" ? "company" : "profile"} />
-                <AdminSelect name="customerType" label={locale === "it" ? "Tipo cliente" : "客户类型"} defaultValue={customerType}>
-                  {customerTypeOptions.map((group) => {
-                    const option = formatCustomerType(group, locale);
-                    return (
-                      <option key={group} value={group}>
-                        {option.label}
-                      </option>
-                    );
-                  })}
-                </AdminSelect>
-                {canManageStaff ? (
-                  customer.profileId ? (
-                    <>
-                      <AdminSelect
-                        name="staffRole"
-                        label={locale === "it" ? "Ruolo staff" : "员工角色"}
-                        defaultValue={customer.staffRole && customer.staffStatus !== "archived" ? customer.staffRole : "none"}
-                      >
-                        <option value="none">{locale === "it" ? "Nessun accesso admin" : "无后台权限"}</option>
-                        {staffRoleOptions.map((roleOption) => (
-                          <option key={roleOption} value={roleOption}>
-                            {staffRoleLabels[roleOption][locale]}
-                          </option>
-                        ))}
-                      </AdminSelect>
-                      <AdminSelect
-                        name="staffStatus"
-                        label={locale === "it" ? "Stato staff" : "员工状态"}
-                        defaultValue={customer.staffStatus ?? "active"}
-                      >
-                        <option value="active">{formatAdminStatus("account", "active", locale).label}</option>
-                        <option value="suspended">{formatAdminStatus("account", "suspended", locale).label}</option>
-                        <option value="archived">{formatAdminStatus("account", "archived", locale).label}</option>
-                      </AdminSelect>
-                    </>
-                  ) : (
-                    <AdminNotice tone="warning">
-                      {locale === "it"
-                        ? "Lo staff admin richiede un account registrato."
-                        : "分配后台员工权限前，该邮箱需要先注册/登录过站点账号。"}
-                    </AdminNotice>
-                  )
-                ) : null}
-                <AdminSelect name="accountStatus" label={locale === "it" ? "Stato account" : "账号状态"} defaultValue={customer.accountStatus}>
-                  {accountStatusOptions.map((status) => {
-                    const option = formatAdminStatus("account", status, locale);
-                    return (
-                      <option key={status} value={status}>
-                        {option.label}
-                      </option>
-                    );
-                  })}
-                </AdminSelect>
-                <AdminSelect name="crmStatus" label="CRM" defaultValue={customer.crmStatus}>
-                  {crmOptions.map((status) => {
-                    const option = formatAdminStatus("crm", status, locale);
-                    return (
-                      <option key={status} value={status}>
-                        {option.label}
-                      </option>
-                    );
-                  })}
-                </AdminSelect>
-                <AdminInput name="nextFollowUpAt" label={locale === "it" ? "Prossimo follow-up" : "下次跟进"} type="date" defaultValue={dateValue(customer.nextFollowUpAt)} required={false} />
-                <button className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white" type="submit">
-                  {locale === "it" ? "Salva identita" : "保存身份权限"}
-                </button>
-              </form>
-            </AdminPanel>
+      <section className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+        <AdminMetricCard icon={UserRound} label={locale === "it" ? "Fonte" : "来源"} value={<StatusPill status={source.label} tone={source.tone} />} tone={source.tone} />
+        <AdminMetricCard icon={ShieldCheck} label={locale === "it" ? "Accesso" : "账号状态"} value={<StatusPill status={account.label} tone={account.tone} />} tone={account.tone} />
+        <AdminMetricCard icon={Building2} label={locale === "it" ? "Tipo cliente" : "客户类型"} value={<StatusPill status={priceGroup.label} tone={priceGroup.tone} />} tone={priceGroup.tone} />
+        <AdminMetricCard icon={Clock3} label={locale === "it" ? "Ruolo staff" : "员工角色"} value={staffRole ? <StatusPill status={staffRole.label} tone={staffRole.tone} /> : locale === "it" ? "Nessuno" : "无后台权限"} tone={staffRole?.tone ?? "slate"} />
+      </section>
 
-            {!customer.companyId && customer.profileId ? (
-              <AdminPanel title={locale === "it" ? "Collega azienda" : "关联公司"}>
-                <form action="/api/admin/accounts/customers/link-company" method="post" className="grid gap-2">
+      <AdminPanel title={locale === "it" ? "Identita e permessi" : "身份与权限"} toolbar={<StatusPill status={crm.label} tone={crm.tone} />}>
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          <InfoRow label={locale === "it" ? "Email" : "邮箱"} value={customer.email ?? "-"} />
+          <InfoRow label={locale === "it" ? "Profilo" : "用户账号 ID"} value={customer.profileId ?? "-"} />
+          <InfoRow label={locale === "it" ? "Ruolo sito" : "站内角色"} value={role?.label ?? "-"} />
+          <InfoRow label={locale === "it" ? "Prossimo follow-up" : "下次跟进"} value={customer.nextFollowUpAt ? formatDate(customer.nextFollowUpAt, locale) : "-"} />
+        </div>
+        <details className="mt-3 rounded-lg border border-black/10 bg-stone-50 p-3">
+          <summary className="cursor-pointer text-sm font-black text-stone-950">
+            {locale === "it" ? "Modifica identita e permessi" : "编辑身份与权限"}
+          </summary>
+          <form action="/api/admin/accounts/customers/access" method="post" className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            <AdminCsrfField />
+            <input type="hidden" name="locale" value={locale} />
+            <input type="hidden" name="returnTo" value={customerPath} />
+            <input type="hidden" name="id" value={customer.id} />
+            <input type="hidden" name="source" value={customer.source === "company" ? "company" : "profile"} />
+            <AdminSelect name="customerType" label={locale === "it" ? "Tipo cliente" : "客户类型"} defaultValue={customerType}>
+              {customerTypeOptions.map((group) => {
+                const option = formatCustomerType(group, locale);
+                return <option key={group} value={group}>{option.label}</option>;
+              })}
+            </AdminSelect>
+            <AdminSelect name="accountStatus" label={locale === "it" ? "Stato account" : "账号状态"} defaultValue={customer.accountStatus}>
+              {accountStatusOptions.map((status) => {
+                const option = formatAdminStatus("account", status, locale);
+                return <option key={status} value={status}>{option.label}</option>;
+              })}
+            </AdminSelect>
+            <AdminSelect name="crmStatus" label="CRM" defaultValue={customer.crmStatus}>
+              {getSelectOptions(crmStatusOptions, customer.crmStatus).map((status) => {
+                const option = formatAdminStatus("crm", status, locale);
+                return <option key={status} value={status}>{option.label}</option>;
+              })}
+            </AdminSelect>
+            <AdminInput name="nextFollowUpAt" label={locale === "it" ? "Prossimo follow-up" : "下次跟进"} type="date" defaultValue={dateValue(customer.nextFollowUpAt)} required={false} />
+            {canManageStaff && customer.profileId ? (
+              <>
+                <AdminSelect name="staffRole" label={locale === "it" ? "Ruolo staff" : "员工角色"} defaultValue={customer.staffRole && customer.staffStatus !== "archived" ? customer.staffRole : "none"}>
+                  <option value="none">{locale === "it" ? "Nessun accesso admin" : "无后台权限"}</option>
+                  {staffRoleOptions.map((roleOption) => (
+                    <option key={roleOption} value={roleOption}>{staffRoleLabels[roleOption][locale]}</option>
+                  ))}
+                </AdminSelect>
+                <AdminSelect name="staffStatus" label={locale === "it" ? "Stato staff" : "员工状态"} defaultValue={customer.staffStatus ?? "active"}>
+                  <option value="active">{formatAdminStatus("account", "active", locale).label}</option>
+                  <option value="suspended">{formatAdminStatus("account", "suspended", locale).label}</option>
+                  <option value="archived">{formatAdminStatus("account", "archived", locale).label}</option>
+                </AdminSelect>
+              </>
+            ) : null}
+            {canManageStaff && !customer.profileId ? (
+              <AdminNotice tone="warning">
+                {locale === "it"
+                  ? "Lo staff admin richiede un account registrato."
+                  : "分配后台员工权限前，该邮箱需要先注册/登录过站点账号。"}
+              </AdminNotice>
+            ) : null}
+            <div className="md:col-span-2 xl:col-span-4">
+              <button className="h-9 rounded-lg bg-stone-950 px-4 text-xs font-black text-white" type="submit">
+                {locale === "it" ? "Salva identita" : "保存身份权限"}
+              </button>
+            </div>
+          </form>
+        </details>
+      </AdminPanel>
+
+      <AdminPanel title={locale === "it" ? "Azienda e consegna" : "公司与收货资料"} toolbar={<Building2 className="h-4 w-4 text-stone-500" />}>
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          <InfoRow label={locale === "it" ? "Azienda" : "公司名称"} value={customer.companyName} />
+          <InfoRow label="P.IVA / VAT" value={customer.vatNumber ?? "-"} />
+          <InfoRow label={locale === "it" ? "Contatto" : "联系人"} value={customer.contactName ?? "-"} />
+          <InfoRow label={locale === "it" ? "Telefono" : "电话"} value={customer.phone ?? "-"} />
+          <InfoRow label="WhatsApp" value={customer.whatsapp ?? "-"} />
+          <InfoRow label={locale === "it" ? "Email contatto" : "联系邮箱"} value={customer.email ?? "-"} />
+          <InfoRow label={locale === "it" ? "Fatturazione" : "账单地址"} value={customer.billingAddress ?? "-"} />
+          <InfoRow label={locale === "it" ? "Spedizione" : "收货地址"} value={customer.shippingAddress ?? "-"} />
+          <InfoRow label={locale === "it" ? "Categorie" : "关注品类"} value={customer.interestedCategories ?? "-"} />
+        </div>
+        {customer.profileId ? (
+          <details className="mt-3 rounded-lg border border-black/10 bg-stone-50 p-3">
+            <summary className="cursor-pointer text-sm font-black text-stone-950">
+              {customer.companyId
+                ? locale === "it" ? "Modifica dati azienda base" : "编辑基础公司资料"
+                : locale === "it" ? "Crea scheda azienda" : "创建/关联公司档案"}
+            </summary>
+            <form action="/api/admin/accounts/customers/link-company" method="post" className="mt-3 grid gap-2 md:grid-cols-3">
+              <AdminCsrfField />
+              <input type="hidden" name="locale" value={locale} />
+              <input type="hidden" name="returnTo" value={customerPath} />
+              <input type="hidden" name="profileId" value={customer.profileId} />
+              <AdminInput name="companyName" label={locale === "it" ? "Azienda" : "公司名称"} defaultValue={customer.companyName} />
+              <AdminInput name="vatNumber" label="P.IVA / VAT" defaultValue={customer.vatNumber ?? ""} required={false} />
+              <AdminInput name="contactEmail" label={locale === "it" ? "Email contatto" : "联系邮箱"} defaultValue={customer.email ?? ""} required={false} />
+              <div className="md:col-span-3">
+                <button className="h-9 rounded-lg bg-stone-950 px-4 text-xs font-black text-white" type="submit">
+                  {locale === "it" ? "Salva azienda" : "保存公司资料"}
+                </button>
+              </div>
+            </form>
+          </details>
+        ) : (
+          <AdminNotice tone="warning">
+            {locale === "it"
+              ? "Questo record non ha un profilo registrato, quindi non puo ricevere accesso staff."
+              : "该记录没有注册账号 ID，因此不能分配员工权限。"}
+          </AdminNotice>
+        )}
+      </AdminPanel>
+
+      <AdminPanel title={locale === "it" ? "Note e attivita" : "备注与任务"} toolbar={<MessageSquareText className="h-4 w-4 text-stone-500" />}>
+        {customer.companyId ? (
+          <div className="grid gap-3 lg:grid-cols-2">
+            <section className="rounded-lg border border-black/5 bg-stone-50 p-3">
+              <details>
+                <summary className="cursor-pointer text-sm font-black text-stone-950">{locale === "it" ? "Aggiungi nota" : "新增备注"}</summary>
+                <form action="/api/admin/customers/notes" method="post" className="mt-3 grid gap-2">
                   <AdminCsrfField />
                   <input type="hidden" name="locale" value={locale} />
                   <input type="hidden" name="returnTo" value={customerPath} />
-                  <input type="hidden" name="profileId" value={customer.profileId} />
-                  <AdminInput name="companyName" label={locale === "it" ? "Azienda" : "公司名称"} defaultValue={customer.companyName} />
-                  <AdminInput name="vatNumber" label="P.IVA / VAT" defaultValue={customer.vatNumber ?? ""} required={false} />
-                  <AdminInput name="contactEmail" label={locale === "it" ? "Email contatto" : "联系邮箱"} defaultValue={customer.email ?? ""} required={false} />
+                  <input type="hidden" name="companyId" value={customer.companyId} />
+                  <AdminTextarea name="body" label={locale === "it" ? "Nota" : "备注"} />
                   <button className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white" type="submit">
-                    {locale === "it" ? "Crea azienda" : "创建/关联公司"}
+                    {locale === "it" ? "Aggiungi" : "添加"}
                   </button>
                 </form>
-              </AdminPanel>
-            ) : null}
-
-            {customer.companyId ? (
-              <>
-                <AdminPanel title={locale === "it" ? "Nuova nota" : "新增备注"}>
-                  <form action="/api/admin/customers/notes" method="post" className="grid gap-2">
-                    <AdminCsrfField />
-                    <input type="hidden" name="locale" value={locale} />
-                    <input type="hidden" name="returnTo" value={customerPath} />
-                    <input type="hidden" name="companyId" value={customer.companyId} />
-                    <AdminTextarea name="body" label={locale === "it" ? "Nota" : "备注"} />
-                    <button className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white" type="submit">
-                      {locale === "it" ? "Aggiungi" : "添加"}
-                    </button>
-                  </form>
-                </AdminPanel>
-
-                <AdminPanel title={locale === "it" ? "Attivita follow-up" : "跟进任务"}>
-                  <form action="/api/admin/customers/tasks" method="post" className="grid gap-2">
-                    <AdminCsrfField />
-                    <input type="hidden" name="locale" value={locale} />
-                    <input type="hidden" name="returnTo" value={customerPath} />
-                    <input type="hidden" name="companyId" value={customer.companyId} />
-                    <AdminInput name="title" label={locale === "it" ? "Attivita" : "任务"} defaultValue="" />
-                    <AdminInput name="dueAt" label={locale === "it" ? "Scadenza" : "截止日期"} type="date" required={false} />
-                    <button className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white" type="submit">
-                      {locale === "it" ? "Crea attivita" : "创建任务"}
-                    </button>
-                  </form>
-                </AdminPanel>
-              </>
-            ) : null}
-          </AdminActionRail>
-        }
-      >
-        <section className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-          <AdminMetricCard icon={UserRound} label={locale === "it" ? "Fonte" : "来源"} value={<StatusPill status={source.label} tone={source.tone} />} tone={source.tone} />
-          <AdminMetricCard icon={ShieldCheck} label={locale === "it" ? "Accesso" : "账号状态"} value={<StatusPill status={account.label} tone={account.tone} />} tone={account.tone} />
-          <AdminMetricCard icon={Building2} label={locale === "it" ? "Tipo cliente" : "客户类型"} value={<StatusPill status={priceGroup.label} tone={priceGroup.tone} />} tone={priceGroup.tone} />
-          <AdminMetricCard icon={Clock3} label={locale === "it" ? "Ruolo staff" : "员工角色"} value={staffRole ? <StatusPill status={staffRole.label} tone={staffRole.tone} /> : locale === "it" ? "Nessuno" : "无后台权限"} tone={staffRole?.tone ?? "slate"} />
-        </section>
-
-        <AdminPanel title={locale === "it" ? "Salute account" : "账号健康"} toolbar={<StatusPill status={crm.label} tone={crm.tone} />}>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-            {getHealthItems(customer, locale).map((item) => (
-              <div key={item.label} className="rounded-lg bg-stone-50 p-3">
-                <p className="text-[11px] font-black uppercase text-stone-400">{item.label}</p>
-                <p className="mt-1 break-words text-sm font-black text-stone-950">{item.value}</p>
-                <p className="mt-1 text-xs font-semibold leading-5 text-stone-500">{item.description}</p>
-              </div>
-            ))}
-          </div>
-        </AdminPanel>
-
-        <AdminPanel title={locale === "it" ? "Profilo e azienda" : "账号与公司资料"} toolbar={<UserRound className="h-4 w-4 text-stone-500" />}>
-          <div className="grid gap-2 md:grid-cols-2">
-            <InfoRow label={locale === "it" ? "Email" : "邮箱"} value={customer.email ?? "-"} />
-            <InfoRow label={locale === "it" ? "Profilo" : "用户账号 ID"} value={customer.profileId ?? "-"} />
-            <InfoRow label={locale === "it" ? "Ruolo sito" : "站内角色"} value={role?.label ?? "-"} />
-            <InfoRow label={locale === "it" ? "Ruolo staff" : "员工角色"} value={staffRole?.label ?? (locale === "it" ? "Nessuno" : "无后台权限")} />
-            <InfoRow label={locale === "it" ? "P.IVA" : "税号"} value={customer.vatNumber ?? "-"} />
-            <InfoRow label={locale === "it" ? "Contatto" : "联系人"} value={customer.contactName ?? "-"} />
-            <InfoRow label={locale === "it" ? "Telefono" : "电话"} value={customer.phone ?? "-"} />
-            <InfoRow label="WhatsApp" value={customer.whatsapp ?? "-"} />
-            <InfoRow label={locale === "it" ? "Fatturazione" : "账单地址"} value={customer.billingAddress ?? "-"} />
-            <InfoRow label={locale === "it" ? "Spedizione" : "收货地址"} value={customer.shippingAddress ?? "-"} />
-            <InfoRow label={locale === "it" ? "Categorie" : "关注品类"} value={customer.interestedCategories ?? "-"} />
-          </div>
-          <div className="mt-3 flex flex-wrap gap-1">
-            <StatusPill status={source.label} tone={source.tone} />
-            <StatusPill status={account.label} tone={account.tone} />
-            <StatusPill status={crm.label} tone={crm.tone} />
-            <StatusPill status={priceGroup.label} tone={priceGroup.tone} />
-            {staffRole ? <StatusPill status={staffRole.label} tone={staffRole.tone} /> : null}
-            {customer.tags.map((tag) => (
-              <StatusPill key={tag} status={formatCustomerTag(tag, locale)} tone="violet" />
-            ))}
-          </div>
-          {!customer.companyId ? (
-            <AdminNotice tone="warning" title={locale === "it" ? "Scheda azienda mancante" : "缺少公司档案"}>
-              {locale === "it"
-                ? "Questo account e registrato ma non ha ancora una scheda azienda collegata."
-                : "该客户已注册，但还没有关联公司档案；可在右侧创建/关联公司。"}
-            </AdminNotice>
-          ) : null}
-        </AdminPanel>
-
-        <AdminPanel title={locale === "it" ? "Note e attivita" : "备注与任务"} toolbar={<MessageSquareText className="h-4 w-4 text-stone-500" />}>
-          {customer.companyId ? (
-            <div className="grid gap-3 lg:grid-cols-2">
-              <AdminRecordList>
+              </details>
+              <AdminRecordList className="mt-3">
                 {customer.notes.length ? customer.notes.map((note) => (
-                  <article key={note.id} className="rounded-lg bg-stone-50 p-3">
+                  <article key={note.id} className="rounded-lg bg-white p-3">
                     <p className="whitespace-pre-wrap break-words text-sm font-semibold leading-5 text-stone-700">{note.body}</p>
-                    <p className="mt-2 text-xs text-stone-400">{new Date(note.createdAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN")}</p>
+                    <p className="mt-2 text-xs text-stone-400">{formatDateTime(note.createdAt, locale)}</p>
                   </article>
                 )) : <p className="text-sm font-semibold text-stone-500">{locale === "it" ? "Nessuna nota." : "暂无备注。"}</p>}
               </AdminRecordList>
-              <AdminRecordList>
+            </section>
+            <section className="rounded-lg border border-black/5 bg-stone-50 p-3">
+              <details>
+                <summary className="cursor-pointer text-sm font-black text-stone-950">{locale === "it" ? "Crea attivita" : "创建任务"}</summary>
+                <form action="/api/admin/customers/tasks" method="post" className="mt-3 grid gap-2">
+                  <AdminCsrfField />
+                  <input type="hidden" name="locale" value={locale} />
+                  <input type="hidden" name="returnTo" value={customerPath} />
+                  <input type="hidden" name="companyId" value={customer.companyId} />
+                  <AdminInput name="title" label={locale === "it" ? "Attivita" : "任务"} defaultValue="" />
+                  <AdminInput name="dueAt" label={locale === "it" ? "Scadenza" : "截止日期"} type="date" required={false} />
+                  <button className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white" type="submit">
+                    {locale === "it" ? "Crea attivita" : "创建任务"}
+                  </button>
+                </form>
+              </details>
+              <AdminRecordList className="mt-3">
                 {customer.tasks.length ? customer.tasks.map((task) => {
                   const taskStatus = formatAdminStatus("task", task.status, locale);
                   return (
-                    <article key={task.id} className="rounded-lg bg-stone-50 p-3">
+                    <article key={task.id} className="rounded-lg bg-white p-3">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <p className="min-w-0 break-words text-sm font-black text-stone-950">{task.title}</p>
                         <StatusPill status={taskStatus.label} tone={taskStatus.tone} />
                       </div>
-                      <p className="mt-1 text-xs text-stone-500">{task.dueAt ? new Date(task.dueAt).toLocaleDateString(locale === "it" ? "it-IT" : "zh-CN") : "-"}</p>
+                      <p className="mt-1 text-xs text-stone-500">{task.dueAt ? formatDate(task.dueAt, locale) : "-"}</p>
                       {task.status !== "completed" ? (
                         <form action="/api/admin/customers/tasks" method="post" className="mt-2">
                           <AdminCsrfField />
@@ -321,64 +285,60 @@ export default async function AdminAccountCustomerDetailPage({
                   );
                 }) : <p className="text-sm font-semibold text-stone-500">{locale === "it" ? "Nessuna attivita." : "暂无任务。"}</p>}
               </AdminRecordList>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 rounded-lg bg-stone-50 p-3 text-sm font-semibold text-stone-600">
-              <Link2 className="h-4 w-4" />
-              {locale === "it" ? "Collega prima una scheda azienda per usare note e attivita CRM." : "先关联公司档案后，可使用备注和跟进任务。"}
-            </div>
-          )}
-        </AdminPanel>
+            </section>
+          </div>
+        ) : (
+          <AdminNotice tone="warning">
+            {locale === "it" ? "Collega prima una scheda azienda per usare note e attivita CRM." : "先关联公司档案后，可使用备注和跟进任务。"}
+          </AdminNotice>
+        )}
+      </AdminPanel>
 
-        <AdminPanel title={locale === "it" ? "Storico ordini" : "订单历史"} toolbar={<ClipboardList className="h-4 w-4 text-stone-500" />}>
-          {customer.orders.length ? (
-            <AdminRecordList>
-              {customer.orders.map((order) => {
-                const orderStatus = formatAdminStatus("order", order.status, locale);
-                const paymentStatus = formatAdminStatus("payment", order.paymentStatus ?? "-", locale);
-                return (
-                  <article key={order.id} className="grid gap-2 rounded-lg bg-stone-50 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-                    <div className="min-w-0">
-                      <p className="break-words font-mono text-xs font-black text-stone-900">{order.id}</p>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        <StatusPill status={orderStatus.label} tone={orderStatus.tone} />
-                        <StatusPill status={paymentStatus.label} tone={paymentStatus.tone} />
-                        <StatusPill status={formatMoney(order.total, locale)} tone="slate" />
-                      </div>
+      <AdminPanel title={locale === "it" ? "Storico ordini" : "订单历史"} toolbar={<ClipboardList className="h-4 w-4 text-stone-500" />}>
+        {customer.orders.length ? (
+          <AdminRecordList>
+            {customer.orders.map((order) => {
+              const orderStatus = formatAdminStatus("order", order.status, locale);
+              const paymentStatus = formatAdminStatus("payment", order.paymentStatus ?? "-", locale);
+              return (
+                <article key={order.id} className="grid gap-2 rounded-lg bg-stone-50 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                  <div className="min-w-0">
+                    <p className="break-words font-mono text-xs font-black text-stone-900">{order.id}</p>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      <StatusPill status={orderStatus.label} tone={orderStatus.tone} />
+                      <StatusPill status={paymentStatus.label} tone={paymentStatus.tone} />
+                      <StatusPill status={formatMoney(order.total, locale)} tone="slate" />
                     </div>
-                    <AdminButtonLink href={localizePath(locale, `/admin/orders/${order.id}`)} variant="secondary">
-                      {locale === "it" ? "Apri" : "查看"}
-                    </AdminButtonLink>
-                  </article>
-                );
-              })}
-            </AdminRecordList>
-          ) : (
-            <p className="text-sm font-semibold text-stone-500">{locale === "it" ? "Nessun ordine." : "暂无订单。"}</p>
-          )}
-        </AdminPanel>
+                  </div>
+                  <AdminButtonLink href={localizePath(locale, `/admin/orders/${order.id}`)} variant="secondary">
+                    {locale === "it" ? "Apri" : "查看"}
+                  </AdminButtonLink>
+                </article>
+              );
+            })}
+          </AdminRecordList>
+        ) : (
+          <p className="text-sm font-semibold text-stone-500">{locale === "it" ? "Nessun ordine." : "暂无订单。"}</p>
+        )}
+      </AdminPanel>
 
-        <AdminPanel title="RMA" toolbar={<BadgeCheck className="h-4 w-4 text-stone-500" />}>
-          {customer.rmas.length ? (
-            <AdminRecordList>
-              {customer.rmas.map((rma) => {
-                const rmaStatus = formatAdminStatus("rma", rma.status, locale);
-                return (
-                  <article key={rma.id} className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg bg-stone-50 p-3">
-                    <div className="min-w-0">
-                      <p className="break-words font-mono text-xs font-black text-stone-900">{rma.rmaNumber ?? rma.id}</p>
-                      <p className="mt-1 break-words text-sm font-semibold text-stone-600">{rma.sku} x {rma.quantity}</p>
-                    </div>
-                    <StatusPill status={rmaStatus.label} tone={rmaStatus.tone} />
-                  </article>
-                );
-              })}
-            </AdminRecordList>
-          ) : (
-            <p className="text-sm font-semibold text-stone-500">{locale === "it" ? "Nessun RMA." : "暂无 RMA。"}</p>
-          )}
-        </AdminPanel>
-      </AdminWorkspaceGrid>
+      <AdminPanel title={locale === "it" ? "Timeline operativa" : "操作时间线"} toolbar={<History className="h-4 w-4 text-stone-500" />}>
+        {timeline.length ? (
+          <div className="grid gap-2">
+            {timeline.map((event) => (
+              <article key={event.id} className="rounded-lg border border-black/5 bg-stone-50 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="font-black text-stone-950">{event.title}</p>
+                  <span className="text-xs font-semibold text-stone-500">{formatDateTime(event.createdAt, locale)}</span>
+                </div>
+                <p className="mt-1 break-words text-sm font-semibold leading-5 text-stone-600">{event.body}</p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm font-semibold text-stone-500">{locale === "it" ? "Nessun evento registrato." : "暂无操作记录。"}</p>
+        )}
+      </AdminPanel>
     </div>
   );
 }
@@ -392,61 +352,45 @@ function InfoRow({ label, value }: Readonly<{ label: string; value: string }>) {
   );
 }
 
-function getHealthItems(customer: AdminCustomerDetail, locale: Locale) {
-  const requiredCompanyFields = [
-    customer.companyName,
-    customer.email,
-    customer.vatNumber,
-    customer.contactName,
-    customer.billingAddress,
-    customer.shippingAddress,
-  ];
-  const completedFields = requiredCompanyFields.filter(Boolean).length;
-  const nextStep = getNextStep(customer, locale);
+function buildTimeline(
+  customer: AdminCustomerDetail,
+  auditEvents: CustomerAuditEventRow[],
+  locale: Locale,
+) {
+  const matchedAuditEvents = auditEvents.filter((event) => {
+    if (customer.companyId && event.companyId === customer.companyId) return true;
+    if (customer.profileId && event.customerProfileId === customer.profileId) return true;
+    return false;
+  });
   return [
-    {
-      label: locale === "it" ? "Completezza" : "资料完整度",
-      value: `${completedFields}/${requiredCompanyFields.length}`,
-      description: locale === "it" ? "Azienda, contatto e indirizzi." : "公司、联系人与地址资料。",
-    },
-    {
-      label: locale === "it" ? "Tipo cliente" : "客户类型",
-      value: formatCustomerType(customer.priceGroup, locale).label,
-      description: locale === "it" ? "Determina prezzo retail o wholesale." : "决定前台显示零售价或批发价。",
-    },
-    {
-      label: locale === "it" ? "Storico" : "交易记录",
-      value: `${customer.orderCount} / ${formatMoney(customer.totalSpent, locale)}`,
-      description: locale === "it" ? "Ordini e valore totale." : "订单数与历史成交额。",
-    },
-    {
-      label: locale === "it" ? "Prossimo passo" : "下一步",
-      value: nextStep,
-      description: locale === "it" ? "Suggerimento operativo." : "系统建议的运营动作。",
-    },
-  ];
-}
-
-function getNextStep(customer: AdminCustomerDetail, locale: Locale) {
-  if (!customer.companyId) return locale === "it" ? "Collegare azienda" : "补公司资料";
-  if (customer.crmStatus.includes("pending")) return locale === "it" ? "Gestire richiesta wholesale" : "处理批发申请";
-  if (customer.accountStatus !== "active" || customer.crmStatus === "paused") {
-    return locale === "it" ? "Verificare accesso" : "检查权限";
-  }
-  if (customer.pendingTaskCount > 0) return locale === "it" ? "Gestire attivita" : "处理任务";
-  if (customer.rmaCount > 0) return locale === "it" ? "Controllare RMA" : "查看售后";
-  return locale === "it" ? "Monitorare" : "持续维护";
-}
-
-function formatCustomerTag(value: string, locale: Locale) {
-  const normalized = value.toLowerCase();
-  if (normalized === "b2b application") {
-    return locale === "it" ? "Richiesta wholesale" : "批发申请";
-  }
-  if (normalized === "registered") {
-    return locale === "it" ? "Registrato" : "已注册";
-  }
-  return value;
+    ...matchedAuditEvents.map((event) => {
+      const action = formatAdminStatus("auditAction", event.action, locale);
+      return {
+        id: `audit-${event.id}`,
+        title: action.label,
+        body: formatAuditDataSummary(event.afterData, locale),
+        createdAt: event.createdAt,
+      };
+    }),
+    ...customer.notes.map((note) => ({
+      id: `note-${note.id}`,
+      title: locale === "it" ? "Nota cliente" : "客户备注",
+      body: note.body,
+      createdAt: note.createdAt,
+    })),
+    ...customer.tasks.map((task) => ({
+      id: `task-${task.id}`,
+      title: locale === "it" ? "Attivita CRM" : "跟进任务",
+      body: `${task.title} / ${formatAdminStatus("task", task.status, locale).label}`,
+      createdAt: task.createdAt,
+    })),
+    ...customer.orders.map((order) => ({
+      id: `order-${order.id}`,
+      title: locale === "it" ? "Ordine creato" : "订单创建",
+      body: `${order.id} / ${formatMoney(order.total, locale)}`,
+      createdAt: order.createdAt,
+    })),
+  ].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
 
 function getSelectOptions<T extends readonly string[]>(options: T, currentValue: string) {
@@ -473,6 +417,14 @@ function Feedback({
 function dateValue(value: string | null) {
   if (!value) return "";
   return value.slice(0, 10);
+}
+
+function formatDate(value: string, locale: Locale) {
+  return new Date(value).toLocaleDateString(locale === "it" ? "it-IT" : "zh-CN");
+}
+
+function formatDateTime(value: string, locale: Locale) {
+  return new Date(value).toLocaleString(locale === "it" ? "it-IT" : "zh-CN");
 }
 
 function valueOf(value: string | string[] | undefined) {

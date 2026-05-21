@@ -538,14 +538,9 @@ export function AdminWorkspaceGrid({
   className?: string;
 }>) {
   return (
-    <div
-      className={cn(
-        "grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_340px]",
-        className,
-      )}
-    >
+    <div className={cn("min-w-0 space-y-3", className)}>
+      {rail ? <div className="min-w-0">{rail}</div> : null}
       <div className="min-w-0 space-y-3">{children}</div>
-      {rail ? <div className="min-w-0 space-y-3">{rail}</div> : null}
     </div>
   );
 }
@@ -554,17 +549,15 @@ export function AdminActionRail({
   title,
   description,
   children,
-  sticky = true,
 }: Readonly<{
   title?: ReactNode;
   description?: ReactNode;
   children: ReactNode;
-  sticky?: boolean;
 }>) {
   return (
-    <aside className={cn("space-y-3", sticky && "xl:sticky xl:top-[76px] xl:self-start")}>
+    <section className="space-y-2 rounded-xl border border-black/5 bg-white/70 p-2 shadow-sm">
       {(title || description) ? (
-        <div className="rounded-lg border border-black/5 bg-white px-3 py-2 shadow-sm">
+        <div className="rounded-lg border border-black/5 bg-white px-3 py-2">
           {title ? <h3 className="text-sm font-black text-stone-950">{title}</h3> : null}
           {description ? (
             <p className="mt-0.5 text-xs font-semibold leading-5 text-stone-500">
@@ -573,8 +566,8 @@ export function AdminActionRail({
           ) : null}
         </div>
       ) : null}
-      {children}
-    </aside>
+      <div className="grid min-w-0 gap-2 md:grid-cols-2 xl:grid-cols-4">{children}</div>
+    </section>
   );
 }
 

@@ -171,8 +171,8 @@ export default async function ProductDetailPage({
               </p>
             ) : null}
           </div>
-          <ButtonLink href={localizePath(locale, "/b2b")} variant="secondary">
-            {dictionary.common.requestB2b}
+          <ButtonLink href={localizePath(locale, "/account/company")} variant="secondary">
+            {dictionary.common.accountProfile as string}
           </ButtonLink>
         </div>
       </section>

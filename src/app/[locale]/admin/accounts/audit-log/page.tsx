@@ -36,8 +36,8 @@ export default async function AdminAccountAuditLogPage({
         title={locale === "it" ? "Audit account" : "账号操作日志"}
         description={
           locale === "it"
-            ? "Log delle modifiche a clienti, richieste wholesale e staff."
-            : "记录客户权限、批发申请、员工权限等账号相关操作。"
+            ? "Log delle modifiche a clienti, price group e staff."
+            : "记录客户权限、价格组、员工权限等账号相关操作。"
         }
       />
 
@@ -55,7 +55,7 @@ export default async function AdminAccountAuditLogPage({
           <AdminRecordList>
             {events.map((event) => {
               const action = formatAdminStatus("auditAction", event.action, locale);
-              const target = event.companyId ?? event.customerProfileId ?? event.applicationId ?? "-";
+              const target = event.companyId ?? event.customerProfileId ?? "-";
               return (
                 <article key={event.id} className="grid min-w-0 gap-3 rounded-lg bg-stone-50 p-3 lg:grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)_auto] lg:items-center">
                   <div className="min-w-0">

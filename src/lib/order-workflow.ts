@@ -14,7 +14,6 @@ export type RefundReason =
   | "fraudulent"
   | "requested_by_customer"
   | "order_cancelled"
-  | "rma_refund"
   | "other";
 
 export type OrderLine = {

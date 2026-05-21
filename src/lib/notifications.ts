@@ -7,7 +7,6 @@ export type NotificationLocale = "it" | "zh";
 type NotificationInput = {
   profileId?: string | null;
   orderId?: string | null;
-  rmaId?: string | null;
   recipientEmail?: string | null;
   locale?: string | null;
   subject: string;
@@ -21,11 +20,6 @@ type OrderNotificationType =
   | "refund_recorded"
   | "shipment_updated"
   | "status_updated";
-
-type RmaNotificationType =
-  | "rma_status_updated"
-  | "rma_resolution_updated"
-  | "rma_attachment_added";
 
 export async function notifyOrderCustomer({
   orderId,
@@ -85,74 +79,10 @@ export async function notifyOrderCustomer({
   });
 }
 
-export async function notifyRmaCustomer({
-  rmaId,
-  type,
-  locale,
-  metadata = {},
-}: {
-  rmaId: string;
-  type: RmaNotificationType;
-  locale?: string | null;
-  metadata?: Record<string, unknown>;
-}) {
-  if (!hasSupabaseAdminConfig()) return { status: "skipped", reason: "supabase_missing" };
-
-  const supabase = getSupabaseAdminClient();
-  const { data: rma, error } = await supabase
-    .from("rmas")
-    .select(
-      "id, rma_number, profile_id, order_id, status, order_number, sku, resolution_type, refund_amount, replacement_sku, resolution_note",
-    )
-    .eq("id", rmaId)
-    .maybeSingle();
-
-  if (error) throw new Error(error.message);
-  if (!rma) return { status: "skipped", reason: "rma_missing" };
-
-  const recipientEmail = await resolveRmaRecipientEmail(supabase, {
-    orderId: rma.order_id,
-    profileId: rma.profile_id,
-  });
-  const template = buildRmaNotification({
-    type,
-    locale: normalizeLocale(locale),
-    rma: {
-      id: rma.id,
-      rmaNumber: rma.rma_number,
-      status: rma.status,
-      orderNumber: rma.order_number,
-      sku: rma.sku,
-      resolutionType: rma.resolution_type,
-      refundAmount:
-        rma.refund_amount === null || rma.refund_amount === undefined
-          ? null
-          : Number(rma.refund_amount),
-      replacementSku: rma.replacement_sku,
-      resolutionNote: rma.resolution_note,
-    },
-  });
-
-  return createAndMaybeSendNotification({
-    supabase,
-    profileId: rma.profile_id,
-    rmaId: rma.id,
-    recipientEmail,
-    locale,
-    subject: template.subject,
-    body: template.body,
-    metadata: {
-      notificationType: type,
-      ...metadata,
-    },
-  });
-}
-
 async function createAndMaybeSendNotification({
   supabase,
   profileId,
   orderId,
-  rmaId,
   recipientEmail,
   locale,
   subject,
@@ -172,7 +102,6 @@ async function createAndMaybeSendNotification({
     .insert({
       profile_id: profileId ?? null,
       order_id: orderId ?? null,
-      rma_id: rmaId ?? null,
       channel: "email",
       locale: normalizeLocale(locale),
       recipient_email: cleanEmail,
@@ -221,37 +150,6 @@ async function createAndMaybeSendNotification({
       .eq("id", data.id);
     return { id: data.id, status: "failed", error: message };
   }
-}
-
-async function resolveRmaRecipientEmail(
-  supabase: SupabaseClient,
-  {
-    orderId,
-    profileId,
-  }: {
-    orderId?: string | null;
-    profileId?: string | null;
-  },
-) {
-  if (orderId) {
-    const { data } = await supabase
-      .from("orders")
-      .select("email")
-      .eq("id", orderId)
-      .maybeSingle();
-    if (data?.email) return data.email as string;
-  }
-
-  if (profileId) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("email")
-      .eq("id", profileId)
-      .maybeSingle();
-    if (data?.email) return data.email as string;
-  }
-
-  return null;
 }
 
 async function sendResendEmail({
@@ -381,65 +279,6 @@ function buildOrderNotification({
   return {
     subject: `PartsPro stato ordine aggiornato ${shortId(order.id)}`,
     body: `Lo stato del tuo ordine e stato aggiornato.\n\nStato ordine: ${order.status || "-"}\nFulfilment: ${order.fulfillmentStatus || "-"}\n\nApri ordine: ${url}`,
-  };
-}
-
-function buildRmaNotification({
-  type,
-  locale,
-  rma,
-}: {
-  type: RmaNotificationType;
-  locale: NotificationLocale;
-  rma: {
-    id: string;
-    rmaNumber?: string | null;
-    status: string;
-    orderNumber: string;
-    sku: string;
-    resolutionType?: string | null;
-    refundAmount?: number | null;
-    replacementSku?: string | null;
-    resolutionNote?: string | null;
-  };
-}) {
-  const rmaLabel = rma.rmaNumber || rma.id;
-  const url = `${getSiteUrl()}/${locale}/account/rma/${rma.id}`;
-
-  if (locale === "zh") {
-    if (type === "rma_resolution_updated") {
-      return {
-        subject: `PartsPro 售后处理结果已更新 ${rmaLabel}`,
-        body: `您的售后处理结果已更新。\n\nRMA：${rmaLabel}\n处理类型：${rma.resolutionType || "-"}\n退款金额：${rma.refundAmount === null || rma.refundAmount === undefined ? "-" : `${rma.refundAmount.toFixed(2)} EUR`}\n换货 SKU：${rma.replacementSku || "-"}\n${rma.resolutionNote ? `\n说明：${rma.resolutionNote}\n` : ""}\n查看售后：${url}`,
-      };
-    }
-    if (type === "rma_attachment_added") {
-      return {
-        subject: `PartsPro 售后附件已更新 ${rmaLabel}`,
-        body: `售后团队为您的 RMA 添加了新的附件或凭证。\n\nRMA：${rmaLabel}\nSKU：${rma.sku}\n\n查看售后：${url}`,
-      };
-    }
-    return {
-      subject: `PartsPro 售后状态已更新 ${rmaLabel}`,
-      body: `您的售后状态已更新。\n\nRMA：${rmaLabel}\n状态：${rma.status}\nSKU：${rma.sku}\n\n查看售后：${url}`,
-    };
-  }
-
-  if (type === "rma_resolution_updated") {
-    return {
-      subject: `PartsPro esito RMA aggiornato ${rmaLabel}`,
-      body: `L'esito della tua pratica RMA e stato aggiornato.\n\nRMA: ${rmaLabel}\nEsito: ${rma.resolutionType || "-"}\nRimborso: ${rma.refundAmount === null || rma.refundAmount === undefined ? "-" : `${rma.refundAmount.toFixed(2)} EUR`}\nSKU sostitutivo: ${rma.replacementSku || "-"}\n${rma.resolutionNote ? `\nNota: ${rma.resolutionNote}\n` : ""}\nApri RMA: ${url}`,
-    };
-  }
-  if (type === "rma_attachment_added") {
-    return {
-      subject: `PartsPro allegato RMA aggiornato ${rmaLabel}`,
-      body: `Il team post-vendita ha aggiunto un nuovo allegato alla tua pratica RMA.\n\nRMA: ${rmaLabel}\nSKU: ${rma.sku}\n\nApri RMA: ${url}`,
-    };
-  }
-  return {
-    subject: `PartsPro stato RMA aggiornato ${rmaLabel}`,
-    body: `Lo stato della tua pratica RMA e stato aggiornato.\n\nRMA: ${rmaLabel}\nStato: ${rma.status}\nSKU: ${rma.sku}\n\nApri RMA: ${url}`,
   };
 }
 

@@ -26,20 +26,6 @@ export const orderSchema = z.object({
     .optional(),
 });
 
-export const b2bApplicationSchema = z.object({
-  companyName: z.string().min(1, "companyName is required"),
-  vatNumber: z.string().optional().or(z.literal("")),
-  fiscalCode: z.string().optional().or(z.literal("")),
-  sdi: z.string().optional().or(z.literal("")),
-  pec: z.string().optional().or(z.literal("")),
-  contactName: z.string().optional().or(z.literal("")),
-  email: z.string().email().optional().or(z.literal("")),
-  phone: z.string().optional().or(z.literal("")),
-  whatsapp: z.string().optional().or(z.literal("")),
-  monthlyVolume: z.string().optional().or(z.literal("")),
-  interestedCategories: z.string().optional().or(z.literal("")),
-});
-
 export const accountCompanySchema = z.object({
   locale: z.enum(["it", "zh"]).default("it"),
   companyName: z.string().min(1, "companyName is required"),
@@ -56,15 +42,6 @@ export const accountCompanySchema = z.object({
   monthlyVolume: z.string().optional().or(z.literal("")),
   interestedCategories: z.string().optional().or(z.literal("")),
   intent: z.string().optional().or(z.literal("")),
-});
-
-export const rmaSchema = z.object({
-  locale: z.enum(["it", "zh"]).default("it"),
-  orderNumber: z.string().min(1, "orderNumber is required"),
-  sku: z.string().min(1, "sku is required"),
-  quantity: z.coerce.number().int().positive(),
-  issueType: z.string().min(1, "issueType is required"),
-  description: z.string().optional().or(z.literal("")),
 });
 
 export const accountOrderActionSchema = z.object({
@@ -85,24 +62,6 @@ export const accountMessageSchema = z.object({
   locale: z.enum(["it", "zh"]).default("it"),
   returnTo: z.string().optional().or(z.literal("")),
   message: z.string().min(2, "message is required"),
-});
-
-export const accountRmaCreateSchema = z.object({
-  locale: z.enum(["it", "zh"]).default("it"),
-  orderId: z.string().min(1, "orderId is required"),
-  sku: z.string().min(1, "sku is required"),
-  quantity: z.coerce.number().int().positive(),
-  issueType: z.string().min(1, "issueType is required"),
-  description: z.string().optional().or(z.literal("")),
-});
-
-export const accountRmaAttachmentSchema = z.object({
-  id: z.string().min(1),
-  locale: z.enum(["it", "zh"]).default("it"),
-  returnTo: z.string().optional().or(z.literal("")),
-  label: z.string().min(1),
-  url: z.string().min(1),
-  note: z.string().optional().or(z.literal("")),
 });
 
 export const accountNotificationReadSchema = z.object({
@@ -300,7 +259,6 @@ export const adminOrderRefundSchema = z.object({
     "fraudulent",
     "requested_by_customer",
     "order_cancelled",
-    "rma_refund",
     "other",
   ]).default("requested_by_customer"),
   providerReference: z.string().optional().or(z.literal("")),
@@ -316,13 +274,6 @@ export const adminOrderShipmentSchema = z.object({
   trackingUrl: z.string().url().optional().or(z.literal("")),
   shipmentNote: z.string().optional().or(z.literal("")),
   customerNote: z.string().optional().or(z.literal("")),
-});
-
-export const adminB2BStatusSchema = z.object({
-  id: z.string().min(1),
-  status: z.enum(["pending", "approved", "rejected"]),
-  priceGroup: z.enum(["b2b_basic", "b2b_silver", "b2b_gold", "distributor"]).optional().or(z.literal("")),
-  locale: z.enum(["it", "zh"]).default("it"),
 });
 
 export const adminCustomerStatusSchema = z.object({
@@ -413,70 +364,4 @@ export const adminCustomerTagSchema = z.object({
   locale: z.enum(["it", "zh"]).default("it"),
   tagName: z.string().min(1),
   color: z.string().optional().or(z.literal("")),
-});
-
-export const adminRmaStatusSchema = z.object({
-  id: z.string().min(1),
-  status: z.enum([
-    "submitted",
-    "waiting_information",
-    "approved_return",
-    "waiting_receive",
-    "testing",
-    "approved",
-    "rejected",
-    "replacement_sent",
-    "refund_processing",
-    "completed",
-  ]),
-  locale: z.enum(["it", "zh"]).default("it"),
-});
-
-export const adminRmaResolutionSchema = z
-  .object({
-    id: z.string().min(1),
-    locale: z.enum(["it", "zh"]).default("it"),
-    returnTo: z.string().optional().or(z.literal("")),
-    resolutionType: z.enum([
-      "pending",
-      "repair",
-      "replace",
-      "refund",
-      "reject",
-      "credit_note",
-    ]),
-    resolutionNote: z.string().optional().or(z.literal("")),
-    refundAmount: z.coerce.number().nonnegative().optional().or(z.literal("")),
-    replacementSku: z.string().optional().or(z.literal("")),
-    closeCase: z.coerce.boolean().default(false),
-  })
-  .superRefine((value, ctx) => {
-    if (
-      (value.resolutionType === "refund" ||
-        value.resolutionType === "credit_note") &&
-      (!value.refundAmount || Number(value.refundAmount) <= 0)
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "refundAmount is required for refund or credit note",
-        path: ["refundAmount"],
-      });
-    }
-
-    if (value.resolutionType === "replace" && !value.replacementSku) {
-      ctx.addIssue({
-        code: "custom",
-        message: "replacementSku is required for replacement",
-        path: ["replacementSku"],
-      });
-    }
-  });
-
-export const adminRmaAttachmentSchema = z.object({
-  id: z.string().min(1),
-  locale: z.enum(["it", "zh"]).default("it"),
-  returnTo: z.string().optional().or(z.literal("")),
-  label: z.string().min(1),
-  url: z.string().min(1),
-  note: z.string().optional().or(z.literal("")),
 });

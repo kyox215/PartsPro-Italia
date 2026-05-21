@@ -1,7 +1,6 @@
 import { Building2, Clock3, Euro, ShieldAlert, UsersRound, type LucideIcon } from "lucide-react";
 import { redirect } from "next/navigation";
 import { AccountManagementTabs } from "@/components/admin/account-management-nav";
-import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
 import {
   AdminActionRail,
   AdminButtonLink,
@@ -50,9 +49,10 @@ export default async function AdminAccountCustomersPage({
   const totalSpent = customers.reduce((sum, customer) => sum + customer.totalSpent, 0);
   const filterItems = [
     ["all", locale === "it" ? "Tutti" : "全部"],
+    ["registered", locale === "it" ? "Registrati" : "已注册"],
     ["retail", locale === "it" ? "Clienti retail" : "零售客户"],
     ["wholesale", locale === "it" ? "Clienti wholesale" : "批发客户"],
-    ["wholesale_pending", locale === "it" ? "Richieste wholesale" : "待处理批发申请"],
+    ["incomplete", locale === "it" ? "Profili incompleti" : "资料待完善"],
     ["staff", locale === "it" ? "Staff" : "员工账号"],
     ["suspended", locale === "it" ? "Sospesi/archiviati" : "暂停/归档"],
   ].map(([value, label]) => ({
@@ -69,8 +69,8 @@ export default async function AdminAccountCustomersPage({
         title={locale === "it" ? "Gestione clienti" : "客户管理"}
         description={
           locale === "it"
-            ? "Account registrati, aziende, richieste wholesale, ordini, RMA e ruoli staff."
-            : "集中显示注册用户、公司资料、批发申请、订单、RMA 和员工权限。"
+            ? "Account registrati, aziende, price group, ordini e ruoli staff."
+            : "集中显示注册用户、公司资料、价格权限、订单和员工权限。"
         }
         actions={
           <AdminButtonLink href={localizePath(locale, "/admin/accounts/permissions")} variant="secondary">
@@ -158,8 +158,8 @@ export default async function AdminAccountCustomersPage({
               title={locale === "it" ? "Nessun cliente" : "暂无客户"}
               description={
                 locale === "it"
-                  ? "Gli account, le aziende e le richieste wholesale appariranno qui."
-                  : "注册用户、公司资料和批发申请都会显示在这里。"
+                  ? "Gli account registrati e le aziende appariranno qui."
+                  : "注册用户和公司资料都会显示在这里。"
               }
             />
           )}
@@ -205,7 +205,6 @@ function CustomerRecord({
       <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-2">
         <MetricMini label={locale === "it" ? "Ordini" : "订单"} value={String(customer.orderCount)} />
         <MetricMini label={locale === "it" ? "Valore" : "成交额"} value={formatMoney(customer.totalSpent, locale)} />
-        <MetricMini label="RMA" value={String(customer.rmaCount)} />
         <MetricMini
           label={locale === "it" ? "Staff" : "员工"}
           value={staffRole?.label ?? "-"}
@@ -227,33 +226,9 @@ function CustomerRecord({
       </div>
 
       <div className="flex xl:justify-end">
-        {customer.source === "application" ? (
-          <div className="flex flex-wrap gap-2 xl:justify-end">
-            <form action="/api/admin/accounts/b2b/status" method="post">
-              <AdminCsrfField />
-              <input type="hidden" name="locale" value={locale} />
-              <input type="hidden" name="id" value={customer.applicationId ?? customer.id} />
-              <input type="hidden" name="status" value="approved" />
-              <input type="hidden" name="priceGroup" value="b2b_basic" />
-              <button className="h-8 rounded-lg bg-stone-950 px-3 text-xs font-black text-white" type="submit">
-                {locale === "it" ? "Wholesale" : "设为批发"}
-              </button>
-            </form>
-            <form action="/api/admin/accounts/b2b/status" method="post">
-              <AdminCsrfField />
-              <input type="hidden" name="locale" value={locale} />
-              <input type="hidden" name="id" value={customer.applicationId ?? customer.id} />
-              <input type="hidden" name="status" value="rejected" />
-              <button className="h-8 rounded-lg border border-black/10 bg-white px-3 text-xs font-black text-stone-700" type="submit">
-                {locale === "it" ? "Rifiuta" : "保持零售"}
-              </button>
-            </form>
-          </div>
-        ) : (
-          <AdminButtonLink href={nextAction.href} variant="secondary">
-            {nextAction.button}
-          </AdminButtonLink>
-        )}
+        <AdminButtonLink href={nextAction.href} variant="secondary">
+          {nextAction.button}
+        </AdminButtonLink>
       </div>
     </article>
   );
@@ -289,15 +264,6 @@ function SummaryLink({
 }
 
 function getCustomerNextAction(customer: AdminCustomerRow, locale: Locale) {
-  if (customer.source === "application" || customer.crmStatus.includes("b2b_pending")) {
-    return {
-      label: locale === "it" ? "Gestire richiesta wholesale" : "处理批发申请",
-      button: locale === "it" ? "Gestisci" : "处理",
-      href: customer.profileId
-        ? localizePath(locale, `/admin/accounts/customers/${customer.profileId}`)
-        : localizePath(locale, "/admin/accounts/customers?filter=wholesale_pending"),
-    };
-  }
   if (!customer.companyId) {
     return {
       label: locale === "it" ? "Collegare scheda azienda" : "补齐公司档案",
@@ -319,13 +285,6 @@ function getCustomerNextAction(customer: AdminCustomerRow, locale: Locale) {
       href: localizePath(locale, `/admin/accounts/customers/${customer.id}`),
     };
   }
-  if (customer.rmaCount > 0) {
-    return {
-      label: locale === "it" ? "Controllare storico RMA" : "查看售后记录",
-      button: locale === "it" ? "Apri" : "查看",
-      href: localizePath(locale, `/admin/accounts/customers/${customer.id}`),
-    };
-  }
   return {
     label: locale === "it" ? "Scheda cliente aggiornata" : "查看客户详情",
     button: locale === "it" ? "Apri" : "详情",
@@ -335,8 +294,9 @@ function getCustomerNextAction(customer: AdminCustomerRow, locale: Locale) {
 
 function filterCustomers(customers: AdminCustomerRow[], filter: string) {
   if (filter === "retail") return customers.filter((customer) => customer.priceGroup === "retail");
+  if (filter === "registered") return customers.filter((customer) => customer.profileId);
   if (filter === "wholesale") return customers.filter(isWholesaleCustomer);
-  if (filter === "wholesale_pending") return customers.filter(isWholesalePending);
+  if (filter === "incomplete") return customers.filter(isCompanyIncomplete);
   if (filter === "staff") return customers.filter(isStaffCustomer);
   if (filter === "suspended") return customers.filter(isSuspended);
   return customers;
@@ -347,7 +307,7 @@ function getCustomerFilterCounts(customers: AdminCustomerRow[]) {
     all: customers.length,
     registered: 0,
     retail: 0,
-    wholesale_pending: 0,
+    incomplete: 0,
     wholesale: 0,
     staff: 0,
     suspended: 0,
@@ -356,7 +316,7 @@ function getCustomerFilterCounts(customers: AdminCustomerRow[]) {
   customers.forEach((customer) => {
     if (customer.profileId) counts.registered += 1;
     if (customer.priceGroup === "retail") counts.retail += 1;
-    if (isWholesalePending(customer)) counts.wholesale_pending += 1;
+    if (isCompanyIncomplete(customer)) counts.incomplete += 1;
     if (isWholesaleCustomer(customer)) counts.wholesale += 1;
     if (isStaffCustomer(customer)) counts.staff += 1;
     if (isSuspended(customer)) counts.suspended += 1;
@@ -365,8 +325,8 @@ function getCustomerFilterCounts(customers: AdminCustomerRow[]) {
   return counts;
 }
 
-function isWholesalePending(customer: AdminCustomerRow) {
-  return customer.crmStatus.includes("pending") || customer.priceGroup === "b2b_pending";
+function isCompanyIncomplete(customer: AdminCustomerRow) {
+  return !customer.companyId || !customer.vatNumber;
 }
 
 function isWholesaleCustomer(customer: AdminCustomerRow) {

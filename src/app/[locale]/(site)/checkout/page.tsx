@@ -1,8 +1,14 @@
 import { cookies } from "next/headers";
 import type { ReactNode } from "react";
-import { Banknote, CreditCard, Landmark } from "lucide-react";
+import { Banknote, Building2, CreditCard, Landmark } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
+import {
+  getAccountCompany,
+  getCheckoutCompanyMissingFields,
+  type AccountCompany,
+} from "@/lib/account-company";
+import { canViewB2BPrice, getAuthContext } from "@/lib/auth";
 import {
   checkoutCartCookieName,
   decodeCheckoutCart,
@@ -29,10 +35,20 @@ export default async function CheckoutPage({
   const checkoutItems = selectedItems.length
     ? selectedItems
     : decodeCheckoutCart(cookieStore.get(checkoutCartCookieName)?.value);
+  const auth = await getAuthContext();
   const checkout = await loadCheckoutLines({ locale, items: checkoutItems });
+  const accountCompany = auth.user
+    ? await getAccountCompany(auth)
+    : { company: null, demoMode: false, error: null };
   const error = valueOf(query.error);
   const cartLines = checkout.lines;
   const stripeReady = hasStripeConfig();
+  const companyRequired = !auth.isAdmin && canViewB2BPrice(auth);
+  const missingCompanyFields = companyRequired
+    ? getCheckoutCompanyMissingFields(accountCompany.company)
+    : [];
+  const companyBlocked =
+    !checkout.requiresLogin && cartLines.length > 0 && missingCompanyFields.length > 0;
   const itemsJson = JSON.stringify(
     cartLines.map((line) => ({ sku: line.sku, quantity: line.quantity })),
   );
@@ -82,24 +98,37 @@ export default async function CheckoutPage({
         ) : null}
 
         {!checkout.requiresLogin && cartLines.length > 0 ? (
+          <>
+            <CheckoutCompanySummary
+              company={accountCompany.company}
+              companyRequired={companyRequired}
+              locale={locale}
+              missingFields={missingCompanyFields}
+            />
+            {companyBlocked ? (
+              <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <strong>
+                  {locale === "it"
+                    ? "Completa i dati aziendali prima del checkout wholesale."
+                    : "批发账号下单前需要先补齐公司资料。"}
+                </strong>
+                <p className="mt-2 leading-6">
+                  {locale === "it"
+                    ? "Servono ragione sociale, P.IVA e indirizzo spedizione."
+                    : "必填项：公司名称、P.IVA 和收货地址。"}
+                </p>
+                <ButtonLink
+                  href={`${localizePath(locale, "/account/company")}?next=${encodeURIComponent(localizePath(locale, "/checkout"))}&error=company-required`}
+                  className="mt-4 w-fit"
+                  variant="secondary"
+                >
+                  {locale === "it" ? "Completa profilo" : "去完善资料"}
+                </ButtonLink>
+              </div>
+            ) : (
         <form className="mt-8 grid gap-6" action="/api/orders" method="post">
           <input type="hidden" name="locale" value={locale} />
           <input type="hidden" name="itemsJson" value={itemsJson} />
-          <Fieldset title={dictionary.checkout.customer as string}>
-            <Input name="email" label="Email" type="email" />
-            <Input name="name" label={locale === "it" ? "Nome" : "姓名"} />
-            <Input name="phone" label={locale === "it" ? "Telefono" : "电话"} />
-            <Input name="whatsapp" label="WhatsApp" />
-          </Fieldset>
-
-          <Fieldset title={dictionary.checkout.company as string}>
-            <Input name="companyName" label={locale === "it" ? "Ragione sociale" : "公司名称"} />
-            <Input name="vatNumber" label="P.IVA" />
-            <Input name="fiscalCode" label="Codice Fiscale" />
-            <Input name="sdi" label="SDI" />
-            <Input name="pec" label="PEC" />
-            <Input name="shippingAddress" label={locale === "it" ? "Indirizzo spedizione" : "收货地址"} />
-          </Fieldset>
 
           <Fieldset title={dictionary.checkout.payment as string}>
             <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-4">
@@ -188,8 +217,83 @@ export default async function CheckoutPage({
             {dictionary.common.submit}
           </button>
         </form>
+            )}
+          </>
         ) : null}
       </section>
+    </div>
+  );
+}
+
+function CheckoutCompanySummary({
+  company,
+  companyRequired,
+  locale,
+  missingFields,
+}: Readonly<{
+  company: AccountCompany | null;
+  companyRequired: boolean;
+  locale: Locale;
+  missingFields: string[];
+}>) {
+  return (
+    <section className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="flex items-center gap-2 text-sm font-bold text-slate-950">
+            <Building2 className="h-4 w-4 text-blue-600" />
+            {locale === "it" ? "Profilo account" : "账户资料"}
+          </h2>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            {companyRequired
+              ? locale === "it"
+                ? "Per account wholesale l'ordine usa i dati aziendali salvati."
+                : "批发账号下单会使用账户中心保存的公司资料。"
+              : locale === "it"
+                ? "Puoi completare i dati aziendali dall'area account."
+                : "可在账户中心补充公司与收货资料。"}
+          </p>
+        </div>
+        <ButtonLink href={localizePath(locale, "/account/company")} variant="secondary" className="h-9">
+          {locale === "it" ? "Modifica" : "编辑资料"}
+        </ButtonLink>
+      </div>
+      <div className="mt-4 grid gap-2 md:grid-cols-3">
+        <SummaryField
+          label={locale === "it" ? "Azienda" : "公司名称"}
+          value={company?.companyName}
+          required={companyRequired}
+        />
+        <SummaryField label="P.IVA" value={company?.vatNumber} required={companyRequired} />
+        <SummaryField
+          label={locale === "it" ? "Spedizione" : "收货地址"}
+          value={company?.shippingAddress}
+          required={companyRequired}
+        />
+      </div>
+      {missingFields.length ? (
+        <p className="mt-3 text-xs font-semibold text-amber-700">
+          {locale === "it"
+            ? "Dati obbligatori mancanti per il checkout wholesale."
+            : "批发结账必填资料尚未完整。"}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function SummaryField({
+  label,
+  value,
+  required,
+}: Readonly<{ label: string; value?: string | null; required: boolean }>) {
+  const cleanValue = value?.trim();
+  return (
+    <div className="min-w-0 rounded-lg bg-white p-3 ring-1 ring-slate-200">
+      <p className="text-[11px] font-bold uppercase text-slate-400">{label}</p>
+      <p className="mt-1 break-words text-sm font-semibold text-slate-900">
+        {cleanValue || (required ? "-" : "Optional")}
+      </p>
     </div>
   );
 }
@@ -248,21 +352,4 @@ function itemsFromSearchParams(searchParams: Record<string, string | string[] | 
 
 function valueOf(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : (value ?? "");
-}
-
-function Input({
-  name,
-  label,
-  type = "text",
-}: Readonly<{ name: string; label: string; type?: string }>) {
-  return (
-    <label className="grid gap-2 text-sm font-medium text-slate-700">
-      {label}
-      <input
-        className="h-11 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-        name={name}
-        type={type}
-      />
-    </label>
-  );
 }

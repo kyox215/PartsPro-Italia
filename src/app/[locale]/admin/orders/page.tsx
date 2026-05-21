@@ -1,17 +1,18 @@
 import {
   Banknote,
   CreditCard,
+  type LucideIcon,
   PackageCheck,
   ReceiptText,
   TimerReset,
 } from "lucide-react";
+import Link from "next/link";
 import { StatusSelectForm } from "@/components/admin/status-select-form";
 import {
   AdminActionRail,
   AdminButtonLink,
   AdminDataTable,
   AdminEmptyState,
-  AdminMetricCard,
   AdminNotice,
   AdminPageHeader,
   AdminPanel,
@@ -19,6 +20,7 @@ import {
   AdminWorkspaceGrid,
   StatusPill,
 } from "@/components/admin/admin-ui";
+import { formatAdminStatus, type AdminStatusKind, type AdminTone } from "@/lib/admin-display";
 import { getAdminOrderRows } from "@/lib/admin-operations";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
@@ -53,6 +55,7 @@ export default async function AdminOrdersPage({
   const orderCounts = getOrderFilterCounts(orders);
   const saved = valueOf(query.saved);
   const error = valueOf(query.error);
+  const orderStatusLabels = getStatusSelectLabels("order", orderStatuses, locale);
 
   const filterItems = [
     ["all", locale === "it" ? "Tutti" : "全部"],
@@ -92,48 +95,57 @@ export default async function AdminOrdersPage({
       <Feedback saved={saved} error={error} locale={locale} />
 
       <AdminWorkspaceGrid
+        className="xl:!grid-cols-[minmax(0,1fr)_244px] 2xl:!grid-cols-[minmax(0,1fr)_260px]"
         rail={
           <AdminActionRail
             title={locale === "it" ? "Stato ordini" : "订单状态"}
             description={locale === "it" ? "Pagamenti e lock" : "付款、锁库、预购"}
           >
-            <section className="grid gap-2">
-              <AdminMetricCard
+            <section className="grid grid-cols-2 gap-1.5 xl:grid-cols-1">
+              <CompactOrderMetric
                 icon={Banknote}
                 label={locale === "it" ? "Contanti" : "待收现金"}
                 value={orderCounts.pending_cash}
                 tone="amber"
               />
-              <AdminMetricCard
+              <CompactOrderMetric
                 icon={ReceiptText}
                 label={locale === "it" ? "Bonifici" : "待确认转账"}
                 value={orderCounts.pending_bank_transfer}
                 tone="blue"
               />
-              <AdminMetricCard
+              <CompactOrderMetric
                 icon={CreditCard}
                 label={locale === "it" ? "Stripe pending" : "Stripe 待支付"}
                 value={orderCounts.pending_card}
                 tone="violet"
               />
-              <AdminMetricCard
+              <CompactOrderMetric
                 icon={PackageCheck}
                 label={locale === "it" ? "Preorder" : "待分配预购"}
                 value={orderCounts.preorder}
                 tone="green"
               />
-              <AdminMetricCard
+              <CompactOrderMetric
                 icon={TimerReset}
                 label={locale === "it" ? "Lock in scadenza" : "即将过期锁库"}
                 value={orderCounts.expiring}
                 tone="red"
               />
             </section>
-            <AdminPanel title={locale === "it" ? "Filtri rapidi" : "快捷筛选"} contentClassName="grid gap-2 p-2">
-              {filterItems.slice(0, 5).map((item) => (
-                <AdminButtonLink key={item.href} href={item.href} variant={item.active ? "primary" : "secondary"}>
-                  {item.label} ({item.count})
-                </AdminButtonLink>
+            <AdminPanel title={locale === "it" ? "Filtri rapidi" : "快捷筛选"} contentClassName="flex flex-wrap gap-1.5 p-2">
+              {filterItems.map((item) => (
+                <Link
+                  key={item.href}
+                  className={`inline-flex h-7 items-center rounded-full px-2.5 text-xs font-black transition ${
+                    item.active
+                      ? "bg-stone-950 text-white"
+                      : "border border-black/10 bg-white text-stone-700 hover:border-black/20"
+                  }`}
+                  href={item.href}
+                >
+                  {item.label} {item.count}
+                </Link>
               ))}
             </AdminPanel>
           </AdminActionRail>
@@ -152,82 +164,77 @@ export default async function AdminOrdersPage({
         {visibleOrders.length ? (
           <>
             <div className="hidden lg:block">
-              <AdminDataTable minWidth={980}>
-                <table className="w-full text-left text-sm">
-                  <thead className="text-xs uppercase text-stone-400">
+              <AdminDataTable minWidth={1040}>
+                <table className="w-full text-left text-xs">
+                  <thead className="text-[11px] uppercase text-stone-400">
                     <tr className="border-b border-black/5">
-                      <th className="px-2.5 py-2">Order</th>
-                      <th className="px-2.5 py-2">Customer</th>
-                      <th className="px-2.5 py-2">Items</th>
-                      <th className="px-2.5 py-2">Payment</th>
-                      <th className="px-2.5 py-2">Total</th>
-                      <th className="px-2.5 py-2">Status</th>
-                      <th className="px-2.5 py-2">Detail</th>
+                      <th className="px-2 py-1.5">{locale === "it" ? "Ordine" : "订单"}</th>
+                      <th className="px-2 py-1.5">{locale === "it" ? "Cliente" : "客户"}</th>
+                      <th className="px-2 py-1.5">{locale === "it" ? "Articoli" : "商品"}</th>
+                      <th className="px-2 py-1.5">{locale === "it" ? "Pagamento" : "付款"}</th>
+                      <th className="px-2 py-1.5">{locale === "it" ? "Importo" : "金额"}</th>
+                      <th className="px-2 py-1.5">{locale === "it" ? "Stato" : "状态"}</th>
+                      <th className="px-2 py-1.5">{locale === "it" ? "Operazioni" : "操作"}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-black/5">
-                    {visibleOrders.map((order) => (
+                    {visibleOrders.map((order) => {
+                      const paymentStatus = formatAdminStatus("payment", order.paymentStatus ?? "-", locale);
+                      const paymentMethod = formatAdminStatus("paymentMethod", order.paymentMethod, locale);
+                      const fulfillmentStatus = formatAdminStatus("fulfillment", order.fulfillmentStatus ?? "-", locale);
+
+                      return (
                       <tr key={order.id} className="align-top hover:bg-stone-50">
-                        <td className="px-2.5 py-2.5">
-                          <p className="font-mono text-xs font-black text-stone-900">
-                            {order.id}
+                        <td className="w-[150px] px-2 py-2">
+                          <p className="font-mono text-[11px] font-black text-stone-900" title={order.id}>
+                            {shortOrderId(order.id)}
                           </p>
-                          <p className="mt-1 text-xs font-medium text-stone-500">
-                            {new Date(order.createdAt).toLocaleString()}
+                          <p className="mt-0.5 text-[11px] font-medium text-stone-500">
+                            {formatDateTime(order.createdAt, locale)}
                           </p>
                         </td>
-                        <td className="px-2.5 py-2.5">
-                          <p className="font-black text-stone-950">
+                        <td className="w-[190px] px-2 py-2">
+                          <p className="truncate font-black text-stone-950">
                             {order.companyName || order.customerName || "-"}
                           </p>
-                          <p className="mt-1 max-w-[220px] truncate text-xs font-medium text-stone-500">
+                          <p className="mt-0.5 max-w-[180px] truncate text-[11px] font-medium text-stone-500">
                             {order.email}
                           </p>
                         </td>
-                        <td className="px-2.5 py-2.5">
-                          <ul className="space-y-1 text-xs font-semibold text-stone-600">
-                            {order.items.map((item) => (
-                              <li key={`${order.id}-${item.sku}`}>
-                                {item.sku} x {item.quantity}
-                                {item.fulfillmentType ? (
-                                  <span className="ml-2 text-stone-400">
-                                    {item.fulfillmentType}
-                                    {item.preorderQty ? ` / preorder ${item.preorderQty}` : ""}
-                                  </span>
-                                ) : null}
-                              </li>
-                            ))}
-                          </ul>
+                        <td className="px-2 py-2">
+                          <OrderItemsSummary order={order} locale={locale} />
                         </td>
-                        <td className="px-2.5 py-2.5 text-stone-700">
-                          <p className="font-black">{order.paymentMethod}</p>
-                          <div className="mt-2">
-                            <StatusPill status={order.paymentStatus ?? "-"} />
+                        <td className="w-[150px] px-2 py-2 text-stone-700">
+                          <p className="font-black">{paymentMethod.label}</p>
+                          <div className="mt-1">
+                            <StatusPill status={paymentStatus.label} tone={paymentStatus.tone} />
                           </div>
                         </td>
-                        <td className="px-2.5 py-2.5 font-black text-stone-950">
+                        <td className="w-[110px] px-2 py-2 font-black text-stone-950">
                           {formatMoney(order.total, locale)}
                           {order.refundTotal ? (
-                            <p className="mt-1 text-xs font-semibold text-rose-600">
+                            <p className="mt-0.5 text-[11px] font-semibold text-rose-600">
                               - {formatMoney(order.refundTotal, locale)}
                             </p>
                           ) : null}
                         </td>
-                        <td className="px-2.5 py-2.5">
+                        <td className="w-[200px] px-2 py-2">
                           <StatusSelectForm
                             action="/api/admin/orders/status"
                             currentStatus={order.status}
                             id={order.id}
                             locale={locale}
+                            statusLabels={orderStatusLabels}
                             statuses={orderStatuses}
+                            submitLabel={locale === "it" ? "Salva" : "保存"}
                           />
                           {order.fulfillmentStatus ? (
-                            <p className="mt-2 text-xs font-black text-stone-500">
-                              {order.fulfillmentStatus}
-                            </p>
+                            <div className="mt-1">
+                              <StatusPill status={fulfillmentStatus.label} tone={fulfillmentStatus.tone} />
+                            </div>
                           ) : null}
                         </td>
-                        <td className="px-2.5 py-2.5">
+                        <td className="w-[74px] px-2 py-2">
                           <AdminButtonLink
                             href={localizePath(locale, `/admin/orders/${order.id}`)}
                             variant="secondary"
@@ -236,7 +243,8 @@ export default async function AdminOrdersPage({
                           </AdminButtonLink>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </AdminDataTable>
@@ -260,10 +268,10 @@ export default async function AdminOrdersPage({
                         {order.email}
                       </p>
                     </div>
-                    <StatusPill status={order.status} />
+                    <LocalizedStatusPill kind="order" locale={locale} value={order.status} />
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-stone-500">
-                    <StatusPill status={order.paymentStatus ?? "-"} />
+                    <LocalizedStatusPill kind="payment" locale={locale} value={order.paymentStatus ?? "-"} />
                     <span>{formatMoney(order.total, locale)}</span>
                     {order.refundTotal ? (
                       <span className="text-rose-600">
@@ -277,7 +285,9 @@ export default async function AdminOrdersPage({
                       currentStatus={order.status}
                       id={order.id}
                       locale={locale}
+                      statusLabels={orderStatusLabels}
                       statuses={orderStatuses}
+                      submitLabel={locale === "it" ? "Salva" : "保存"}
                     />
                   </div>
                   <div className="mt-3">
@@ -307,6 +317,115 @@ export default async function AdminOrdersPage({
       </AdminWorkspaceGrid>
     </div>
   );
+}
+
+type AdminOrder = Awaited<ReturnType<typeof getAdminOrderRows>>[number];
+
+const compactMetricToneClasses: Record<AdminTone, string> = {
+  default: "bg-stone-50 text-stone-700 ring-black/5",
+  slate: "bg-stone-50 text-stone-700 ring-black/5",
+  blue: "bg-blue-50 text-blue-700 ring-blue-100",
+  green: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+  amber: "bg-amber-50 text-amber-700 ring-amber-100",
+  red: "bg-rose-50 text-rose-700 ring-rose-100",
+  violet: "bg-violet-50 text-violet-700 ring-violet-100",
+};
+
+function CompactOrderMetric({
+  icon: Icon,
+  label,
+  value,
+  tone,
+}: Readonly<{ icon: LucideIcon; label: string; value: number; tone: AdminTone }>) {
+  return (
+    <div className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ring-1 ${compactMetricToneClasses[tone]}`}>
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-white/70">
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-[11px] font-black uppercase tracking-wide opacity-70">
+          {label}
+        </span>
+        <span className="block text-base font-black leading-5">{value}</span>
+      </span>
+    </div>
+  );
+}
+
+function OrderItemsSummary({
+  order,
+  locale,
+}: Readonly<{ order: AdminOrder; locale: Locale }>) {
+  const visibleItems = order.items.slice(0, 2);
+  const hiddenCount = Math.max(order.items.length - visibleItems.length, 0);
+
+  return (
+    <div className="max-w-[340px] space-y-0.5">
+      {visibleItems.map((item) => {
+        const fulfillmentType = formatAdminStatus(
+          "fulfillmentType",
+          item.fulfillmentType ?? "-",
+          locale,
+        );
+        return (
+          <p
+            key={`${order.id}-${item.sku}`}
+            className="truncate text-[11px] font-semibold text-stone-600"
+            title={`${item.sku} x ${item.quantity}`}
+          >
+            <span className="font-mono font-black text-stone-800">{item.sku}</span>{" "}
+            <span>x {item.quantity}</span>
+            <span className="mx-1 text-stone-300">·</span>
+            <span>{fulfillmentType.label}</span>
+            {item.preorderQty ? (
+              <span className="text-amber-700">
+                {" "}
+                {locale === "it" ? "preorder" : "预购"} {item.preorderQty}
+              </span>
+            ) : null}
+          </p>
+        );
+      })}
+      {hiddenCount > 0 ? (
+        <p className="text-[11px] font-black text-stone-400">
+          +{hiddenCount} {locale === "it" ? "articoli" : "件商品"}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function LocalizedStatusPill({
+  kind,
+  value,
+  locale,
+}: Readonly<{ kind: AdminStatusKind; value: string | null | undefined; locale: Locale }>) {
+  const status = formatAdminStatus(kind, value, locale);
+  return <StatusPill status={status.label} tone={status.tone} />;
+}
+
+function getStatusSelectLabels(
+  kind: AdminStatusKind,
+  values: string[],
+  locale: Locale,
+) {
+  return Object.fromEntries(
+    values.map((value) => [value, formatAdminStatus(kind, value, locale).label]),
+  );
+}
+
+function shortOrderId(value: string) {
+  if (value.length <= 14) return value;
+  return `${value.slice(0, 8)}...${value.slice(-4)}`;
+}
+
+function formatDateTime(value: string, locale: Locale) {
+  return new Date(value).toLocaleString(locale === "it" ? "it-IT" : "zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function SystemNotice({

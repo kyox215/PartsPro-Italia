@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  getAccountCompany,
+  getCheckoutCompanyMissingFields,
+} from "@/lib/account-company";
 import { canViewB2BPrice, getAuthContext } from "@/lib/auth";
 import { checkoutCartCookieName } from "@/lib/checkout-cart-cookie";
 import { getSiteUrl } from "@/lib/env";
@@ -66,8 +70,18 @@ export async function POST(request: Request) {
     );
   }
 
-  const orderId = crypto.randomUUID();
   const useB2BPrice = canViewB2BPrice(auth);
+  const { company } = await getAccountCompany(auth);
+  const requiresCompanyProfile = !auth.isAdmin && useB2BPrice;
+  const missingCompanyFields = requiresCompanyProfile
+    ? getCheckoutCompanyMissingFields(company)
+    : [];
+
+  if (missingCompanyFields.length > 0) {
+    return companyProfileError(request, parsed.data.locale, missingCompanyFields);
+  }
+
+  const orderId = crypto.randomUUID();
   const supabase = getSupabaseAdminClient();
   const now = new Date();
   const reservationExpiresAt = getReservationExpiry(now);
@@ -99,15 +113,19 @@ export async function POST(request: Request) {
       reservationExpiresAt: reservationExpiresAt.toISOString(),
       reservedAt: now.toISOString(),
       paymentMethod,
-      email: parsed.data.email || auth.user.email || null,
-      customerName: parsed.data.name || null,
-      companyName: parsed.data.companyName || null,
-      vatNumber: parsed.data.vatNumber || null,
-      fiscalCode: parsed.data.fiscalCode || null,
-      sdi: parsed.data.sdi || null,
-      pec: parsed.data.pec || null,
-      shippingAddress: parsed.data.shippingAddress || null,
-      metadata: parsed.data,
+      email: auth.user.email || null,
+      customerName: company?.contactName || null,
+      companyName: company?.companyName || null,
+      vatNumber: company?.vatNumber || null,
+      fiscalCode: company?.fiscalCode || null,
+      sdi: company?.sdi || null,
+      pec: company?.pec || null,
+      shippingAddress: company?.shippingAddress || null,
+      metadata: {
+        ...parsed.data,
+        companyProfileId: company?.id ?? null,
+        companyProfileRequired: requiresCompanyProfile,
+      },
       lines,
     });
   } catch (error) {
@@ -127,7 +145,7 @@ export async function POST(request: Request) {
         success_url: `${getSiteUrl()}/${parsed.data.locale}/account/orders/${orderId}?checkout=success`,
         cancel_url: `${getSiteUrl()}/${parsed.data.locale}/cart?checkout=cancelled&order=${orderId}`,
         client_reference_id: orderId,
-        customer_email: parsed.data.email || auth.user.email || undefined,
+        customer_email: auth.user.email || undefined,
         line_items: lines.map((line) => ({
           quantity: line.quantity,
           price_data: {
@@ -256,4 +274,21 @@ function orderError(
   }
 
   return NextResponse.json({ error: message }, { status });
+}
+
+function companyProfileError(request: Request, locale: string, missingFields: string[]) {
+  if (wantsRedirect(request)) {
+    const url = new URL(`/${locale}/account/company`, request.url);
+    url.searchParams.set("next", `/${locale}/checkout`);
+    url.searchParams.set("error", "company-required");
+    return NextResponse.redirect(url, 303);
+  }
+
+  return NextResponse.json(
+    {
+      error: "Company profile is required for wholesale checkout.",
+      missingFields,
+    },
+    { status: 409 },
+  );
 }

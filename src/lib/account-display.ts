@@ -31,7 +31,7 @@ const roleLabels: Record<Locale, Record<string, string>> = {
     admin: "Account admin",
     retail: "Cliente retail",
     wholesale: "Cliente wholesale",
-    b2b_pending: "Richiesta wholesale",
+    b2b_pending: "Profilo in verifica",
     b2b_basic: "Cliente wholesale",
     b2b_silver: "Cliente wholesale",
     b2b_gold: "Cliente wholesale",
@@ -43,7 +43,7 @@ const roleLabels: Record<Locale, Record<string, string>> = {
     admin: "管理员账户",
     retail: "零售客户",
     wholesale: "批发客户",
-    b2b_pending: "批发申请审核中",
+    b2b_pending: "价格权限待确认",
     b2b_basic: "批发客户",
     b2b_silver: "批发客户",
     b2b_gold: "批发客户",
@@ -194,77 +194,6 @@ export function formatFulfillmentType(type: string | null | undefined, locale: L
   return locale === "it" ? "Stock" : "现货";
 }
 
-export function formatRmaStatus(status: string | null | undefined, locale: Locale) {
-  return mapStatus(status, locale, {
-    submitted: {
-      it: ["Inviata", "La richiesta e stata ricevuta.", "blue"],
-      zh: ["已提交", "售后申请已收到。", "blue"],
-    },
-    waiting_information: {
-      it: ["Info richieste", "Il team aspetta dettagli o allegati.", "amber"],
-      zh: ["等待补充", "售后团队等待更多说明或附件。", "amber"],
-    },
-    approved_return: {
-      it: ["Reso approvato", "Puoi spedire il prodotto per verifica.", "emerald"],
-      zh: ["批准寄回", "可按售后要求寄回检测。", "emerald"],
-    },
-    waiting_receive: {
-      it: ["In attesa ricezione", "Il team aspetta il pacco.", "amber"],
-      zh: ["等待收货", "售后团队等待收到退件。", "amber"],
-    },
-    testing: {
-      it: ["In test", "Il prodotto e in verifica tecnica.", "blue"],
-      zh: ["检测中", "售后团队正在检测。", "blue"],
-    },
-    approved: {
-      it: ["Approvata", "La pratica e stata approvata.", "emerald"],
-      zh: ["已批准", "售后申请已批准。", "emerald"],
-    },
-    rejected: {
-      it: ["Rifiutata", "La pratica non e stata approvata.", "rose"],
-      zh: ["已拒绝", "售后申请未通过。", "rose"],
-    },
-    replacement_sent: {
-      it: ["Sostituzione inviata", "Il ricambio sostitutivo e stato registrato.", "blue"],
-      zh: ["换货已发出", "换货商品已登记。", "blue"],
-    },
-    refund_processing: {
-      it: ["Rimborso in corso", "Il rimborso e in lavorazione.", "orange"],
-      zh: ["退款处理中", "退款正在处理。", "orange"],
-    },
-    completed: {
-      it: ["Completata", "Pratica chiusa.", "emerald"],
-      zh: ["已完成", "售后流程已关闭。", "emerald"],
-    },
-  });
-}
-
-export function formatRmaIssueType(type: string | null | undefined, locale: Locale) {
-  const labels: Record<string, Record<Locale, string>> = {
-    defective: { it: "Difettoso", zh: "产品故障" },
-    wrong_item: { it: "Articolo errato", zh: "发错商品" },
-    damaged: { it: "Danneggiato", zh: "运输/外观损坏" },
-    compatibility: { it: "Compatibilita", zh: "兼容问题" },
-    touch_issue: { it: "Problema touch", zh: "触控问题" },
-    other: { it: "Altro", zh: "其他问题" },
-  };
-
-  return labels[type ?? ""]?.[locale] ?? (type || "-");
-}
-
-export function formatResolutionType(type: string | null | undefined, locale: Locale) {
-  const labels: Record<string, Record<Locale, string>> = {
-    pending: { it: "In attesa", zh: "待处理" },
-    repair: { it: "Riparazione", zh: "维修" },
-    replace: { it: "Sostituzione", zh: "换货" },
-    refund: { it: "Rimborso", zh: "退款" },
-    reject: { it: "Rifiuto", zh: "拒绝" },
-    credit_note: { it: "Nota di credito", zh: "信用额度/贷项" },
-  };
-
-  return labels[type ?? ""]?.[locale] ?? (type || "-");
-}
-
 export function formatTimelineEvent(type: string | null | undefined, locale: Locale) {
   const labels: Record<string, Record<Locale, string>> = {
     order_created: { it: "Ordine creato", zh: "订单创建" },
@@ -282,11 +211,9 @@ export function formatTimelineEvent(type: string | null | undefined, locale: Loc
     order_picked_up: { it: "Ordine ritirato", zh: "订单自提" },
     order_completed: { it: "Ordine completato", zh: "订单完成" },
     reservation_extended: { it: "Prenotazione estesa", zh: "库存锁定延长" },
-    rma_submitted: { it: "RMA inviata", zh: "售后提交" },
     status_updated: { it: "Stato aggiornato", zh: "状态更新" },
     resolution_updated: { it: "Esito aggiornato", zh: "处理结果更新" },
     attachment_added: { it: "Allegato aggiunto", zh: "附件添加" },
-    rma_customer_message: { it: "Messaggio cliente", zh: "客户补充说明" },
   };
 
   return labels[type ?? ""]?.[locale] ?? (type || "-");
@@ -322,13 +249,6 @@ export function canSubmitPaymentProof(
     order.status !== "cancelled" &&
     order.paymentStatus !== "paid" &&
     order.paymentStatus !== "refunded"
-  );
-}
-
-export function canCreateRma(order: Pick<AccountOrderRow, "status" | "paymentStatus">) {
-  return (
-    order.paymentStatus === "paid" &&
-    ["paid", "processing", "shipped", "completed"].includes(order.status)
   );
 }
 
@@ -445,8 +365,8 @@ export function formatCompanyStatus(status: string | null | undefined, locale: L
       zh: ["潜在客户", "资料已记录，尚未完成审核。", "slate"],
     },
     pending: {
-      it: ["In revisione", "Il team sta verificando i dati wholesale.", "amber"],
-      zh: ["审核中", "后台正在审核批发资料。", "amber"],
+      it: ["In verifica", "Il team sta verificando il profilo account.", "amber"],
+      zh: ["待确认", "后台正在检查账户资料。", "amber"],
     },
     active: {
       it: ["Attivo", "Account aziendale attivo.", "emerald"],
@@ -454,7 +374,7 @@ export function formatCompanyStatus(status: string | null | undefined, locale: L
     },
     approved_pending_signup: {
       it: ["Approvato, signup atteso", "Approvato ma non ancora collegato a un login.", "blue"],
-      zh: ["已批准待注册", "批发申请已批准，等待账号注册或关联。", "blue"],
+      zh: ["已批准待注册", "资料已批准，等待账号注册或关联。", "blue"],
     },
     paused: {
       it: ["In pausa", "Account temporaneamente sospeso.", "orange"],

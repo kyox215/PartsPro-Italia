@@ -44,7 +44,9 @@ export default async function AdminAccountsPage({
 
   const wholesaleCustomers = customers.filter((customer) => customer.priceGroup === "wholesale");
   const suspendedCustomers = customers.filter((customer) => customer.accountStatus !== "active");
-  const pendingWholesale = customers.filter((customer) => customer.source === "application" || customer.crmStatus.includes("b2b_pending"));
+  const incompleteProfiles = customers.filter(
+    (customer) => !customer.companyId || !customer.vatNumber,
+  );
   const totalSpent = customers.reduce((sum, customer) => sum + customer.totalSpent, 0);
 
   return (
@@ -54,8 +56,8 @@ export default async function AdminAccountsPage({
         title={locale === "it" ? "Gestione account" : "账号管理"}
         description={
           locale === "it"
-            ? "Clienti registrati, richieste wholesale, ruoli staff e audit in un solo pannello."
-            : "集中处理已注册客户、批发申请、客户类型、员工角色和账号操作日志。"
+            ? "Clienti registrati, dati aziendali, price group, ruoli staff e audit in un solo pannello."
+            : "集中处理已注册客户、公司资料、价格权限、员工角色和账号操作日志。"
         }
         actions={
           <AdminButtonLink href={localizePath(locale, "/admin/accounts/customers")} variant="secondary">
@@ -88,10 +90,10 @@ export default async function AdminAccountsPage({
         <section className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
           <AdminMetricCard
             icon={ClipboardList}
-            label={locale === "it" ? "Richieste wholesale" : "待处理批发申请"}
-            value={pendingWholesale.length}
+            label={locale === "it" ? "Profili incompleti" : "资料待完善"}
+            value={incompleteProfiles.length}
             tone="amber"
-            caption={locale === "it" ? "Gestite dai clienti" : "在客户管理中处理"}
+            caption={locale === "it" ? "Azienda o P.IVA mancanti" : "公司或 P.IVA 缺失"}
           />
           <AdminMetricCard
             icon={UsersRound}
@@ -119,9 +121,9 @@ export default async function AdminAccountsPage({
         >
           <div className="grid gap-2 md:grid-cols-3">
             <QuickAction
-              href={localizePath(locale, "/admin/accounts/customers?filter=wholesale_pending")}
-              title={locale === "it" ? "Richieste wholesale" : "批发申请"}
-              value={pendingWholesale.length}
+              href={localizePath(locale, "/admin/accounts/customers?filter=incomplete")}
+              title={locale === "it" ? "Profili incompleti" : "资料待完善"}
+              value={incompleteProfiles.length}
               label={locale === "it" ? "Apri clienti" : "打开客户队列"}
             />
             <QuickAction
@@ -151,7 +153,7 @@ export default async function AdminAccountsPage({
                   <div className="min-w-0">
                     <StatusPill status={action.label} tone={action.tone} />
                     <p className="mt-2 break-words text-xs font-semibold text-stone-500">
-                      {event.actorEmail ?? "-"} · {event.companyId ?? event.customerProfileId ?? event.applicationId ?? "-"}
+                      {event.actorEmail ?? "-"} · {event.companyId ?? event.customerProfileId ?? "-"}
                     </p>
                   </div>
                   <p className="text-xs font-semibold text-stone-500 md:text-right">

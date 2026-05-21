@@ -96,62 +96,6 @@ export type AdminOrderRow = {
   }>;
 };
 
-export type AdminB2BApplicationRow = {
-  id: string;
-  status: string;
-  companyName: string;
-  vatNumber: string | null;
-  email: string | null;
-  createdAt: string;
-  duplicateCount?: number;
-};
-
-export type AdminRmaRow = {
-  id: string;
-  rmaNumber?: string | null;
-  orderId?: string | null;
-  profileId?: string | null;
-  status: string;
-  orderNumber: string;
-  sku: string;
-  quantity: number;
-  issueType: string;
-  description: string | null;
-  installationTested?: boolean | null;
-  installed?: boolean | null;
-  resolutionType?: string | null;
-  resolutionNote?: string | null;
-  refundAmount?: number | null;
-  replacementSku?: string | null;
-  closedAt?: string | null;
-  attachments: Array<{
-    id: string;
-    label: string;
-    url: string;
-    note?: string | null;
-    createdAt: string;
-  }>;
-  createdAt: string;
-  events: Array<{
-    id: string;
-    eventType: string;
-    title: string;
-    body?: string | null;
-    actorProfileId?: string | null;
-    customerVisible?: boolean;
-    createdAt: string;
-  }>;
-  notifications: Array<{
-    id: string;
-    status: string;
-    recipientEmail: string;
-    subject: string;
-    errorMessage?: string | null;
-    sentAt?: string | null;
-    createdAt: string;
-  }>;
-};
-
 export async function getAdminOrderRows(): Promise<AdminOrderRow[]> {
   if (!hasSupabaseAdminConfig()) {
     return [
@@ -334,242 +278,26 @@ export async function getAdminOrderById(
   return data ? mapAdminOrder(data) : null;
 }
 
-export async function getAdminB2BApplicationRows(): Promise<AdminB2BApplicationRow[]> {
-  if (!hasSupabaseAdminConfig()) {
-    return [
-      {
-        id: "demo-b2b-1",
-        status: "pending",
-        companyName: "Centro Riparazioni Milano",
-        vatNumber: "IT12345678901",
-        email: "buyer@example.it",
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: "demo-b2b-2",
-        status: "pending",
-        companyName: "Tech Service Torino",
-        vatNumber: "IT10987654321",
-        email: "orders@example.it",
-        createdAt: new Date().toISOString(),
-      },
-    ];
-  }
-
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("b2b_applications")
-    .select("id, status, company_name, vat_number, email, created_at")
-    .order("created_at", { ascending: false })
-    .limit(100);
-
-  if (error) {
-    console.error("Failed to load B2B applications", error);
-    return [];
-  }
-
-  const rows = (data ?? []).map((row) => ({
-    id: row.id,
-    status: row.status,
-    companyName: row.company_name,
-    vatNumber: row.vat_number,
-    email: row.email,
-    createdAt: row.created_at,
-  }));
-  return dedupeB2BApplications(rows);
-}
-
-function dedupeB2BApplications(rows: AdminB2BApplicationRow[]) {
-  const byKey = new Map<string, AdminB2BApplicationRow>();
-
-  rows.forEach((row) => {
-    const key = [
-      row.email?.trim().toLowerCase() || row.companyName.trim().toLowerCase(),
-      row.vatNumber?.trim().toLowerCase() || "no-vat",
-    ].join("::");
-    const current = byKey.get(key);
-    if (!current) {
-      byKey.set(key, { ...row, duplicateCount: 1 });
-      return;
-    }
-    const keepNewRow = new Date(row.createdAt).getTime() > new Date(current.createdAt).getTime();
-    const next = keepNewRow ? { ...row } : { ...current };
-    next.duplicateCount = (current.duplicateCount ?? 1) + 1;
-    byKey.set(key, next);
-  });
-
-  return Array.from(byKey.values()).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
-}
-
-export async function getAdminRmaRows(): Promise<AdminRmaRow[]> {
-  if (!hasSupabaseAdminConfig()) {
-    return [
-      {
-        id: "demo-rma-1",
-        rmaNumber: "RMA-DEMO-001",
-        orderId: "demo-order-1001",
-        profileId: null,
-        status: "submitted",
-        orderNumber: "demo-order-1001",
-        sku: products[0].sku,
-        quantity: 1,
-        issueType: "touch_issue",
-        description: "Touch intermittente prima dell'installazione.",
-        installationTested: true,
-        installed: false,
-        resolutionType: null,
-        resolutionNote: null,
-        refundAmount: null,
-        replacementSku: null,
-        closedAt: null,
-        attachments: [],
-        createdAt: new Date().toISOString(),
-        events: [
-          {
-            id: "demo-rma-event-1",
-            eventType: "rma_submitted",
-            title: "Demo RMA submitted",
-            body: "RMA processing events will appear here.",
-            actorProfileId: null,
-            createdAt: new Date().toISOString(),
-          },
-        ],
-        notifications: [],
-      },
-    ];
-  }
-
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("rmas")
-    .select(
-      "id, rma_number, order_id, profile_id, status, order_number, sku, quantity, issue_type, description, installation_tested, installed, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, attachments, created_at",
-    )
-    .order("created_at", { ascending: false })
-    .limit(100);
-
-  if (error) {
-    console.error("Failed to load RMAs", error);
-    return [];
-  }
-
-  return (data ?? []).map(mapAdminRma);
-}
-
-export async function getAdminRmaRowsForCustomer({
-  profileId,
-  orderIds,
-}: Readonly<{
-  profileId?: string | null;
-  orderIds?: string[];
-}>): Promise<AdminRmaRow[]> {
-  if (!hasSupabaseAdminConfig()) {
-    const rmas = await getAdminRmaRows();
-    const orderIdSet = new Set(orderIds ?? []);
-    return rmas.filter((rma) => {
-      if (profileId && rma.profileId === profileId) return true;
-      return Boolean(rma.orderId && orderIdSet.has(rma.orderId));
-    });
-  }
-
-  const supabase = getSupabaseAdminClient();
-  const queries = [];
-  if (profileId) {
-    queries.push(
-      supabase
-        .from("rmas")
-        .select(
-          "id, rma_number, order_id, profile_id, status, order_number, sku, quantity, issue_type, description, installation_tested, installed, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, attachments, created_at",
-        )
-        .eq("profile_id", profileId)
-        .limit(100),
-    );
-  }
-  if (orderIds?.length) {
-    queries.push(
-      supabase
-        .from("rmas")
-        .select(
-          "id, rma_number, order_id, profile_id, status, order_number, sku, quantity, issue_type, description, installation_tested, installed, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, attachments, created_at",
-        )
-        .in("order_id", orderIds)
-        .limit(100),
-    );
-  }
-
-  if (queries.length === 0) return [];
-
-  const results = await Promise.all(queries);
-  const rowsById = new Map<string, AdminRmaRow>();
-  results.forEach((result) => {
-    if (result.error) {
-      console.error("Failed to load customer RMAs", result.error);
-      return;
-    }
-    (result.data ?? []).forEach((rma) => {
-      rowsById.set(rma.id, mapAdminRma(rma));
-    });
-  });
-
-  return [...rowsById.values()].sort(
-    (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
-  );
-}
-
-export async function getAdminRmaById(rmaId: string): Promise<AdminRmaRow | null> {
-  if (!hasSupabaseAdminConfig()) {
-    const rows = await getAdminRmaRows();
-    return rows.find((rma) => rma.id === rmaId) ?? null;
-  }
-
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("rmas")
-    .select(
-      "id, rma_number, order_id, profile_id, status, order_number, sku, quantity, issue_type, description, installation_tested, installed, resolution_type, resolution_note, refund_amount, replacement_sku, closed_at, attachments, created_at, rma_events (*), notification_events (*)",
-    )
-    .eq("id", rmaId)
-    .maybeSingle();
-
-  if (error) {
-    console.error("Failed to load admin RMA detail", error);
-    return null;
-  }
-
-  return data ? mapAdminRma(data) : null;
-}
-
 export async function getAdminDashboardMetrics() {
   if (!hasSupabaseAdminConfig()) {
-    const [orders, b2bApplications, rmas, preorderIncomingTotal] = await Promise.all([
+    const [orders, preorderIncomingTotal] = await Promise.all([
       getAdminOrderRows(),
-      getAdminB2BApplicationRows(),
-      getAdminRmaRows(),
       getPreorderIncomingTotal(),
     ]);
 
     return summarizeDashboardMetrics({
       orders,
-      b2bApplications,
-      rmas,
       preorderIncomingTotal,
     });
   }
 
-  const [orderSummary, pendingB2BCount, openRmaCount, preorderIncomingTotal] =
-    await Promise.all([
-      getAdminOrderMetricRows(),
-      getAdminPendingB2BCount(),
-      getAdminOpenRmaCount(),
-      getPreorderIncomingTotal(),
-    ]);
+  const [orderSummary, preorderIncomingTotal] = await Promise.all([
+    getAdminOrderMetricRows(),
+    getPreorderIncomingTotal(),
+  ]);
 
   return {
     orders: [],
-    b2bApplications: [],
-    rmas: [],
     orderCount: orderSummary.orderCount,
     pendingPaymentCount: orderSummary.pendingPaymentCount,
     pendingCashCount: orderSummary.pendingCashCount,
@@ -577,8 +305,6 @@ export async function getAdminDashboardMetrics() {
     pendingCardCount: orderSummary.pendingCardCount,
     expiringReservationCount: orderSummary.expiringReservationCount,
     preorderAllocationCount: orderSummary.preorderAllocationCount,
-    pendingB2BCount,
-    openRmaCount,
     preorderIncomingTotal,
     revenueTotal: orderSummary.revenueTotal,
   };
@@ -586,19 +312,13 @@ export async function getAdminDashboardMetrics() {
 
 function summarizeDashboardMetrics({
   orders,
-  b2bApplications,
-  rmas,
   preorderIncomingTotal,
 }: Readonly<{
   orders: AdminOrderRow[];
-  b2bApplications: AdminB2BApplicationRow[];
-  rmas: AdminRmaRow[];
   preorderIncomingTotal: number;
 }>) {
   return {
     orders,
-    b2bApplications,
-    rmas,
     orderCount: orders.length,
     pendingPaymentCount: orders.filter((order) => order.status === "pending_payment")
       .length,
@@ -613,9 +333,6 @@ function summarizeDashboardMetrics({
     preorderAllocationCount: orders.filter(
       (order) => order.fulfillmentStatus === "awaiting_preorder",
     ).length,
-    pendingB2BCount: b2bApplications.filter((item) => item.status === "pending")
-      .length,
-    openRmaCount: rmas.filter((item) => item.status !== "completed").length,
     preorderIncomingTotal,
     revenueTotal: orders.reduce(
       (sum, order) => sum + order.total - (order.refundTotal ?? 0),
@@ -685,36 +402,6 @@ async function getAdminOrderMetricRows() {
   });
 
   return summary;
-}
-
-async function getAdminPendingB2BCount() {
-  const supabase = getSupabaseAdminClient();
-  const { count, error } = await supabase
-    .from("b2b_applications")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "pending");
-
-  if (error) {
-    console.error("Failed to load pending B2B count", error);
-    return 0;
-  }
-
-  return count ?? 0;
-}
-
-async function getAdminOpenRmaCount() {
-  const supabase = getSupabaseAdminClient();
-  const { count, error } = await supabase
-    .from("rmas")
-    .select("id", { count: "exact", head: true })
-    .neq("status", "completed");
-
-  if (error) {
-    console.error("Failed to load open RMA count", error);
-    return 0;
-  }
-
-  return count ?? 0;
 }
 
 function isAdminReservationExpiringSoon(order: AdminOrderRow) {
@@ -931,83 +618,6 @@ function mapAdminOrder(order: {
   };
 }
 
-function mapAdminRma(row: {
-  id: string;
-  rma_number?: string | null;
-  order_id?: string | null;
-  profile_id?: string | null;
-  status: string;
-  order_number: string;
-  sku: string;
-  quantity: number;
-  issue_type: string;
-  description: string | null;
-  installation_tested?: boolean | null;
-  installed?: boolean | null;
-  resolution_type?: string | null;
-  resolution_note?: string | null;
-  refund_amount?: number | string | null;
-  replacement_sku?: string | null;
-  closed_at?: string | null;
-  attachments?: unknown;
-  created_at: string;
-  rma_events?: Array<{
-    id: string;
-    event_type: string;
-    title: string;
-    body?: string | null;
-    actor_profile_id?: string | null;
-    customer_visible?: boolean | null;
-    created_at: string;
-  }> | null;
-  notification_events?: Array<{
-    id: string;
-    status: string;
-    recipient_email: string;
-    subject: string;
-    error_message?: string | null;
-    sent_at?: string | null;
-    created_at: string;
-  }> | null;
-}): AdminRmaRow {
-  return {
-    id: row.id,
-    rmaNumber: row.rma_number ?? null,
-    orderId: row.order_id,
-    profileId: row.profile_id,
-    status: row.status,
-    orderNumber: row.order_number,
-    sku: row.sku,
-    quantity: row.quantity,
-    issueType: row.issue_type,
-    description: row.description,
-    installationTested: row.installation_tested,
-    installed: row.installed,
-    resolutionType: row.resolution_type ?? null,
-    resolutionNote: row.resolution_note ?? null,
-    refundAmount:
-      row.refund_amount === null || row.refund_amount === undefined
-        ? null
-        : Number(row.refund_amount),
-    replacementSku: row.replacement_sku ?? null,
-    closedAt: row.closed_at ?? null,
-    attachments: normalizeRmaAttachments(row.attachments),
-    createdAt: row.created_at,
-    events: (row.rma_events ?? [])
-      .map((event) => ({
-        id: event.id,
-        eventType: event.event_type,
-        title: event.title,
-        body: event.body ?? null,
-        actorProfileId: event.actor_profile_id ?? null,
-        customerVisible: event.customer_visible ?? true,
-        createdAt: event.created_at,
-      }))
-      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
-    notifications: mapNotifications(row.notification_events),
-  };
-}
-
 function mapNotifications(
   rows:
     | Array<{
@@ -1033,18 +643,4 @@ function mapNotifications(
       createdAt: row.created_at,
     }))
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
-}
-
-function normalizeRmaAttachments(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
-    .map((item) => ({
-      id: String(item.id ?? ""),
-      label: String(item.label ?? item.name ?? "Attachment"),
-      url: toAttachmentHref(String(item.url ?? "")) ?? "",
-      note: typeof item.note === "string" ? item.note : null,
-      createdAt: String(item.createdAt ?? item.created_at ?? ""),
-    }))
-    .filter((item) => item.id && item.url);
 }

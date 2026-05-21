@@ -1,10 +1,7 @@
 import {
   getAdminOrderRows,
   getAdminOrderRowsForCustomer,
-  getAdminRmaRows,
-  getAdminRmaRowsForCustomer,
   type AdminOrderRow,
-  type AdminRmaRow,
 } from "@/lib/admin-operations";
 import { normalizeCustomerType } from "@/lib/admin-display";
 import {
@@ -14,9 +11,8 @@ import {
 
 export type AdminCustomerRow = {
   id: string;
-  source: "company" | "application" | "profile";
+  source: "company" | "profile";
   companyId: string | null;
-  applicationId: string | null;
   companyName: string;
   email: string | null;
   profileId: string | null;
@@ -33,7 +29,6 @@ export type AdminCustomerRow = {
   priceGroup: string;
   orderCount: number;
   totalSpent: number;
-  rmaCount: number;
   pendingTaskCount: number;
   tags: string[];
   nextFollowUpAt: string | null;
@@ -69,7 +64,6 @@ export type AdminCustomerDetail = AdminCustomerRow & {
   notes: AdminCustomerNote[];
   tasks: AdminCustomerTask[];
   orders: AdminOrderRow[];
-  rmas: AdminRmaRow[];
 };
 
 export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
@@ -91,14 +85,12 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
 
   const ownerIds = [...new Set((companies ?? []).map((row) => row.owner_id).filter(Boolean))];
   const companyIds = (companies ?? []).map((row) => row.id);
-  const [profiles, allProfiles, notesAndTasks, tagMap, orders, rmas, applications, staffMembers] = await Promise.all([
+  const [profiles, allProfiles, notesAndTasks, tagMap, orders, staffMembers] = await Promise.all([
     loadProfiles(ownerIds),
     loadAllProfiles(),
     loadCustomerActivityCounts(companyIds),
     loadCustomerTags(companyIds),
     getAdminOrderRows(),
-    getAdminRmaRows(),
-    loadOpenApplications(),
     loadAllStaffMembers(),
   ]);
 
@@ -107,14 +99,12 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
     const email = company.contact_email ?? profile?.email ?? null;
     const staff = company.owner_id ? staffMembers.get(company.owner_id) : undefined;
     const customerOrders = matchCustomerOrders(orders, company.owner_id, company.company_name, email);
-    const customerRmas = matchCustomerRmas(rmas, company.owner_id, customerOrders);
     const activity = notesAndTasks.get(company.id);
 
     return {
       id: company.id,
       source: "company",
       companyId: company.id,
-      applicationId: null,
       companyName: company.company_name,
       email,
       profileId: company.owner_id ?? null,
@@ -131,7 +121,6 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
       priceGroup: normalizeCustomerType(company.price_group),
       orderCount: customerOrders.length,
       totalSpent: customerOrders.reduce((sum, order) => sum + order.total, 0),
-      rmaCount: customerRmas.length,
       pendingTaskCount: activity?.pendingTaskCount ?? 0,
       tags: tagMap.get(company.id) ?? [],
       nextFollowUpAt: company.next_follow_up_at ?? null,
@@ -143,14 +132,6 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
 
   const representedProfileIds = new Set(rows.map((row) => row.profileId).filter(Boolean));
   const representedEmails = new Set(rows.map((row) => normalizeEmail(row.email)).filter(Boolean));
-  const applicationByEmail = new Map<string, (typeof applications)[number]>();
-
-  applications.forEach((application) => {
-    const emailKey = normalizeEmail(application.email);
-    if (emailKey && !applicationByEmail.has(emailKey)) {
-      applicationByEmail.set(emailKey, application);
-    }
-  });
 
   allProfiles.forEach((profile) => {
     const emailKey = normalizeEmail(profile.email);
@@ -158,17 +139,14 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
       return;
     }
 
-    const application = emailKey ? applicationByEmail.get(emailKey) : undefined;
     const staff = staffMembers.get(profile.id);
     const customerOrders = matchCustomerOrders(orders, profile.id, null, profile.email);
-    const customerRmas = matchCustomerRmas(rmas, profile.id, customerOrders);
 
     rows.push({
       id: profile.id,
       source: "profile",
       companyId: null,
-      applicationId: application?.id ?? null,
-      companyName: application?.companyName ?? profile.fullName ?? profile.email,
+      companyName: profile.fullName ?? profile.email,
       email: profile.email,
       profileId: profile.id,
       profileRole: profile.role,
@@ -178,15 +156,14 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
       contactName: profile.fullName,
       phone: null,
       whatsapp: null,
-      vatNumber: application?.vatNumber ?? null,
+      vatNumber: null,
       status: profile.accountStatus,
-      crmStatus: application ? `b2b_${application.status}` : "registered",
+      crmStatus: "registered",
       priceGroup: normalizeCustomerType(profile.role),
       orderCount: customerOrders.length,
       totalSpent: customerOrders.reduce((sum, order) => sum + order.total, 0),
-      rmaCount: customerRmas.length,
       pendingTaskCount: 0,
-      tags: application ? ["B2B application"] : ["registered"],
+      tags: ["registered"],
       nextFollowUpAt: null,
       lastContactedAt: null,
       updatedAt: profile.updatedAt,
@@ -194,44 +171,6 @@ export async function getAdminCustomerRows(): Promise<AdminCustomerRow[]> {
     });
 
     representedProfileIds.add(profile.id);
-    if (emailKey) representedEmails.add(emailKey);
-  });
-
-  applications.forEach((application) => {
-    const emailKey = normalizeEmail(application.email);
-    if (emailKey && representedEmails.has(emailKey)) {
-      return;
-    }
-
-    rows.push({
-      id: application.id,
-      source: "application",
-      companyId: null,
-      applicationId: application.id,
-      companyName: application.companyName,
-      email: application.email,
-      profileId: null,
-      profileRole: null,
-      staffRole: null,
-      staffStatus: null,
-      accountStatus: "active",
-      contactName: null,
-      phone: null,
-      whatsapp: null,
-      vatNumber: application.vatNumber,
-      status: application.status,
-      crmStatus: `b2b_${application.status}`,
-      priceGroup: "retail",
-      orderCount: 0,
-      totalSpent: 0,
-      rmaCount: 0,
-      pendingTaskCount: 0,
-      tags: ["B2B application"],
-      nextFollowUpAt: null,
-      lastContactedAt: null,
-      updatedAt: null,
-      createdAt: application.createdAt,
-    });
     if (emailKey) representedEmails.add(emailKey);
   });
 
@@ -275,16 +214,11 @@ export async function getAdminCustomerDetail(
     email,
     companyName: company.company_name,
   });
-  const customerRmas = await getAdminRmaRowsForCustomer({
-    profileId: company.owner_id,
-    orderIds: customerOrders.map((order) => order.id),
-  });
 
   return {
     id: company.id,
     source: "company",
     companyId: company.id,
-    applicationId: null,
     companyName: company.company_name,
     email,
     profileId: company.owner_id ?? null,
@@ -301,7 +235,6 @@ export async function getAdminCustomerDetail(
     priceGroup: normalizeCustomerType(company.price_group),
     orderCount: customerOrders.length,
     totalSpent: customerOrders.reduce((sum, order) => sum + order.total, 0),
-    rmaCount: customerRmas.length,
     pendingTaskCount: tasks.filter((task) => task.status !== "completed").length,
     tags: tagMap.get(company.id) ?? [],
     nextFollowUpAt: company.next_follow_up_at ?? null,
@@ -319,7 +252,6 @@ export async function getAdminCustomerDetail(
     notes,
     tasks,
     orders: customerOrders,
-    rmas: customerRmas,
   };
 }
 
@@ -429,30 +361,19 @@ async function getAdminProfileCustomerDetail(
   }
   if (!profile) return null;
 
-  const [applications, staffMembers] = await Promise.all([
-    loadOpenApplications(),
-    loadAllStaffMembers(),
-  ]);
-  const application = applications.find(
-    (item) => normalizeEmail(item.email) === normalizeEmail(profile.email),
-  );
+  const staffMembers = await loadAllStaffMembers();
   const staff = staffMembers.get(profile.id);
   const customerOrders = await getAdminOrderRowsForCustomer({
     profileId: profile.id,
     email: profile.email,
-    companyName: application?.companyName ?? profile.full_name ?? profile.email,
-  });
-  const customerRmas = await getAdminRmaRowsForCustomer({
-    profileId: profile.id,
-    orderIds: customerOrders.map((order) => order.id),
+    companyName: profile.full_name ?? profile.email,
   });
 
   return {
     id: profile.id,
     source: "profile",
     companyId: null,
-    applicationId: application?.id ?? null,
-    companyName: application?.companyName ?? profile.full_name ?? profile.email,
+    companyName: profile.full_name ?? profile.email,
     email: profile.email,
     profileId: profile.id,
     profileRole: profile.role,
@@ -462,15 +383,14 @@ async function getAdminProfileCustomerDetail(
     contactName: profile.full_name ?? null,
     phone: null,
     whatsapp: null,
-    vatNumber: application?.vatNumber ?? null,
+    vatNumber: null,
     status: profile.account_status ?? "active",
-    crmStatus: application ? `b2b_${application.status}` : "registered",
+    crmStatus: "registered",
     priceGroup: normalizeCustomerType(profile.role),
     orderCount: customerOrders.length,
     totalSpent: customerOrders.reduce((sum, order) => sum + order.total, 0),
-    rmaCount: customerRmas.length,
     pendingTaskCount: 0,
-    tags: application ? ["B2B application"] : ["registered"],
+    tags: ["registered"],
     nextFollowUpAt: null,
     lastContactedAt: null,
     updatedAt: profile.updated_at ?? null,
@@ -486,7 +406,6 @@ async function getAdminProfileCustomerDetail(
     notes: [],
     tasks: [],
     orders: customerOrders,
-    rmas: customerRmas,
   };
 }
 
@@ -585,30 +504,6 @@ async function loadCustomerTasks(companyId: string): Promise<AdminCustomerTask[]
   }));
 }
 
-async function loadOpenApplications() {
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("b2b_applications")
-    .select("id, status, company_name, vat_number, email, created_at")
-    .in("status", ["pending", "approved"])
-    .order("created_at", { ascending: false })
-    .limit(80);
-
-  if (error) {
-    console.error("Failed to load customer applications", error);
-    return [];
-  }
-
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    status: row.status,
-    companyName: row.company_name,
-    vatNumber: row.vat_number ?? null,
-    email: row.email ?? null,
-    createdAt: row.created_at,
-  }));
-}
-
 function matchCustomerOrders(
   orders: AdminOrderRow[],
   profileId?: string | null,
@@ -628,25 +523,12 @@ function matchCustomerOrders(
   });
 }
 
-function matchCustomerRmas(
-  rmas: AdminRmaRow[],
-  profileId: string | null | undefined,
-  orders: AdminOrderRow[],
-) {
-  const orderIds = new Set(orders.map((order) => order.id));
-  return rmas.filter((rma) => {
-    if (profileId && rma.profileId === profileId) return true;
-    return Boolean(rma.orderId && orderIds.has(rma.orderId));
-  });
-}
-
 function demoCustomers(): AdminCustomerRow[] {
   return [
     {
       id: "demo-company",
       source: "company",
       companyId: "demo-company",
-      applicationId: null,
       companyName: "Centro Riparazioni Milano",
       email: "buyer@example.it",
       profileId: "demo-profile",
@@ -663,7 +545,6 @@ function demoCustomers(): AdminCustomerRow[] {
       priceGroup: "wholesale",
       orderCount: 1,
       totalSpent: 519.24,
-      rmaCount: 1,
       pendingTaskCount: 1,
       tags: ["维修店", "重点跟进"],
       nextFollowUpAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
@@ -678,7 +559,6 @@ async function demoCustomerDetail(companyId: string): Promise<AdminCustomerDetai
   const row = demoCustomers().find((customer) => customer.id === companyId);
   if (!row) return null;
   const orders = await getAdminOrderRows();
-  const rmas = await getAdminRmaRows();
 
   return {
     ...row,
@@ -708,7 +588,6 @@ async function demoCustomerDetail(companyId: string): Promise<AdminCustomerDetai
       },
     ],
     orders,
-    rmas,
   };
 }
 

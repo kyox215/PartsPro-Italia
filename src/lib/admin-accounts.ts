@@ -32,7 +32,6 @@ export type CustomerAuditEventRow = {
   actorEmail: string | null;
   customerProfileId: string | null;
   companyId: string | null;
-  applicationId: string | null;
   beforeData: Record<string, unknown> | null;
   afterData: Record<string, unknown> | null;
   note: string | null;
@@ -136,7 +135,7 @@ export async function getCustomerAuditEvents(
   const { data, error } = await supabase
     .from("customer_audit_events")
     .select(
-      "id, action, actor_email, customer_profile_id, company_id, application_id, before_data, after_data, note, created_at",
+      "id, action, actor_email, customer_profile_id, company_id, before_data, after_data, note, created_at",
     )
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -152,7 +151,6 @@ export async function getCustomerAuditEvents(
     actorEmail: event.actor_email ?? null,
     customerProfileId: event.customer_profile_id ?? null,
     companyId: event.company_id ?? null,
-    applicationId: event.application_id ?? null,
     beforeData: asRecordOrNull(event.before_data),
     afterData: asRecordOrNull(event.after_data),
     note: event.note ?? null,
@@ -165,7 +163,6 @@ export async function recordCustomerAuditEvent({
   action,
   customerProfileId,
   companyId,
-  applicationId,
   beforeData,
   afterData,
   note,
@@ -174,7 +171,6 @@ export async function recordCustomerAuditEvent({
   action: string;
   customerProfileId?: string | null;
   companyId?: string | null;
-  applicationId?: string | null;
   beforeData?: Record<string, unknown> | null;
   afterData?: Record<string, unknown> | null;
   note?: string | null;
@@ -188,7 +184,6 @@ export async function recordCustomerAuditEvent({
       actor_email: actor.user?.email ?? null,
       customer_profile_id: customerProfileId ?? null,
       company_id: companyId ?? null,
-      application_id: applicationId ?? null,
       action,
       before_data: beforeData ?? null,
       after_data: afterData ?? null,

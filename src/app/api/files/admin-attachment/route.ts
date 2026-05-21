@@ -53,13 +53,10 @@ async function canUserAccessAttachment(path: string, userId: string): Promise<bo
   const orderId = getEntityId(path, "order-payment-proofs");
   if (orderId) return userOwnsOrder(orderId, userId);
 
-  const rmaId = getEntityId(path, "rma-attachments");
-  if (rmaId) return userOwnsRma(rmaId, userId);
-
   return false;
 }
 
-function getEntityId(path: string, scope: "order-payment-proofs" | "rma-attachments") {
+function getEntityId(path: string, scope: "order-payment-proofs") {
   const prefix = `${scope}/`;
   if (!path.startsWith(prefix)) return null;
   const [, entityId] = path.split("/");
@@ -71,18 +68,6 @@ async function userOwnsOrder(orderId: string, userId: string) {
     .from("orders")
     .select("id")
     .eq("id", orderId)
-    .eq("profile_id", userId)
-    .maybeSingle();
-
-  if (error) return false;
-  return Boolean(data);
-}
-
-async function userOwnsRma(rmaId: string, userId: string) {
-  const { data, error } = await getSupabaseAdminClient()
-    .from("rmas")
-    .select("id")
-    .eq("id", rmaId)
     .eq("profile_id", userId)
     .maybeSingle();
 

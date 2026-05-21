@@ -137,7 +137,7 @@ export const products: Product[] = [
       zh: "Samsung Galaxy A52 Service Pack 屏幕",
     },
     descriptions: {
-      it: "Ricambio Service Pack per riparazioni dove priorita sono resa e bassa incidenza RMA.",
+      it: "Ricambio Service Pack per riparazioni dove priorita sono resa e qualita costante.",
       zh: "Service Pack 等级配件，适合要求稳定显示效果和低售后的维修场景。",
     },
     compatibility: ["Galaxy A52", "SM-A525F", "SM-A526B"],

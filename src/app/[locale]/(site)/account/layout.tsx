@@ -41,12 +41,6 @@ export default async function AccountLayout({
       icon: "shopping",
     },
     {
-      href: localizePath(locale, "/account/rma"),
-      label: locale === "it" ? "RMA e resi" : "退货管理",
-      description: locale === "it" ? "Pratiche aperte" : "售后记录",
-      icon: "rma",
-    },
-    {
       href: localizePath(locale, "/account/company"),
       label: locale === "it" ? "Profilo aziendale" : "公司资料",
       description: locale === "it" ? "Fattura e contatti" : "发票与联系人",

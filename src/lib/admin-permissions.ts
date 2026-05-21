@@ -17,14 +17,12 @@ export type AdminPermission =
   | "admin:access"
   | "accounts:read"
   | "accounts:write"
-  | "b2b:review"
   | "staff:manage"
   | "audit:read"
   | "products:write"
   | "inventory:write"
   | "orders:write"
   | "payments:confirm"
-  | "rma:write"
   | "system:read";
 
 export const staffRoleOptions: StaffRole[] = [
@@ -44,7 +42,7 @@ export const staffRoleLabels: Record<StaffRole, { zh: string; it: string }> = {
   catalog: { zh: "商品目录", it: "Catalogo" },
   warehouse: { zh: "仓库", it: "Magazzino" },
   finance: { zh: "财务", it: "Finanza" },
-  support: { zh: "客服售后", it: "Supporto" },
+  support: { zh: "客服 / 跟进", it: "Supporto" },
 };
 
 export const staffRoleDescriptions: Record<StaffRole, { zh: string; it: string }> = {
@@ -53,12 +51,12 @@ export const staffRoleDescriptions: Record<StaffRole, { zh: string; it: string }
     it: "Accesso completo a staff, clienti, ordini, stock, finanza e sistema.",
   },
   manager: {
-    zh: "运营工作台全局管理，能处理客户、商品、库存、订单、售后和日志，但不默认拥有系统配置。",
+    zh: "运营工作台全局管理，能处理客户、商品、库存、订单和日志，但不默认拥有系统配置。",
     it: "Gestione operativa completa senza accesso sistema predefinito.",
   },
   sales: {
-    zh: "客户管理、批发申请、客户跟进和订单协作。",
-    it: "Gestione clienti, richieste wholesale e follow-up commerciali.",
+    zh: "客户管理、价格权限、客户跟进和订单协作。",
+    it: "Gestione clienti, price group e follow-up commerciali.",
   },
   catalog: {
     zh: "商品、翻译、价格、目录和导入维护。",
@@ -73,8 +71,8 @@ export const staffRoleDescriptions: Record<StaffRole, { zh: string; it: string }
     it: "Incassi, bonifici, rimborsi e stati pagamento.",
   },
   support: {
-    zh: "客户资料查看、RMA、售后、备注和任务。",
-    it: "Profilo cliente, RMA, assistenza, note e task.",
+    zh: "客户资料查看、客户跟进、备注和任务。",
+    it: "Profilo cliente, assistenza, note e task.",
   },
 };
 
@@ -82,20 +80,16 @@ const allPermissions: AdminPermission[] = [
   "admin:access",
   "accounts:read",
   "accounts:write",
-  "b2b:review",
   "staff:manage",
   "audit:read",
   "products:write",
   "inventory:write",
   "orders:write",
   "payments:confirm",
-  "rma:write",
   "system:read",
 ];
 
-const configurablePermissions: AdminPermission[] = allPermissions.filter(
-  (permission) => permission !== "b2b:review",
-);
+const configurablePermissions: AdminPermission[] = allPermissions;
 
 const staffPermissions: Record<StaffRole, AdminPermission[]> = {
   owner: allPermissions,
@@ -109,7 +103,6 @@ const staffPermissions: Record<StaffRole, AdminPermission[]> = {
     "inventory:write",
     "orders:write",
     "payments:confirm",
-    "rma:write",
   ],
   sales: [
     "admin:access",
@@ -117,7 +110,6 @@ const staffPermissions: Record<StaffRole, AdminPermission[]> = {
     "accounts:write",
     "audit:read",
     "orders:write",
-    "rma:write",
   ],
   catalog: ["admin:access", "products:write", "system:read"],
   warehouse: ["admin:access", "inventory:write", "orders:write", "system:read"],
@@ -128,7 +120,7 @@ const staffPermissions: Record<StaffRole, AdminPermission[]> = {
     "audit:read",
     "system:read",
   ],
-  support: ["admin:access", "accounts:read", "rma:write", "audit:read"],
+  support: ["admin:access", "accounts:read", "audit:read"],
 };
 
 export function getStaffPermissions(role: StaffRole | null | undefined) {

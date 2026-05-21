@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     template: "%s | PartsPro Italia",
   },
   description:
-    "Retail and wholesale platform for phone repair parts in Italy, built for fast search, stock clarity, orders, and RMA workflows.",
+    "Retail and wholesale platform for phone repair parts in Italy, built for fast search, stock clarity, and order workflows.",
 };
 
 export default function RootLayout({

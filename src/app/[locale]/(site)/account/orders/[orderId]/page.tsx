@@ -3,14 +3,12 @@ import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { getAccountOrderById, type AccountOrderRow } from "@/lib/account-activity";
 import {
-  canCreateRma,
   canSubmitPaymentProof,
   formatFulfillmentStatus,
   formatFulfillmentType,
   formatOrderStatus,
   formatPaymentMethod,
   formatPaymentStatus,
-  formatRmaIssueType,
   formatTimelineEvent,
   getAccountNextActions,
   statusBadgeClass,
@@ -62,8 +60,8 @@ export default async function AccountOrderDetailPage({
             </h1>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               {locale === "it"
-                ? "Stato, pagamento, stock riservato, preorder, spedizione e RMA collegati a questo ordine."
-                : "查看此订单的状态、付款、库存锁定、预购、物流和售后入口。"}
+                ? "Stato, pagamento, stock riservato, preorder e spedizione collegati a questo ordine."
+                : "查看此订单的状态、付款、库存锁定、预购和物流。"}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -464,8 +462,6 @@ function OrderItemsPanel({
   order,
   locale,
 }: Readonly<{ order: AccountOrderRow; locale: Locale }>) {
-  const rmaAllowed = canCreateRma(order);
-
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="border-b border-slate-200 px-5 py-4">
@@ -481,16 +477,14 @@ function OrderItemsPanel({
         {order.items.map((item) => (
           <OrderItemCard
             key={`${order.id}-${item.sku}-mobile`}
-            order={order}
             item={item}
             locale={locale}
-            rmaAllowed={rmaAllowed}
           />
         ))}
       </div>
 
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[960px] text-left text-sm">
+        <table className="w-full min-w-[820px] text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
               <th className="px-4 py-3">SKU</th>
@@ -498,7 +492,6 @@ function OrderItemsPanel({
               <th className="px-4 py-3">Qty</th>
               <th className="px-4 py-3">Fulfillment</th>
               <th className="px-4 py-3">Price</th>
-              <th className="px-4 py-3">RMA</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
@@ -517,15 +510,6 @@ function OrderItemsPanel({
                 <td className="px-4 py-3 font-bold text-slate-950">
                   {formatMoney(item.unitPrice * item.quantity, locale)}
                 </td>
-                <td className="px-4 py-3">
-                  <RmaRequestDetails
-                    order={order}
-                    sku={item.sku}
-                    maxQuantity={item.quantity}
-                    locale={locale}
-                    enabled={rmaAllowed}
-                  />
-                </td>
               </tr>
             ))}
           </tbody>
@@ -536,15 +520,11 @@ function OrderItemsPanel({
 }
 
 function OrderItemCard({
-  order,
   item,
   locale,
-  rmaAllowed,
 }: Readonly<{
-  order: AccountOrderRow;
   item: AccountOrderRow["items"][number];
   locale: Locale;
-  rmaAllowed: boolean;
 }>) {
   return (
     <article className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -560,15 +540,6 @@ function OrderItemCard({
       </div>
       <div className="mt-3">
         <FulfillmentBadges item={item} locale={locale} />
-      </div>
-      <div className="mt-3">
-        <RmaRequestDetails
-          order={order}
-          sku={item.sku}
-          maxQuantity={item.quantity}
-          locale={locale}
-          enabled={rmaAllowed}
-        />
       </div>
     </article>
   );
@@ -597,75 +568,6 @@ function FulfillmentBadges({
         </Badge>
       ) : null}
     </div>
-  );
-}
-
-function RmaRequestDetails({
-  order,
-  sku,
-  maxQuantity,
-  locale,
-  enabled,
-}: Readonly<{
-  order: AccountOrderRow;
-  sku: string;
-  maxQuantity: number;
-  locale: Locale;
-  enabled: boolean;
-}>) {
-  if (!enabled) {
-    return (
-      <span className="text-xs font-semibold text-slate-500">
-        {locale === "it" ? "Disponibile dopo pagamento" : "付款确认后可申请"}
-      </span>
-    );
-  }
-
-  return (
-    <details className="group">
-      <summary className="inline-flex h-9 cursor-pointer list-none items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 hover:border-blue-300 hover:text-blue-700">
-        {locale === "it" ? "Apri RMA" : "申请售后"}
-      </summary>
-      <form action="/api/account/rma/create" method="post" className="mt-3 grid gap-2">
-        <input type="hidden" name="locale" value={locale} />
-        <input type="hidden" name="orderId" value={order.id} />
-        <input type="hidden" name="sku" value={sku} />
-        <label className="grid gap-1 text-xs font-semibold text-slate-700">
-          {locale === "it" ? "Quantita" : "数量"}
-          <input
-            className="h-9 rounded-lg border border-slate-300 px-2 text-sm"
-            max={maxQuantity}
-            min={1}
-            name="quantity"
-            type="number"
-            defaultValue={1}
-          />
-        </label>
-        <label className="grid gap-1 text-xs font-semibold text-slate-700">
-          {locale === "it" ? "Tipo problema" : "问题类型"}
-          <select className="h-9 rounded-lg border border-slate-300 px-2 text-sm" name="issueType">
-            {["defective", "wrong_item", "damaged", "compatibility", "touch_issue", "other"].map(
-              (value) => (
-                <option key={value} value={value}>
-                  {formatRmaIssueType(value, locale)}
-                </option>
-              ),
-            )}
-          </select>
-        </label>
-        <textarea
-          className="min-h-20 rounded-lg border border-slate-300 p-2 text-sm"
-          name="description"
-          placeholder={locale === "it" ? "Descrivi il problema" : "描述问题"}
-        />
-        <button
-          className="h-9 rounded-lg border border-blue-600 bg-blue-600 px-3 text-xs font-bold text-white"
-          type="submit"
-        >
-          {locale === "it" ? "Invia RMA" : "提交售后"}
-        </button>
-      </form>
-    </details>
   );
 }
 
@@ -772,7 +674,6 @@ function formatRefundReason(reason: string, locale: Locale) {
     fraudulent: { it: "Frode", zh: "欺诈风险" },
     requested_by_customer: { it: "Richiesta cliente", zh: "客户申请" },
     order_cancelled: { it: "Ordine annullato", zh: "订单取消" },
-    rma_refund: { it: "Rimborso RMA", zh: "售后退款" },
     other: { it: "Altro", zh: "其他原因" },
   };
 

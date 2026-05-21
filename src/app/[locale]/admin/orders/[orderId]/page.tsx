@@ -14,6 +14,7 @@ import {
   AdminWorkspaceGrid,
   StatusPill,
 } from "@/components/admin/admin-ui";
+import { formatAdminStatus, type AdminStatusKind } from "@/lib/admin-display";
 import { getAdminOrderById } from "@/lib/admin-operations";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
@@ -55,6 +56,11 @@ export default async function AdminOrderDetailPage({
     (sum, item) => sum + (item.preorderQty ?? 0),
     0,
   );
+  const orderStatusLabels = getStatusSelectLabels("order", orderStatuses, locale);
+  const orderStatus = formatAdminStatus("order", order.status, locale);
+  const paymentStatus = formatAdminStatus("payment", order.paymentStatus ?? "-", locale);
+  const paymentMethod = formatAdminStatus("paymentMethod", order.paymentMethod, locale);
+  const fulfillmentStatus = formatAdminStatus("fulfillment", order.fulfillmentStatus ?? "-", locale);
 
   return (
     <div className="space-y-3">
@@ -80,13 +86,13 @@ export default async function AdminOrderDetailPage({
       <Feedback saved={valueOf(query.saved)} error={valueOf(query.error)} locale={locale} />
 
       <AdminMetricStrip className="md:grid-cols-2 xl:grid-cols-6">
-        <AdminMetricCard icon={ClipboardList} label={locale === "it" ? "Stato" : "状态"} value={<StatusPill status={order.status} />} tone="blue" />
+        <AdminMetricCard icon={ClipboardList} label={locale === "it" ? "Stato" : "状态"} value={<StatusPill status={orderStatus.label} tone={orderStatus.tone} />} tone="blue" />
         <AdminMetricCard
           icon={CreditCard}
           label={locale === "it" ? "Pagamento" : "付款"}
-          value={order.paymentMethod}
+          value={paymentMethod.label}
           tone="amber"
-          trend={<StatusPill status={order.paymentStatus ?? "-"} />}
+          trend={<StatusPill status={paymentStatus.label} tone={paymentStatus.tone} />}
         />
         <AdminMetricCard icon={Boxes} label={locale === "it" ? "Totale" : "总额"} value={formatMoney(order.total, locale)} tone="green" />
         <AdminMetricCard
@@ -101,33 +107,29 @@ export default async function AdminOrderDetailPage({
           label={locale === "it" ? "Preorder" : "预购履约"}
           value={preorderQty}
           tone="violet"
-          trend={order.fulfillmentStatus ? <StatusPill status={order.fulfillmentStatus} /> : null}
+          trend={order.fulfillmentStatus ? <StatusPill status={fulfillmentStatus.label} tone={fulfillmentStatus.tone} /> : null}
         />
       </AdminMetricStrip>
 
       <AdminWorkspaceGrid
+        className="xl:!grid-cols-[minmax(0,1fr)_280px] 2xl:!grid-cols-[minmax(0,1fr)_300px]"
         rail={
           <AdminActionRail
             title={locale === "it" ? "Azioni ordine" : "订单操作"}
             description={locale === "it" ? "Stato, pagamento e fulfilment" : "状态、收款与履约"}
           >
-            <AdminPanel
-              title={locale === "it" ? "Aggiorna stato" : "更新状态"}
-              description={
-                locale === "it"
-                  ? "Collegato agli endpoint admin esistenti."
-                  : "仍使用现有后台状态接口。"
-              }
-            >
+            <AdminPanel title={locale === "it" ? "Aggiorna stato" : "更新状态"} contentClassName="p-3">
               <StatusSelectForm
                 action="/api/admin/orders/status"
                 currentStatus={order.status}
                 extraFields={<input type="hidden" name="returnTo" value={returnTo} />}
                 id={order.id}
                 locale={locale}
+                statusLabels={orderStatusLabels}
                 statuses={orderStatuses}
+                submitLabel={locale === "it" ? "Salva" : "保存"}
               />
-              <div className="mt-3 rounded-lg bg-stone-50 p-3 text-xs font-semibold leading-5 text-stone-700">
+              <div className="mt-2 rounded-lg bg-stone-50 p-2.5 text-xs font-semibold leading-5 text-stone-700">
                 <p>
                   {locale === "it" ? "Subtotal" : "小计"}:{" "}
                   <strong>{formatMoney(order.subtotal ?? 0, locale)}</strong>
@@ -149,14 +151,11 @@ export default async function AdminOrderDetailPage({
             </AdminPanel>
 
             <AdminPanel
-              title={locale === "it" ? "Chiusura operativa" : "订单闭环"}
-              description={
-                locale === "it"
-                  ? "Incasso, picking, preorder e stock."
-                  : "收款、备货、预购分配和库存释放。"
-              }
+              title={locale === "it" ? "Azioni rapide" : "快捷操作"}
+              description={locale === "it" ? "Incasso, fulfilment e lock." : "收款、履约与锁库。"}
+              contentClassName="p-3"
             >
-              <div className="grid gap-2">
+              <div className="grid gap-1.5">
                 {order.paymentMethod === "cash" && order.paymentStatus === "pending_cash" ? (
                   <ActionForm action="/api/admin/orders/payment" id={order.id} locale={locale} returnTo={returnTo} value="confirm_cash">
                     {locale === "it" ? "Conferma contanti" : "确认现金收款"}
@@ -230,14 +229,14 @@ export default async function AdminOrderDetailPage({
         }
       >
         <AdminPanel title={locale === "it" ? "Cliente e fattura" : "客户与发票"}>
-          <dl className="grid gap-3 text-sm">
-            <InfoRow label="Company" value={order.companyName || "-"} />
-            <InfoRow label="Customer" value={order.customerName || "-"} />
+          <dl className="grid gap-2 text-sm">
+            <InfoRow label={locale === "it" ? "Azienda" : "公司"} value={order.companyName || "-"} />
+            <InfoRow label={locale === "it" ? "Cliente" : "客户"} value={order.customerName || "-"} />
             <InfoRow label="Email" value={order.email || "-"} />
-            <InfoRow label="VAT" value={order.vatNumber || "-"} />
-            <InfoRow label="Fiscal code" value={order.fiscalCode || "-"} />
+            <InfoRow label={locale === "it" ? "P.IVA" : "P.IVA / 税号"} value={order.vatNumber || "-"} />
+            <InfoRow label={locale === "it" ? "Codice fiscale" : "Fiscal Code"} value={order.fiscalCode || "-"} />
             <InfoRow label="SDI / PEC" value={[order.sdi, order.pec].filter(Boolean).join(" / ") || "-"} />
-            <InfoRow label="Shipping" value={order.shippingAddress || "-"} />
+            <InfoRow label={locale === "it" ? "Indirizzo consegna" : "收货地址"} value={order.shippingAddress || "-"} />
             <InfoRow
               label={locale === "it" ? "Tracking" : "物流单号"}
               value={[order.shippingCarrier, order.trackingNumber].filter(Boolean).join(" / ") || "-"}
@@ -279,10 +278,10 @@ export default async function AdminOrderDetailPage({
                       <div className="font-black text-stone-950">
                         {formatMoney(record.amount, locale)}
                       </div>
-                      <StatusPill status={record.paymentStatus} />
+                      <LocalizedStatusPill kind="payment" locale={locale} value={record.paymentStatus} />
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-stone-500">
-                      <span>{record.paymentMethod}</span>
+                      <span>{formatAdminStatus("paymentMethod", record.paymentMethod, locale).label}</span>
                       {record.provider ? <span>{record.provider}</span> : null}
                       {record.providerReference ? (
                         <span className="font-mono">{record.providerReference}</span>
@@ -337,11 +336,11 @@ export default async function AdminOrderDetailPage({
                       <div className="font-black text-stone-950">
                         {formatMoney(refund.amount, locale)}
                       </div>
-                      <StatusPill status={refund.status} />
+                      <LocalizedStatusPill kind="refundStatus" locale={locale} value={refund.status} />
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-stone-500">
-                      <span>{refund.paymentMethod}</span>
-                      <span>{refund.reason}</span>
+                      <span>{formatAdminStatus("paymentMethod", refund.paymentMethod, locale).label}</span>
+                      <span>{formatAdminStatus("refundReason", refund.reason, locale).label}</span>
                       {refund.provider ? <span>{refund.provider}</span> : null}
                       {refund.providerRefundId ? (
                         <span className="font-mono">{refund.providerRefundId}</span>
@@ -386,7 +385,7 @@ export default async function AdminOrderDetailPage({
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="font-black text-stone-950">{event.title}</p>
                       <span className="rounded-full bg-stone-100 px-2 py-1 text-xs font-black text-stone-500">
-                        {event.eventType}
+                        {formatAdminStatus("timelineEvent", event.eventType, locale).label}
                       </span>
                     </div>
                     {event.body ? (
@@ -430,11 +429,11 @@ export default async function AdminOrderDetailPage({
               <thead className="text-xs uppercase text-stone-400">
                 <tr className="border-b border-black/5">
                   <th className="px-2.5 py-2">SKU</th>
-                  <th className="px-2.5 py-2">Name</th>
-                  <th className="px-2.5 py-2">Qty</th>
-                  <th className="px-2.5 py-2">Stock</th>
-                  <th className="px-2.5 py-2">Preorder</th>
-                  <th className="px-2.5 py-2">Line total</th>
+                  <th className="px-2.5 py-2">{locale === "it" ? "Nome" : "商品名"}</th>
+                  <th className="px-2.5 py-2">{locale === "it" ? "Qta" : "数量"}</th>
+                  <th className="px-2.5 py-2">{locale === "it" ? "Stock" : "现货"}</th>
+                  <th className="px-2.5 py-2">{locale === "it" ? "Preorder" : "预购"}</th>
+                  <th className="px-2.5 py-2">{locale === "it" ? "Totale riga" : "行小计"}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/5">
@@ -484,7 +483,7 @@ function PaymentProofForm({
   return (
     <form
       action="/api/admin/orders/payment-proof"
-      className="grid gap-3"
+      className="grid gap-2"
       encType="multipart/form-data"
       method="post"
     >
@@ -495,7 +494,7 @@ function PaymentProofForm({
       <label className="grid gap-1 text-xs font-black text-stone-500">
         {locale === "it" ? "Metodo" : "付款方式"}
         <select
-          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          className="h-9 rounded-lg border border-black/10 bg-white px-2.5 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
           defaultValue={order.paymentMethod}
           name="paymentMethod"
         >
@@ -507,7 +506,7 @@ function PaymentProofForm({
       <label className="grid gap-1 text-xs font-black text-stone-500">
         {locale === "it" ? "Stato pagamento" : "付款状态"}
         <select
-          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          className="h-9 rounded-lg border border-black/10 bg-white px-2.5 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
           defaultValue={order.paymentStatus ?? "pending_bank_transfer"}
           name="paymentStatus"
         >
@@ -523,7 +522,7 @@ function PaymentProofForm({
       <label className="grid gap-1 text-xs font-black text-stone-500">
         {locale === "it" ? "Importo" : "金额"}
         <input
-          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          className="h-9 rounded-lg border border-black/10 bg-white px-2.5 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
           defaultValue={order.total}
           min="0"
           name="amount"
@@ -534,7 +533,7 @@ function PaymentProofForm({
       <label className="grid gap-1 text-xs font-black text-stone-500">
         {locale === "it" ? "Riferimento" : "付款参考号"}
         <input
-          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          className="h-9 rounded-lg border border-black/10 bg-white px-2.5 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
           name="providerReference"
           placeholder={locale === "it" ? "CRO / ID transazione" : "CRO / 交易号"}
         />
@@ -551,7 +550,7 @@ function PaymentProofForm({
       <label className="grid gap-1 text-xs font-black text-stone-500">
         {locale === "it" ? "Oppure link allegato" : "或填写凭证链接"}
         <input
-          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          className="h-9 rounded-lg border border-black/10 bg-white px-2.5 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
           name="proofUrl"
           placeholder="https://..."
           type="url"
@@ -560,7 +559,7 @@ function PaymentProofForm({
       <label className="grid gap-1 text-xs font-black text-stone-500">
         {locale === "it" ? "Etichetta" : "凭证名称"}
         <input
-          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          className="h-9 rounded-lg border border-black/10 bg-white px-2.5 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
           name="proofLabel"
           placeholder={locale === "it" ? "Ricevuta bonifico" : "银行转账截图"}
         />
@@ -568,13 +567,13 @@ function PaymentProofForm({
       <label className="grid gap-1 text-xs font-black text-stone-500">
         {locale === "it" ? "Nota" : "备注"}
         <textarea
-          className="min-h-20 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          className="min-h-16 rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
           name="note"
           placeholder={locale === "it" ? "Dettagli incasso" : "收款说明"}
         />
       </label>
       <button
-        className="inline-flex h-10 items-center justify-center rounded-lg border border-stone-950 bg-stone-950 px-3 text-xs font-black text-white transition hover:bg-stone-800"
+        className="inline-flex h-9 items-center justify-center rounded-lg border border-stone-950 bg-stone-950 px-3 text-xs font-black text-white transition hover:bg-stone-800"
         type="submit"
       >
         {locale === "it" ? "Salva prova" : "保存付款凭证"}
@@ -597,7 +596,7 @@ function RefundForm({
   const remaining = Math.max(order.total - (order.refundTotal ?? 0), 0);
 
   return (
-    <form action="/api/admin/orders/refund" className="grid gap-3" method="post">
+    <form action="/api/admin/orders/refund" className="grid gap-2" method="post">
       <AdminCsrfField />
       <input type="hidden" name="id" value={order.id} />
       <input type="hidden" name="locale" value={locale} />
@@ -615,7 +614,7 @@ function RefundForm({
       <label className="grid gap-1 text-xs font-black text-stone-500">
         {locale === "it" ? "Importo rimborso" : "退款金额"}
         <input
-          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          className="h-9 rounded-lg border border-black/10 bg-white px-2.5 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
           defaultValue={remaining > 0 ? remaining.toFixed(2) : ""}
           max={remaining || undefined}
           min="0.01"
@@ -627,7 +626,7 @@ function RefundForm({
       <label className="grid gap-1 text-xs font-black text-stone-500">
         {locale === "it" ? "Motivo" : "退款原因"}
         <select
-          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          className="h-9 rounded-lg border border-black/10 bg-white px-2.5 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
           defaultValue="requested_by_customer"
           name="reason"
         >
@@ -637,7 +636,6 @@ function RefundForm({
           <option value="order_cancelled">
             {locale === "it" ? "Ordine annullato" : "订单取消"}
           </option>
-          <option value="rma_refund">{locale === "it" ? "RMA" : "售后退款"}</option>
           <option value="duplicate">{locale === "it" ? "Duplicato" : "重复付款"}</option>
           <option value="fraudulent">{locale === "it" ? "Frode" : "欺诈风险"}</option>
           <option value="other">{locale === "it" ? "Altro" : "其他"}</option>
@@ -647,7 +645,7 @@ function RefundForm({
         <label className="grid gap-1 text-xs font-black text-stone-500">
           {locale === "it" ? "Riferimento rimborso" : "退款参考号"}
           <input
-            className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+            className="h-9 rounded-lg border border-black/10 bg-white px-2.5 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
             name="providerReference"
             placeholder={locale === "it" ? "Bonifico / ricevuta" : "转账单号 / 现金凭证"}
           />
@@ -656,7 +654,7 @@ function RefundForm({
       <label className="grid gap-1 text-xs font-black text-stone-500">
         {locale === "it" ? "Nota" : "备注"}
         <textarea
-          className="min-h-20 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          className="min-h-16 rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
           name="note"
           placeholder={
             order.paymentMethod === "stripe"
@@ -670,7 +668,7 @@ function RefundForm({
         />
       </label>
       <button
-        className="inline-flex h-10 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-3 text-xs font-black text-rose-700 transition hover:border-rose-300"
+        className="inline-flex h-9 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-3 text-xs font-black text-rose-700 transition hover:border-rose-300"
         disabled={remaining <= 0}
         type="submit"
       >
@@ -692,7 +690,7 @@ function ShipmentForm({
   if (!order) return null;
 
   return (
-    <form action="/api/admin/orders/shipment" className="grid gap-3" method="post">
+    <form action="/api/admin/orders/shipment" className="grid gap-2" method="post">
       <AdminCsrfField />
       <input type="hidden" name="id" value={order.id} />
       <input type="hidden" name="locale" value={locale} />
@@ -700,7 +698,7 @@ function ShipmentForm({
       <label className="grid gap-1 text-xs font-black text-stone-500">
         {locale === "it" ? "Corriere" : "物流公司"}
         <input
-          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          className="h-9 rounded-lg border border-black/10 bg-white px-2.5 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
           defaultValue={order.shippingCarrier ?? ""}
           name="shippingCarrier"
           placeholder="DHL / GLS / BRT"
@@ -709,7 +707,7 @@ function ShipmentForm({
       <label className="grid gap-1 text-xs font-black text-stone-500">
         {locale === "it" ? "Tracking" : "物流单号"}
         <input
-          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          className="h-9 rounded-lg border border-black/10 bg-white px-2.5 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
           defaultValue={order.trackingNumber ?? ""}
           name="trackingNumber"
         />
@@ -717,7 +715,7 @@ function ShipmentForm({
       <label className="grid gap-1 text-xs font-black text-stone-500">
         {locale === "it" ? "URL tracking" : "跟踪链接"}
         <input
-          className="h-10 rounded-lg border border-black/10 bg-white px-3 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          className="h-9 rounded-lg border border-black/10 bg-white px-2.5 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
           defaultValue={order.trackingUrl ?? ""}
           name="trackingUrl"
           placeholder="https://..."
@@ -727,7 +725,7 @@ function ShipmentForm({
       <label className="grid gap-1 text-xs font-black text-stone-500">
         {locale === "it" ? "Nota cliente" : "客户通知"}
         <textarea
-          className="min-h-20 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          className="min-h-16 rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
           defaultValue={order.customerNote ?? ""}
           name="customerNote"
           placeholder={locale === "it" ? "Messaggio visibile al cliente" : "客户订单详情页可见"}
@@ -736,13 +734,13 @@ function ShipmentForm({
       <label className="grid gap-1 text-xs font-black text-stone-500">
         {locale === "it" ? "Nota interna" : "内部备注"}
         <textarea
-          className="min-h-20 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
+          className="min-h-16 rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm font-semibold text-stone-950 outline-none focus:border-blue-300"
           defaultValue={order.shipmentNote ?? ""}
           name="shipmentNote"
         />
       </label>
       <button
-        className="inline-flex h-10 items-center justify-center rounded-lg border border-stone-950 bg-stone-950 px-3 text-xs font-black text-white transition hover:bg-stone-800"
+        className="inline-flex h-9 items-center justify-center rounded-lg border border-stone-950 bg-stone-950 px-3 text-xs font-black text-white transition hover:bg-stone-800"
         type="submit"
       >
         {locale === "it" ? "Salva tracking" : "保存物流信息"}
@@ -774,7 +772,7 @@ function NotificationList({
         <div key={notification.id} className="rounded-lg border border-black/5 bg-stone-50 p-3 text-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="font-black text-stone-950">{notification.subject}</p>
-            <StatusPill status={notification.status} />
+            <LocalizedStatusPill kind="notification" locale={locale} value={notification.status} />
           </div>
           <p className="mt-2 text-xs font-semibold text-stone-500">
             {notification.recipientEmail}
@@ -793,9 +791,28 @@ function NotificationList({
   );
 }
 
+function LocalizedStatusPill({
+  kind,
+  value,
+  locale,
+}: Readonly<{ kind: AdminStatusKind; value: string | null | undefined; locale: Locale }>) {
+  const status = formatAdminStatus(kind, value, locale);
+  return <StatusPill status={status.label} tone={status.tone} />;
+}
+
+function getStatusSelectLabels(
+  kind: AdminStatusKind,
+  values: string[],
+  locale: Locale,
+) {
+  return Object.fromEntries(
+    values.map((value) => [value, formatAdminStatus(kind, value, locale).label]),
+  );
+}
+
 function InfoRow({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
-    <div className="grid gap-1 rounded-lg bg-stone-50 p-2.5 sm:grid-cols-[120px_1fr]">
+    <div className="grid gap-1 rounded-lg bg-stone-50 p-2 sm:grid-cols-[128px_1fr]">
       <dt className="font-black text-stone-500">{label}</dt>
       <dd className="break-words font-semibold text-stone-900">{value}</dd>
     </div>
@@ -834,7 +851,7 @@ function ActionForm({
       <input type="hidden" name="returnTo" value={returnTo} />
       {value ? <input type="hidden" name="action" value={value} /> : null}
       <button
-        className={`inline-flex h-9 w-full items-center justify-center rounded-lg border px-3 text-xs font-black transition ${className}`}
+        className={`inline-flex h-8 w-full items-center justify-center rounded-lg border px-2.5 text-xs font-black transition ${className}`}
         type="submit"
       >
         {children}
