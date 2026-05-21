@@ -8,6 +8,7 @@ import {
   X,
 } from "lucide-react";
 import { AddToCartButton } from "@/components/cart/add-to-cart-button";
+import { CatalogDeviceMenu } from "@/components/catalog-device-menu";
 import { Badge } from "@/components/ui/badge";
 import {
   catalogStateToParams,
@@ -161,7 +162,12 @@ function FilterPanel({
         </Link>
       </div>
 
-      <DeviceMenu catalog={catalog} locale={locale} />
+      <CatalogDeviceMenu
+        key={catalogStateToParams(catalog.state).toString()}
+        brandModelGroups={catalog.brandModelGroups}
+        state={catalog.state}
+        locale={locale}
+      />
 
       <div className="mt-5 space-y-3">
         {catalog.facets.map((facet) => (
@@ -169,120 +175,6 @@ function FilterPanel({
         ))}
       </div>
     </nav>
-  );
-}
-
-function DeviceMenu({
-  catalog,
-  locale,
-}: Readonly<{ catalog: CatalogPageData; locale: Locale }>) {
-  if (catalog.brandModelGroups.length === 0) return null;
-
-  return (
-    <section className="mt-5 border-t border-slate-200 pt-4">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-bold text-slate-950">
-          {locale === "it" ? "Brand & Model" : "选择设备"}
-        </h3>
-        {(catalog.state.brand || catalog.state.model) ? (
-          <Link
-            href={productsHref(
-              locale,
-              catalogStateToParams(catalog.state, {
-                brand: "",
-                model: "",
-                page: 1,
-              }),
-            )}
-            className="text-xs font-bold text-blue-700 hover:text-blue-900"
-          >
-            {locale === "it" ? "Tutti" : "全部"}
-          </Link>
-        ) : null}
-      </div>
-
-      <div className="mt-3 max-h-[420px] space-y-1 overflow-auto pr-1">
-        {catalog.brandModelGroups.map((group) => (
-          <details key={group.value} className="group rounded-lg">
-            <summary
-              aria-current={group.active ? "true" : undefined}
-              className={cn(
-                "grid min-h-10 cursor-pointer list-none grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold transition marker:hidden [&::-webkit-details-marker]:hidden",
-                group.active
-                  ? "bg-blue-50 text-blue-800 ring-1 ring-blue-200"
-                  : "text-slate-700 hover:bg-slate-50 hover:text-blue-700",
-              )}
-            >
-              <span className="truncate">{group.label}</span>
-              <span className="rounded-md bg-white px-1.5 py-0.5 text-xs font-semibold text-slate-500 ring-1 ring-slate-200">
-                {group.count}
-              </span>
-              <ChevronRight className="h-3.5 w-3.5 text-slate-400 transition group-open:rotate-90 group-open:text-blue-500" />
-            </summary>
-
-            <div className="ml-3 mt-1 space-y-1 border-l border-slate-200 pl-2">
-              <Link
-                href={productsHref(
-                  locale,
-                  catalogStateToParams(catalog.state, {
-                    brand: group.value,
-                    model: "",
-                    page: 1,
-                  }),
-                )}
-                className={cn(
-                  "grid min-h-8 grid-cols-[1fr_auto] items-center gap-2 rounded-md px-2.5 py-1 text-xs font-bold transition",
-                  group.active && !catalog.state.model
-                    ? "bg-slate-900 text-white"
-                    : "text-blue-700 hover:bg-blue-50",
-                )}
-              >
-                <span>{locale === "it" ? "Filtra brand" : "筛选此品牌"}</span>
-                <span>{group.count}</span>
-              </Link>
-
-              {group.models.slice(0, 18).map((model) => (
-                <Link
-                  key={model.value}
-                  href={productsHref(
-                    locale,
-                    catalogStateToParams(catalog.state, {
-                      brand: group.value,
-                      model: model.value,
-                      page: 1,
-                    }),
-                  )}
-                  aria-current={model.active ? "true" : undefined}
-                  className={cn(
-                    "grid min-h-8 grid-cols-[1fr_auto] items-center gap-2 rounded-md px-2.5 py-1 text-xs transition",
-                    model.active
-                      ? "bg-slate-900 font-bold text-white"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-blue-700",
-                  )}
-                >
-                  <span className="truncate">{model.label}</span>
-                  <span
-                    className={cn(
-                      "rounded-md px-1.5 py-0.5 text-xs font-semibold",
-                      model.active
-                        ? "bg-white/15 text-white"
-                        : "bg-slate-100 text-slate-500",
-                    )}
-                  >
-                    {model.count}
-                  </span>
-                </Link>
-              ))}
-              {group.models.length > 18 ? (
-                <p className="px-2.5 py-1 text-xs font-semibold text-slate-400">
-                  +{group.models.length - 18}
-                </p>
-              ) : null}
-            </div>
-          </details>
-        ))}
-      </div>
-    </section>
   );
 }
 
