@@ -16,6 +16,7 @@ export async function POST(request: Request) {
   const locale = String(rawBody.locale ?? "zh");
   const parsed = adminInventorySettingsSchema.safeParse(rawBody);
   const backUrl = new URL(`/${locale}/admin/inventory`, request.url);
+  backUrl.searchParams.set("tools", "open");
 
   if (!parsed.success) {
     backUrl.searchParams.set(

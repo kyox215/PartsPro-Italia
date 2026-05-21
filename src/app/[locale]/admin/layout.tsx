@@ -56,6 +56,32 @@ export default async function AdminLayout({
       description: locale === "it" ? "Arrivi e ammanchi" : "到货与缺货",
       icon: "warehouse",
       permission: "inventory:write",
+      children: [
+        {
+          href: localizePath(locale, "/admin/inventory"),
+          label: locale === "it" ? "Inventario" : "库存总览",
+          icon: "warehouse",
+          permission: "inventory:write",
+        },
+        {
+          href: localizePath(locale, "/admin/inventory/import"),
+          label: locale === "it" ? "Import" : "预到货导入",
+          icon: "package",
+          permission: "inventory:write",
+        },
+        {
+          href: localizePath(locale, "/admin/inventory/incoming"),
+          label: locale === "it" ? "Arrivi" : "到货缺货",
+          icon: "clipboard",
+          permission: "inventory:write",
+        },
+        {
+          href: localizePath(locale, "/admin/inventory/movements"),
+          label: locale === "it" ? "Movimenti" : "库存流水",
+          icon: "activity",
+          permission: "inventory:write",
+        },
+      ],
     },
     {
       href: localizePath(locale, "/admin/orders"),

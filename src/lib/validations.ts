@@ -168,6 +168,7 @@ export const adminInventorySettingsSchema = z.object({
 
 export const adminInventoryReceiveSchema = z.object({
   locale: z.enum(["it", "zh"]).default("it"),
+  purchaseOrderId: z.string().min(1),
   itemIds: z.string().min(1),
 });
 

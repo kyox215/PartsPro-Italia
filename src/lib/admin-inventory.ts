@@ -17,6 +17,7 @@ export type SupplierPurchaseOrderRow = {
   orderedTotal: number;
   receivedTotal: number;
   missingTotal: number;
+  remainingTotal: number;
   createdAt: string;
 };
 
@@ -128,24 +129,38 @@ export async function getSupplierPurchaseOrders(): Promise<
     orderedTotal: Number(row.ordered_total ?? 0),
     receivedTotal: Number(row.received_total ?? 0),
     missingTotal: Number(row.missing_total ?? 0),
+    remainingTotal: Math.max(
+      Number(row.ordered_total ?? 0) -
+        Number(row.received_total ?? 0) -
+        Number(row.missing_total ?? 0),
+      0,
+    ),
     createdAt: row.created_at,
   }));
 }
 
-export async function getOpenSupplierPurchaseItems(): Promise<
+export async function getOpenSupplierPurchaseItems(
+  purchaseOrderId?: string,
+): Promise<
   SupplierPurchaseOrderItemRow[]
 > {
   if (!hasSupabaseAdminConfig()) return [];
 
   const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("supplier_purchase_order_items")
     .select(
       "id, purchase_order_id, sku_id, ean13, sku, supplier_name, original_name, ordered_qty, received_qty, missing_qty, cost_price, status, created_at",
     )
     .in("status", ["ordered", "partial"])
     .order("created_at", { ascending: true })
-    .limit(80);
+    .limit(300);
+
+  if (purchaseOrderId) {
+    query = query.eq("purchase_order_id", purchaseOrderId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("Failed to load supplier purchase items", error);

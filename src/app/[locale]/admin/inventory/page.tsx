@@ -1,16 +1,9 @@
-import {
-  AlertTriangle,
-  Boxes,
-  PackageCheck,
-  Truck,
-} from "lucide-react";
+import { AlertTriangle, Boxes, PackageCheck, Search, SlidersHorizontal, Truck } from "lucide-react";
 import type { ReactNode } from "react";
 import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
 import {
-  AdminActionRail,
   AdminButtonLink,
   AdminCollapsiblePanel,
-  AdminDataTable,
   AdminEmptyState,
   AdminInput,
   AdminMetricCard,
@@ -18,20 +11,29 @@ import {
   AdminPageHeader,
   AdminPanel,
   AdminSelect,
-  AdminWorkspaceGrid,
   StatusPill,
 } from "@/components/admin/admin-ui";
+import { InventorySubnav } from "@/components/admin/inventory-subnav";
+import type { AdminProductRow } from "@/lib/admin-products";
 import {
   getAdminInventoryAlerts,
-  getAdminInventoryMovements,
   getInventorySettings,
   getOpenSupplierPurchaseItems,
   getSupplierPurchaseOrders,
 } from "@/lib/admin-inventory";
 import { getAdminProductRows } from "@/lib/admin-products";
 import { getAuthContext } from "@/lib/auth";
+import { categories } from "@/lib/catalog";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
 import { formatMoney } from "@/lib/pricing";
+
+type InventoryFilterState = {
+  q: string;
+  brand: string;
+  model: string;
+  category: string;
+  status: string;
+};
 
 export default async function AdminInventoryPage({
   params,
@@ -45,380 +47,400 @@ export default async function AdminInventoryPage({
   const locale: Locale = isLocale(rawLocale) ? rawLocale : "it";
   const auth = await getAuthContext();
   const canLoad = !auth.configured || auth.isAdmin;
-  const [settings, orders, openItems, movements, alerts, productRows] = canLoad
+  const [settings, orders, openItems, alerts, rows] = canLoad
     ? await Promise.all([
         getInventorySettings(),
         getSupplierPurchaseOrders(),
         getOpenSupplierPurchaseItems(),
-        getAdminInventoryMovements(),
         getAdminInventoryAlerts(),
         getAdminProductRows(),
       ])
-    : [await getInventorySettings(), [], [], [], [], []];
-  const error = valueOf(query.error);
-  const imported = valueOf(query.imported);
-  const processed = valueOf(query.processed);
-  const skipped = valueOf(query.skipped);
-  const ordered = valueOf(query.ordered);
-  const received = valueOf(query.received);
-  const missing = valueOf(query.missing);
-  const settingsSaved = valueOf(query.settings);
-  const adjusted = valueOf(query.adjusted);
-  const reorderSaved = valueOf(query.reorder);
-  const openItemIds = openItems.map((item) => item.id).join(",");
+    : [await getInventorySettings(), [], [], [], []];
+  const state: InventoryFilterState = {
+    q: valueOf(query.q) ?? "",
+    brand: valueOf(query.brand) ?? "",
+    model: valueOf(query.model) ?? "",
+    category: valueOf(query.category) ?? "",
+    status: valueOf(query.status) ?? "all",
+  };
+  const filteredRows = filterInventoryRows(rows, state);
+  const brandOptions = getCountedOptions(rows.map((row) => row.brand));
+  const modelOptions = getCountedOptions(
+    rows
+      .filter((row) => !state.brand || row.brand === state.brand)
+      .map((row) => row.model),
+  );
+  const categoryOptions = getCountedOptions(rows.map((row) => row.category));
   const openQty = openItems.reduce((sum, item) => sum + item.remainingQty, 0);
+  const incomingTotal = rows.reduce((sum, row) => sum + row.incomingQty, 0);
+  const stockTotal = rows.reduce((sum, row) => sum + row.stockOnHand, 0);
 
   return (
     <div className="space-y-3">
       <AdminPageHeader
-        eyebrow={locale === "it" ? "Inventory components" : "库存组件"}
-        title={locale === "it" ? "Inventario e preordini" : "库存与预购管理"}
+        eyebrow={locale === "it" ? "Inventory workspace" : "库存工作台"}
+        title={locale === "it" ? "Inventario prodotti" : "库存总览与商品查询"}
         description={
           locale === "it"
-            ? "Importa ordini fornitore, conferma arrivi, marca ammanchi e controlla le quantita prenotate."
-            : "导入上游订货单、确认到货、标记缺货，并防止重复下单。"
+            ? "Cerca SKU, EAN, brand, modello e categoria; gli arrivi fornitore sono in funzioni dedicate."
+            : "按商品名、SKU、EAN、品牌、型号和品类查库存；预到货导入和对货放在独立功能里。"
         }
         actions={
           <>
-            <AdminButtonLink href={localizePath(locale, "/admin")} variant="secondary">
-              {locale === "it" ? "Dashboard" : "后台首页"}
+            <AdminButtonLink href={localizePath(locale, "/admin/inventory/import")} variant="secondary">
+              {locale === "it" ? "Import prearrivi" : "预到货导入"}
             </AdminButtonLink>
-            <AdminButtonLink href={localizePath(locale, "/admin/products")} variant="secondary">
-              {locale === "it" ? "Prodotti" : "商品"}
+            <AdminButtonLink href={localizePath(locale, "/admin/inventory/incoming")}>
+              {locale === "it" ? "Conferma arrivi" : "到货 / 缺货"}
             </AdminButtonLink>
           </>
         }
       />
 
       <SystemNotice authConfigured={auth.configured} isAdmin={auth.isAdmin} hasUser={Boolean(auth.user)} locale={locale} />
-      <Feedback
+      <Feedback locale={locale} query={query} />
+      <InventorySubnav
+        active="overview"
+        counts={{ import: orders.length, incoming: openItems.length }}
         locale={locale}
-        error={error}
-        imported={imported}
-        processed={processed}
-        skipped={skipped}
-        ordered={ordered}
-        received={received}
-        missing={missing}
-        settingsSaved={settingsSaved}
-        adjusted={adjusted}
-        reorderSaved={reorderSaved}
       />
 
-      <AdminWorkspaceGrid
-        rail={
-          <AdminActionRail
-            title={locale === "it" ? "Inventario" : "库存侧栏"}
-            description={locale === "it" ? "Metriche e form" : "指标与低频操作"}
-          >
-            <section className="grid gap-2">
-              <AdminMetricCard icon={Truck} label={locale === "it" ? "Righe aperte" : "待确认行"} value={openItems.length} tone="blue" caption={locale === "it" ? "Da ricevere" : "待到货"} />
-              <AdminMetricCard icon={Boxes} label={locale === "it" ? "Quantita aperta" : "待确认数量"} value={openQty} tone="amber" caption={locale === "it" ? "Remaining" : "剩余"} />
-              <AdminMetricCard icon={PackageCheck} label={locale === "it" ? "Batch importati" : "已导入批次"} value={orders.length} tone="green" caption={locale === "it" ? "Purchase orders" : "上游订单"} />
-              <AdminMetricCard icon={AlertTriangle} label={locale === "it" ? "Alert stock" : "库存预警"} value={alerts.length} tone={alerts.length ? "red" : "green"} caption={locale === "it" ? "Da rivedere" : "需处理"} />
-            </section>
+      <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <AdminMetricCard icon={PackageCheck} label={locale === "it" ? "SKU" : "商品 SKU"} value={rows.length} tone="blue" caption={locale === "it" ? "Catalogo" : "库存目录"} />
+        <AdminMetricCard icon={Boxes} label={locale === "it" ? "Stock fisico" : "现货总数"} value={stockTotal} tone="green" caption={locale === "it" ? "Magazzino" : "仓库现货"} />
+        <AdminMetricCard icon={Truck} label={locale === "it" ? "In arrivo" : "预到货数量"} value={incomingTotal} tone="amber" caption={`${openItems.length} ${locale === "it" ? "righe aperte" : "行待确认"} / ${openQty}`} />
+        <AdminMetricCard icon={AlertTriangle} label={locale === "it" ? "Alert" : "库存预警"} value={alerts.length} tone={alerts.length ? "red" : "green"} caption={locale === "it" ? "Da rivedere" : "需处理"} />
+      </section>
 
-            <AdminCollapsiblePanel
-              title={locale === "it" ? "Import ordine fornitore" : "导入上游订货单"}
-              summary={locale === "it" ? "Excel / path fallback" : "Excel / 本地路径"}
-            >
-              <form action="/api/admin/inventory/import-cart" encType="multipart/form-data" method="post" className="grid gap-2">
-                <AdminCsrfField />
-                <input type="hidden" name="locale" value={locale} />
-                <label className="block">
-                  <span className="text-xs font-black uppercase tracking-wide text-stone-500">Excel</span>
-                  <input className="mt-1.5 h-9 w-full rounded-lg border border-black/10 bg-white px-2 py-1.5 text-xs font-semibold text-stone-700" name="file" type="file" accept=".xlsx,.xls" />
-                </label>
-                <AdminInput name="sourcePath" label={locale === "it" ? "Percorso locale fallback" : "本机文件路径 fallback"} defaultValue="/Users/kyox215/Downloads/cart (1).xlsx" />
-                <button className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white transition hover:bg-stone-800" type="submit">
-                  {locale === "it" ? "Importa preordine" : "作为预购导入"}
-                </button>
-              </form>
-            </AdminCollapsiblePanel>
-
-            <AdminCollapsiblePanel
-              title={locale === "it" ? "Impostazioni prezzi" : "库存价格设置"}
-              summary={locale === "it" ? "Markup e lead time" : "加价和交期"}
-            >
-              <form action="/api/admin/inventory/settings" method="post" className="grid gap-2">
-                <AdminCsrfField />
-                <input type="hidden" name="locale" value={locale} />
-                <AdminInput name="b2bMarkup" label={locale === "it" ? "Wholesale x" : "批发 x"} defaultValue={String(settings.b2bMarkup)} step="0.001" type="number" />
-                <AdminInput name="retailMarkup" label="Retail x" defaultValue={String(settings.retailMarkup)} step="0.001" type="number" />
-                <AdminInput name="preorderLeadTimeMinDays" label={locale === "it" ? "Min giorni" : "最短天数"} defaultValue={String(settings.preorderLeadTimeMinDays)} type="number" />
-                <AdminInput name="preorderLeadTimeMaxDays" label={locale === "it" ? "Max giorni" : "最长天数"} defaultValue={String(settings.preorderLeadTimeMaxDays)} type="number" />
-                <button className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white transition hover:bg-stone-800" type="submit">
-                  {locale === "it" ? "Salva" : "保存设置"}
-                </button>
-              </form>
-            </AdminCollapsiblePanel>
-
-            <AdminCollapsiblePanel
-              title={locale === "it" ? "Rettifica stock" : "手动调整库存"}
-              summary={locale === "it" ? "Scrive movement" : "同步写入流水"}
-            >
-              <form action="/api/admin/inventory/adjust" method="post" className="grid gap-2">
-                <AdminCsrfField />
-                <input type="hidden" name="locale" value={locale} />
-                <AdminSelect name="skuId" label="SKU">
-                  {productRows.map((row) => (
-                    <option key={row.skuId} value={row.skuId}>
-                      {row.sku}
-                    </option>
-                  ))}
-                </AdminSelect>
-                <AdminSelect name="adjustmentType" label={locale === "it" ? "Tipo" : "类型"} defaultValue="add_stock">
-                  <option value="add_stock">{locale === "it" ? "+ Stock" : "增加现货"}</option>
-                  <option value="remove_stock">{locale === "it" ? "- Stock" : "减少现货"}</option>
-                  <option value="set_stock">{locale === "it" ? "Imposta stock" : "校准现货"}</option>
-                  <option value="add_incoming">{locale === "it" ? "+ Incoming" : "增加在途"}</option>
-                  <option value="remove_incoming">{locale === "it" ? "- Incoming" : "减少在途"}</option>
-                </AdminSelect>
-                <AdminInput name="quantity" label={locale === "it" ? "Quantita" : "数量"} type="number" defaultValue="1" min="0" />
-                <AdminInput name="reason" label={locale === "it" ? "Motivo" : "原因"} defaultValue={locale === "it" ? "Correzione inventario" : "库存校准"} />
-                <button className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white transition hover:bg-stone-800" type="submit">
-                  {locale === "it" ? "Salva rettifica" : "保存调整"}
-                </button>
-              </form>
-            </AdminCollapsiblePanel>
-
-            <AdminCollapsiblePanel
-              title={locale === "it" ? "Regole riordino" : "低库存规则"}
-              summary={locale === "it" ? "Alert, non acquisto auto" : "只预警不自动下单"}
-            >
-              <form action="/api/admin/inventory/reorder-settings" method="post" className="grid gap-2">
-                <AdminCsrfField />
-                <input type="hidden" name="locale" value={locale} />
-                <AdminSelect name="inventoryId" label="SKU">
-                  {productRows.filter((row) => row.inventoryId).map((row) => (
-                    <option key={row.inventoryId} value={row.inventoryId ?? ""}>
-                      {row.sku}
-                    </option>
-                  ))}
-                </AdminSelect>
-                <AdminInput name="reorderPoint" label={locale === "it" ? "Punto riordino" : "补货点"} type="number" defaultValue="5" min="0" />
-                <AdminInput name="safetyStock" label={locale === "it" ? "Scorta sicurezza" : "安全库存"} type="number" defaultValue="2" min="0" />
-                <button className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white transition hover:bg-stone-800" type="submit">
-                  {locale === "it" ? "Salva alert" : "保存预警规则"}
-                </button>
-              </form>
-            </AdminCollapsiblePanel>
-          </AdminActionRail>
-        }
-      >
       <AdminPanel
-        title={locale === "it" ? "Alert riordino" : "低库存 / 异常预警"}
-        description={
-          locale === "it"
-            ? "Evidenzia SKU sotto safety stock, punto riordino o con riserve anomale."
-            : "显示低于安全库存、补货点或存在异常预留的 SKU。"
-        }
+        title={locale === "it" ? "Cerca inventario" : "搜索库存商品"}
+        toolbar={<StatusPill status={`${filteredRows.length} / ${rows.length} SKU`} tone="blue" />}
       >
-        {alerts.length ? (
-          <div className="grid gap-2 md:grid-cols-2">
-            {alerts.slice(0, 8).map((alert) => (
-              <article key={alert.inventoryId} className="rounded-lg border border-amber-100 bg-amber-50 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-mono text-xs font-black text-stone-900">{alert.sku}</p>
-                  <StatusPill status={alert.reason} tone={alert.reason === "oversold" ? "red" : "amber"} />
-                </div>
-                <p className="mt-1 truncate text-sm font-black text-stone-950">{alert.name}</p>
-                <p className="mt-2 text-xs font-semibold text-stone-600">
-                  Stock {alert.stockOnHand - alert.stockReserved} / reorder {alert.reorderPoint} / safety {alert.safetyStock}
-                </p>
-              </article>
+        <form
+          action={localizePath(locale, "/admin/inventory")}
+          className="grid gap-2 lg:grid-cols-[minmax(240px,1fr)_160px_160px_160px_auto] lg:items-end"
+          method="get"
+        >
+          <AdminInput
+            defaultValue={state.q}
+            label={locale === "it" ? "Cerca tutto" : "全局搜索"}
+            name="q"
+            placeholder={locale === "it" ? "Nome, SKU, EAN, modello..." : "商品名、SKU、EAN、品牌、型号..."}
+            required={false}
+          />
+          <AdminSelect defaultValue={state.brand} label={locale === "it" ? "Brand" : "品牌"} name="brand">
+            <option value="">{locale === "it" ? "Tutti" : "全部品牌"}</option>
+            {brandOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.value}</option>
             ))}
-          </div>
-        ) : (
-          <AdminNotice tone="success">
-            {locale === "it" ? "Nessun alert inventario." : "当前没有库存预警。"}
-          </AdminNotice>
-        )}
+          </AdminSelect>
+          <AdminSelect defaultValue={state.model} label={locale === "it" ? "Modello" : "型号"} name="model">
+            <option value="">{locale === "it" ? "Tutti" : "全部型号"}</option>
+            {modelOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.value}</option>
+            ))}
+          </AdminSelect>
+          <AdminSelect defaultValue={state.category} label={locale === "it" ? "Categoria" : "品类"} name="category">
+            <option value="">{locale === "it" ? "Tutte" : "全部品类"}</option>
+            {categoryOptions.map((option) => (
+              <option key={option.value} value={option.value}>{getCategoryLabel(option.value, locale)}</option>
+            ))}
+          </AdminSelect>
+          <input type="hidden" name="status" value={state.status} />
+          <button className="h-10 rounded-lg bg-stone-950 px-4 text-sm font-black text-white" type="submit">
+            {locale === "it" ? "Cerca" : "搜索"}
+          </button>
+        </form>
       </AdminPanel>
+
+      <div className="grid gap-3 xl:grid-cols-[280px_minmax(0,1fr)]">
+        <AdminPanel
+          title={locale === "it" ? "Categorie rapide" : "选择种类"}
+          description={locale === "it" ? "Filtri sempre visibili, senza modali." : "像前台一样直接点品牌、型号和品类。"}
+          contentClassName="space-y-3"
+        >
+          <FilterLinkGroup
+            current={state.status}
+            items={[
+              { label: locale === "it" ? "Tutti" : "全部库存", value: "all", count: rows.length },
+              { label: locale === "it" ? "Disponibile" : "有现货", value: "in_stock", count: rows.filter((row) => row.stockOnHand - row.stockReserved > 0).length },
+              { label: locale === "it" ? "In arrivo" : "有预到货", value: "incoming", count: rows.filter((row) => row.incomingQty - row.incomingReserved > 0).length },
+              { label: locale === "it" ? "Stock basso" : "库存低", value: "low_stock", count: rows.filter(isLowStock).length },
+              { label: locale === "it" ? "Anomalia" : "异常预留", value: "shortage", count: rows.filter((row) => row.incomingReserved > row.incomingQty || row.stockReserved > row.stockOnHand).length },
+            ]}
+            label={locale === "it" ? "Stato" : "库存状态"}
+            param="status"
+            state={state}
+            locale={locale}
+          />
+          <FilterLinkGroup current={state.brand} items={brandOptions} label={locale === "it" ? "Brand" : "品牌"} param="brand" state={state} locale={locale} clearModel />
+          <FilterLinkGroup current={state.model} items={modelOptions} label={locale === "it" ? "Modello" : "型号"} param="model" state={state} locale={locale} />
+          <FilterLinkGroup current={state.category} items={categoryOptions.map((option) => ({ ...option, label: getCategoryLabel(option.value, locale) }))} label={locale === "it" ? "Categoria" : "品类"} param="category" state={state} locale={locale} />
+        </AdminPanel>
+
+        <div className="min-w-0 space-y-3">
+          <AdminPanel
+            title={locale === "it" ? "Risultati inventario" : "库存商品结果"}
+            toolbar={<StatusPill status={`${filteredRows.length} SKU`} />}
+          >
+            {filteredRows.length ? (
+              <div className="grid gap-2 lg:grid-cols-2 2xl:grid-cols-3">
+                {filteredRows.map((row) => (
+                  <InventoryProductCard key={row.skuId} row={row} locale={locale} />
+                ))}
+              </div>
+            ) : (
+              <AdminEmptyState
+                icon={Search}
+                title={locale === "it" ? "Nessuno SKU trovato" : "没有找到 SKU"}
+                description={locale === "it" ? "Cambia ricerca o filtri." : "调整搜索或筛选条件。"}
+              />
+            )}
+          </AdminPanel>
+
+          {alerts.length ? (
+            <AdminPanel
+              title={locale === "it" ? "Alert inventario" : "低库存 / 异常预警"}
+              description={locale === "it" ? "SKU sotto soglia o con riserve anomale." : "低于安全库存、补货点或存在异常预留的 SKU。"}
+            >
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {alerts.slice(0, 9).map((alert) => (
+                  <article key={alert.inventoryId} className="rounded-lg border border-amber-100 bg-amber-50 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-mono text-xs font-black text-stone-900">{alert.sku}</p>
+                      <StatusPill status={alert.reason} tone={alert.reason === "oversold" ? "red" : "amber"} />
+                    </div>
+                    <p className="mt-1 truncate text-sm font-black text-stone-950">{alert.name}</p>
+                    <p className="mt-2 text-xs font-semibold text-stone-600">
+                      Stock {alert.stockOnHand - alert.stockReserved} / reorder {alert.reorderPoint} / safety {alert.safetyStock}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </AdminPanel>
+          ) : null}
+        </div>
+      </div>
 
       <AdminPanel
-        title={locale === "it" ? "Conferma arrivi" : "确认到货 / 缺货"}
-        description={
-          locale === "it"
-            ? "Aggiorna lo stock solo dopo ricezione effettiva."
-            : "只有实际到货后才更新现货库存。"
-        }
-        toolbar={<Truck className="h-5 w-5 text-stone-500" />}
+        title={locale === "it" ? "Strumenti avanzati" : "低频工具"}
+        description={locale === "it" ? "Impostazioni e rettifiche manuali, fuori dal flusso arrivi." : "库存设置、手动调整和低库存规则放在这里，不影响主流程。"}
+        toolbar={<SlidersHorizontal className="h-4 w-4 text-stone-500" />}
       >
-        {openItems.length > 0 ? (
-          <form action="/api/admin/inventory/receive" method="post">
-            <AdminCsrfField />
-            <input type="hidden" name="locale" value={locale} />
-            <input type="hidden" name="itemIds" value={openItemIds} />
-            <AdminDataTable
-              minWidth={1040}
-              mobileBreakpoint="lg"
-              mobileCards={<InventoryReceiveCards items={openItems} locale={locale} />}
+        <div className="grid gap-2 lg:grid-cols-3">
+          <SettingsTool locale={locale} settings={settings} defaultOpen={valueOf(query.tools) === "open"} />
+          <AdjustTool locale={locale} productRows={rows} defaultOpen={valueOf(query.tools) === "open"} />
+          <ReorderTool locale={locale} productRows={rows} defaultOpen={valueOf(query.tools) === "open"} />
+        </div>
+      </AdminPanel>
+    </div>
+  );
+}
+
+function InventoryProductCard({ row, locale }: Readonly<{ row: AdminProductRow; locale: Locale }>) {
+  const availableStock = row.stockOnHand - row.stockReserved;
+  const incomingAvailable = row.incomingQty - row.incomingReserved;
+
+  return (
+    <article className="rounded-lg border border-black/5 bg-white p-3 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex flex-wrap gap-1.5">
+            <StatusPill status={row.isActive ? (locale === "it" ? "Attivo" : "上架") : (locale === "it" ? "Archiviato" : "下架")} tone={row.isActive ? "green" : "slate"} />
+            {incomingAvailable > 0 ? <StatusPill status={locale === "it" ? "In arrivo" : "预到货"} tone="amber" /> : null}
+            {isLowStock(row) ? <StatusPill status={locale === "it" ? "Stock basso" : "库存低"} tone="red" /> : null}
+          </div>
+          <h3 className="mt-2 line-clamp-2 text-sm font-black leading-5 text-stone-950">
+            {locale === "it" ? row.nameIt : row.nameZh}
+          </h3>
+          <p className="mt-1 truncate text-xs font-semibold text-stone-500">
+            {row.brand} / {row.model} / {getCategoryLabel(row.category, locale)}
+          </p>
+        </div>
+        <AdminButtonLink href={localizePath(locale, `/admin/products/${row.skuId}`)} variant="secondary">
+          {locale === "it" ? "Edit" : "编辑"}
+        </AdminButtonLink>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+        <MiniStat label="SKU" value={row.sku} />
+        <MiniStat label="EAN" value={row.barcodeEan13 ?? "-"} />
+        <MiniStat label={locale === "it" ? "Stock" : "现货"} value={availableStock} tone={availableStock < 0 ? "red" : "default"} />
+        <MiniStat label={locale === "it" ? "Incoming" : "在途"} value={incomingAvailable} tone={incomingAvailable > 0 ? "amber" : "default"} />
+        <MiniStat label={locale === "it" ? "Reserved" : "已锁定"} value={row.stockReserved + row.incomingReserved} />
+        <MiniStat label={locale === "it" ? "Costo" : "成本"} value={row.costPrice === null ? "-" : formatMoney(row.costPrice, locale)} />
+        <MiniStat label={locale === "it" ? "Retail" : "零售价"} value={formatMoney(row.retailPrice, locale)} />
+        <MiniStat label={locale === "it" ? "Wholesale" : "批发价"} value={formatMoney(row.b2bPrice, locale)} />
+      </div>
+    </article>
+  );
+}
+
+function FilterLinkGroup({
+  clearModel = false,
+  current,
+  items,
+  label,
+  locale,
+  param,
+  state,
+}: Readonly<{
+  clearModel?: boolean;
+  current: string;
+  items: Array<{ value: string; label?: string; count: number }>;
+  label: string;
+  locale: Locale;
+  param: keyof InventoryFilterState;
+  state: InventoryFilterState;
+}>) {
+  return (
+    <section>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <h3 className="text-xs font-black uppercase tracking-wide text-stone-500">{label}</h3>
+        {current ? (
+          <a className="text-xs font-black text-blue-600" href={buildInventoryHref(locale, { ...state, [param]: "", ...(clearModel ? { model: "" } : {}) })}>
+            {locale === "it" ? "Reset" : "清空"}
+          </a>
+        ) : null}
+      </div>
+      <div className="max-h-72 space-y-1 overflow-auto pr-1">
+        {items.map((item) => {
+          const active = current === item.value;
+          return (
+            <a
+              className={[
+                "flex min-h-9 items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-xs font-black transition",
+                active ? "bg-stone-950 text-white" : "bg-stone-50 text-stone-700 hover:bg-stone-100 hover:text-stone-950",
+              ].join(" ")}
+              href={buildInventoryHref(locale, {
+                ...state,
+                [param]: item.value,
+                ...(clearModel ? { model: "" } : {}),
+              })}
+              key={item.value}
             >
-              <table className="w-full text-left text-sm">
-                <thead className="text-xs uppercase text-stone-400">
-                  <tr className="border-b border-black/5">
-                    <th className="px-2.5 py-2">SKU / EAN</th>
-                    <th className="px-2.5 py-2">{locale === "it" ? "Prodotto" : "商品"}</th>
-                    <th className="px-2.5 py-2">{locale === "it" ? "Ordinato" : "已订购"}</th>
-                    <th className="px-2.5 py-2">{locale === "it" ? "Ricevuto" : "已实收"}</th>
-                    <th className="px-2.5 py-2">{locale === "it" ? "Mancante" : "已缺货"}</th>
-                    <th className="px-2.5 py-2">{locale === "it" ? "Costo" : "成本"}</th>
-                    <th className="px-2.5 py-2">{locale === "it" ? "Conferma ricevuto" : "本次实收"}</th>
-                    <th className="px-2.5 py-2">{locale === "it" ? "Conferma mancante" : "本次缺货"}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-black/5">
-                  {openItems.map((item) => (
-                    <tr key={item.id} className="align-top hover:bg-stone-50">
-                      <td className="px-2.5 py-2.5">
-                        <p className="font-mono text-xs font-black text-stone-900">
-                          {item.sku}
-                        </p>
-                        <p className="mt-1 font-mono text-xs font-semibold text-stone-500">
-                          {item.ean13}
-                        </p>
-                      </td>
-                      <td className="px-2.5 py-2.5">
-                        <p className="font-black text-stone-950">{item.originalName}</p>
-                        <p className="mt-1 text-xs font-semibold text-stone-500">
-                          {item.supplierName} / {item.status}
-                        </p>
-                      </td>
-                      <td className="px-2.5 py-2.5 font-black">{item.orderedQty}</td>
-                      <td className="px-2.5 py-2.5">{item.receivedQty}</td>
-                      <td className="px-2.5 py-2.5">{item.missingQty}</td>
-                      <td className="px-2.5 py-2.5">{formatMoney(item.costPrice, locale)}</td>
-                      <td className="px-2.5 py-2.5">
-                        <SmallNumberInput name={`received_${item.id}`} max={item.remainingQty} />
-                      </td>
-                      <td className="px-2.5 py-2.5">
-                        <SmallNumberInput name={`missing_${item.id}`} max={item.remainingQty} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </AdminDataTable>
-            <div className="mt-4 border-t border-black/5 pt-4">
-              <button
-                className="h-11 rounded-lg bg-emerald-600 px-4 text-sm font-black text-white transition hover:bg-emerald-700"
-                type="submit"
-              >
-                {locale === "it" ? "Aggiorna inventario" : "更新库存"}
-              </button>
-            </div>
-          </form>
-        ) : (
-          <AdminEmptyState
-            icon={PackageCheck}
-            title={locale === "it" ? "Nessun ordine aperto" : "暂无待确认记录"}
-            description={
-              locale === "it"
-                ? "Importa un ordine fornitore per iniziare."
-                : "导入上游订货单后即可确认到货。"
-            }
-          />
-        )}
-      </AdminPanel>
+              <span className="min-w-0 truncate">{item.label ?? item.value}</span>
+              <span className={active ? "text-white/70" : "text-stone-400"}>{item.count}</span>
+            </a>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
-      <AdminPanel title={locale === "it" ? "Batch importati" : "已导入批次"}>
-        {orders.length ? (
-          <AdminDataTable
-            minWidth={760}
-            mobileCards={<SupplierOrderCards orders={orders} locale={locale} />}
-          >
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-stone-400">
-                <tr className="border-b border-black/5">
-                  <th className="px-2.5 py-2">File</th>
-                  <th className="px-2.5 py-2">Status</th>
-                  <th className="px-2.5 py-2">{locale === "it" ? "Ordinato" : "订购"}</th>
-                  <th className="px-2.5 py-2">{locale === "it" ? "Ricevuto" : "实收"}</th>
-                  <th className="px-2.5 py-2">{locale === "it" ? "Mancante" : "缺货"}</th>
-                  <th className="px-2.5 py-2">{locale === "it" ? "Creato" : "创建时间"}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/5">
-                {orders.map((order) => (
-                  <tr key={order.id} className="hover:bg-stone-50">
-                    <td className="px-2.5 py-2.5">
-                      <p className="font-black text-stone-950">{order.sourceFilename}</p>
-                      <p className="mt-1 font-mono text-xs font-semibold text-stone-500">
-                        {order.id}
-                      </p>
-                    </td>
-                    <td className="px-2.5 py-2.5">
-                      <StatusPill status={order.status} />
-                    </td>
-                    <td className="px-2.5 py-2.5">{order.orderedTotal}</td>
-                    <td className="px-2.5 py-2.5">{order.receivedTotal}</td>
-                    <td className="px-2.5 py-2.5">{order.missingTotal}</td>
-                    <td className="px-2.5 py-2.5 text-stone-600">
-                      {new Date(order.createdAt).toLocaleString(
-                        locale === "it" ? "it-IT" : "zh-CN",
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </AdminDataTable>
-        ) : (
-          <AdminEmptyState
-            icon={Boxes}
-            title={locale === "it" ? "Nessun batch importato" : "暂无导入批次"}
-            description={
-              locale === "it"
-                ? "I batch caricati dal carrello fornitore appariranno qui."
-                : "从上游购物车导入的批次会显示在这里。"
-            }
-          />
-        )}
-      </AdminPanel>
+function SettingsTool({
+  defaultOpen,
+  locale,
+  settings,
+}: Readonly<{
+  defaultOpen?: boolean;
+  locale: Locale;
+  settings: Awaited<ReturnType<typeof getInventorySettings>>;
+}>) {
+  return (
+    <AdminCollapsiblePanel
+      defaultOpen={defaultOpen}
+      title={locale === "it" ? "Impostazioni prezzi" : "库存价格设置"}
+      summary={locale === "it" ? "Markup e lead time" : "加价和交期"}
+    >
+      <form action="/api/admin/inventory/settings" method="post" className="grid gap-2">
+        <AdminCsrfField />
+        <input type="hidden" name="locale" value={locale} />
+        <AdminInput name="b2bMarkup" label={locale === "it" ? "Wholesale x" : "批发 x"} defaultValue={String(settings.b2bMarkup)} step="0.001" type="number" />
+        <AdminInput name="retailMarkup" label="Retail x" defaultValue={String(settings.retailMarkup)} step="0.001" type="number" />
+        <AdminInput name="preorderLeadTimeMinDays" label={locale === "it" ? "Min giorni" : "最短天数"} defaultValue={String(settings.preorderLeadTimeMinDays)} type="number" />
+        <AdminInput name="preorderLeadTimeMaxDays" label={locale === "it" ? "Max giorni" : "最长天数"} defaultValue={String(settings.preorderLeadTimeMaxDays)} type="number" />
+        <button className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white transition hover:bg-stone-800" type="submit">
+          {locale === "it" ? "Salva" : "保存设置"}
+        </button>
+      </form>
+    </AdminCollapsiblePanel>
+  );
+}
 
-      <AdminPanel title={locale === "it" ? "Movimenti inventario" : "库存流水"}>
-        {movements.length ? (
-          <AdminDataTable
-            minWidth={880}
-            mobileCards={<InventoryMovementCards movements={movements} locale={locale} />}
-          >
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-stone-400">
-                <tr className="border-b border-black/5">
-                  <th className="px-2.5 py-2">SKU</th>
-                  <th className="px-2.5 py-2">Type</th>
-                  <th className="px-2.5 py-2">Qty</th>
-                  <th className="px-2.5 py-2">Stock Δ</th>
-                  <th className="px-2.5 py-2">Incoming Δ</th>
-                  <th className="px-2.5 py-2">Note</th>
-                  <th className="px-2.5 py-2">Time</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/5">
-                {movements.map((movement) => (
-                  <tr key={movement.id} className="hover:bg-stone-50">
-                    <td className="px-2.5 py-2.5 font-mono text-xs font-black text-stone-900">{movement.sku}</td>
-                    <td className="px-2.5 py-2.5"><StatusPill status={movement.movementType} tone="slate" /></td>
-                    <td className="px-2.5 py-2.5 font-black">{movement.quantity}</td>
-                    <td className="px-2.5 py-2.5">{movement.stockDelta}</td>
-                    <td className="px-2.5 py-2.5">{movement.incomingDelta}</td>
-                    <td className="px-2.5 py-2.5 text-xs font-semibold text-stone-600">{movement.note ?? "-"}</td>
-                    <td className="px-2.5 py-2.5 text-xs text-stone-500">{new Date(movement.createdAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </AdminDataTable>
-        ) : (
-          <AdminEmptyState
-            icon={Truck}
-            title={locale === "it" ? "Nessun movimento" : "暂无库存流水"}
-            description={locale === "it" ? "Import, ricezioni e rettifiche appariranno qui." : "导入、到货和手动调整会显示在这里。"}
-          />
-        )}
-      </AdminPanel>
-      </AdminWorkspaceGrid>
+function AdjustTool({
+  defaultOpen,
+  locale,
+  productRows,
+}: Readonly<{
+  defaultOpen?: boolean;
+  locale: Locale;
+  productRows: AdminProductRow[];
+}>) {
+  return (
+    <AdminCollapsiblePanel
+      defaultOpen={defaultOpen}
+      title={locale === "it" ? "Rettifica stock" : "手动调整库存"}
+      summary={locale === "it" ? "Scrive movement" : "同步写入流水"}
+    >
+      <form action="/api/admin/inventory/adjust" method="post" className="grid gap-2">
+        <AdminCsrfField />
+        <input type="hidden" name="locale" value={locale} />
+        <AdminSelect name="skuId" label="SKU">
+          {productRows.map((row) => (
+            <option key={row.skuId} value={row.skuId}>{row.sku}</option>
+          ))}
+        </AdminSelect>
+        <AdminSelect name="adjustmentType" label={locale === "it" ? "Tipo" : "类型"} defaultValue="add_stock">
+          <option value="add_stock">{locale === "it" ? "+ Stock" : "增加现货"}</option>
+          <option value="remove_stock">{locale === "it" ? "- Stock" : "减少现货"}</option>
+          <option value="set_stock">{locale === "it" ? "Imposta stock" : "校准现货"}</option>
+          <option value="add_incoming">{locale === "it" ? "+ Incoming" : "增加在途"}</option>
+          <option value="remove_incoming">{locale === "it" ? "- Incoming" : "减少在途"}</option>
+        </AdminSelect>
+        <AdminInput name="quantity" label={locale === "it" ? "Quantita" : "数量"} type="number" defaultValue="1" min="0" />
+        <AdminInput name="reason" label={locale === "it" ? "Motivo" : "原因"} defaultValue={locale === "it" ? "Correzione inventario" : "库存校准"} />
+        <button className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white transition hover:bg-stone-800" type="submit">
+          {locale === "it" ? "Salva rettifica" : "保存调整"}
+        </button>
+      </form>
+    </AdminCollapsiblePanel>
+  );
+}
+
+function ReorderTool({
+  defaultOpen,
+  locale,
+  productRows,
+}: Readonly<{
+  defaultOpen?: boolean;
+  locale: Locale;
+  productRows: AdminProductRow[];
+}>) {
+  return (
+    <AdminCollapsiblePanel
+      defaultOpen={defaultOpen}
+      title={locale === "it" ? "Regole riordino" : "低库存规则"}
+      summary={locale === "it" ? "Alert, non acquisto auto" : "只预警不自动下单"}
+    >
+      <form action="/api/admin/inventory/reorder-settings" method="post" className="grid gap-2">
+        <AdminCsrfField />
+        <input type="hidden" name="locale" value={locale} />
+        <AdminSelect name="inventoryId" label="SKU">
+          {productRows.filter((row) => row.inventoryId).map((row) => (
+            <option key={row.inventoryId} value={row.inventoryId ?? ""}>{row.sku}</option>
+          ))}
+        </AdminSelect>
+        <AdminInput name="reorderPoint" label={locale === "it" ? "Punto riordino" : "补货点"} type="number" defaultValue="5" min="0" />
+        <AdminInput name="safetyStock" label={locale === "it" ? "Scorta sicurezza" : "安全库存"} type="number" defaultValue="2" min="0" />
+        <button className="h-9 rounded-lg bg-stone-950 px-3 text-xs font-black text-white transition hover:bg-stone-800" type="submit">
+          {locale === "it" ? "Salva alert" : "保存预警规则"}
+        </button>
+      </form>
+    </AdminCollapsiblePanel>
+  );
+}
+
+function MiniStat({
+  label,
+  tone = "default",
+  value,
+}: Readonly<{ label: string; tone?: "default" | "amber" | "red"; value: ReactNode }>) {
+  const toneClass = tone === "red" ? "bg-rose-50 text-rose-700" : tone === "amber" ? "bg-amber-50 text-amber-700" : "bg-stone-50 text-stone-950";
+  return (
+    <div className={`min-w-0 rounded-lg px-2 py-1.5 ${toneClass}`}>
+      <p className="truncate text-[10px] font-black uppercase text-stone-400">{label}</p>
+      <p className="mt-0.5 truncate font-black">{value}</p>
     </div>
   );
 }
@@ -434,6 +456,16 @@ function SystemNotice({
   hasUser: boolean;
   locale: Locale;
 }>) {
+  if (!authConfigured) {
+    return (
+      <AdminNotice tone="warning">
+        {locale === "it"
+          ? "Demo mode: Supabase non configurato, la pagina usa dati locali."
+          : "演示模式：Supabase 未配置，页面使用本地样例数据。"}
+      </AdminNotice>
+    );
+  }
+
   if (authConfigured && !isAdmin) {
     return (
       <AdminNotice tone="danger">
@@ -453,29 +485,16 @@ function SystemNotice({
 
 function Feedback({
   locale,
-  error,
-  imported,
-  processed,
-  skipped,
-  ordered,
-  received,
-  missing,
-  settingsSaved,
-  adjusted,
-  reorderSaved,
+  query,
 }: Readonly<{
   locale: Locale;
-  error?: string;
-  imported?: string;
-  processed?: string;
-  skipped?: string;
-  ordered?: string;
-  received?: string;
-  missing?: string;
-  settingsSaved?: string;
-  adjusted?: string;
-  reorderSaved?: string;
+  query: Record<string, string | string[] | undefined>;
 }>) {
+  const error = valueOf(query.error);
+  const settingsSaved = valueOf(query.settings);
+  const adjusted = valueOf(query.adjusted);
+  const reorderSaved = valueOf(query.reorder);
+
   return (
     <>
       {error ? (
@@ -483,29 +502,9 @@ function Feedback({
           {decodeURIComponent(error)}
         </AdminNotice>
       ) : null}
-
-      {imported ? (
-        <AdminNotice tone="info">
-          {locale === "it"
-            ? `Import: ${imported} SKU importati, ${ordered || "0"} pezzi ordinati, ${skipped || "0"} righe saltate su ${processed || "0"}.`
-            : `导入完成：${imported} 个 SKU，${ordered || "0"} 件在途，${skipped || "0"} 行跳过，共读取 ${processed || "0"} 行。`}
-        </AdminNotice>
-      ) : null}
-
-      {received || missing ? (
-        <AdminNotice tone="success">
-          {locale === "it"
-            ? `Ricezione aggiornata: ${received || "0"} ricevuti, ${missing || "0"} mancanti.`
-            : `到货已更新：实收 ${received || "0"}，缺货 ${missing || "0"}。`}
-        </AdminNotice>
-      ) : null}
-
       {settingsSaved ? (
-        <AdminNotice tone="success">
-          {locale === "it" ? "Impostazioni salvate." : "库存设置已保存。"}
-        </AdminNotice>
+        <AdminNotice tone="success">{locale === "it" ? "Impostazioni salvate." : "库存设置已保存。"}</AdminNotice>
       ) : null}
-
       {adjusted ? (
         <AdminNotice tone="success">
           {adjusted === "demo"
@@ -517,160 +516,72 @@ function Feedback({
               : "库存调整已保存。"}
         </AdminNotice>
       ) : null}
-
       {reorderSaved ? (
-        <AdminNotice tone="success">
-          {locale === "it" ? "Regole riordino salvate." : "低库存规则已保存。"}
-        </AdminNotice>
+        <AdminNotice tone="success">{locale === "it" ? "Regole riordino salvate." : "低库存规则已保存。"}</AdminNotice>
       ) : null}
     </>
   );
 }
 
-function InventoryReceiveCards({
-  items,
-  locale,
-}: Readonly<{
-  items: Awaited<ReturnType<typeof getOpenSupplierPurchaseItems>>;
-  locale: Locale;
-}>) {
-  return (
-    <div className="grid gap-2">
-      {items.map((item) => (
-        <article key={item.id} className="rounded-lg border border-black/5 bg-stone-50 p-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="break-all font-mono text-xs font-black text-stone-900">
-                {item.sku}
-              </p>
-              <p className="mt-1 line-clamp-2 text-sm font-black leading-5 text-stone-950">
-                {item.originalName}
-              </p>
-              <p className="mt-1 truncate text-xs font-semibold text-stone-500">
-                {item.supplierName} / {item.status}
-              </p>
-            </div>
-            <StatusPill status={`${item.remainingQty} left`} tone="amber" />
-          </div>
-          <div className="mt-2 grid grid-cols-4 gap-2 text-xs">
-            <MetricMini label={locale === "it" ? "Ord." : "订购"} value={item.orderedQty} />
-            <MetricMini label={locale === "it" ? "Ric." : "实收"} value={item.receivedQty} />
-            <MetricMini label={locale === "it" ? "Miss" : "缺货"} value={item.missingQty} />
-            <MetricMini label={locale === "it" ? "Costo" : "成本"} value={formatMoney(item.costPrice, locale)} />
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <label className="text-xs font-black text-stone-500">
-              {locale === "it" ? "Ricevuto" : "本次实收"}
-              <SmallNumberInput name={`received_${item.id}`} max={item.remainingQty} />
-            </label>
-            <label className="text-xs font-black text-stone-500">
-              {locale === "it" ? "Mancante" : "本次缺货"}
-              <SmallNumberInput name={`missing_${item.id}`} max={item.remainingQty} />
-            </label>
-          </div>
-        </article>
-      ))}
-    </div>
-  );
+function filterInventoryRows(rows: AdminProductRow[], state: InventoryFilterState) {
+  const query = normalizeSearch(state.q);
+
+  return rows.filter((row) => {
+    if (state.brand && row.brand !== state.brand) return false;
+    if (state.model && row.model !== state.model) return false;
+    if (state.category && row.category !== state.category) return false;
+    if (state.status === "in_stock" && row.stockOnHand - row.stockReserved <= 0) return false;
+    if (state.status === "incoming" && row.incomingQty - row.incomingReserved <= 0) return false;
+    if (state.status === "low_stock" && !isLowStock(row)) return false;
+    if (state.status === "shortage" && !(row.incomingReserved > row.incomingQty || row.stockReserved > row.stockOnHand)) return false;
+    if (!query) return true;
+
+    const haystack = normalizeSearch([
+      row.sku,
+      row.barcodeEan13,
+      row.nameIt,
+      row.nameZh,
+      row.brand,
+      row.model,
+      row.category,
+      row.qualityGrade,
+      row.compatibility.join(" "),
+    ].filter(Boolean).join(" "));
+
+    return haystack.includes(query);
+  });
 }
 
-function SupplierOrderCards({
-  orders,
-  locale,
-}: Readonly<{
-  orders: Awaited<ReturnType<typeof getSupplierPurchaseOrders>>;
-  locale: Locale;
-}>) {
-  return (
-    <div className="grid gap-2">
-      {orders.map((order) => (
-        <article key={order.id} className="rounded-lg border border-black/5 bg-stone-50 p-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-black text-stone-950">
-                {order.sourceFilename}
-              </p>
-              <p className="mt-1 break-all font-mono text-xs font-semibold text-stone-500">
-                {order.id}
-              </p>
-            </div>
-            <StatusPill status={order.status} />
-          </div>
-          <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-            <MetricMini label={locale === "it" ? "Ord." : "订购"} value={order.orderedTotal} />
-            <MetricMini label={locale === "it" ? "Ric." : "实收"} value={order.receivedTotal} />
-            <MetricMini label={locale === "it" ? "Miss" : "缺货"} value={order.missingTotal} />
-          </div>
-          <p className="mt-2 text-xs font-semibold text-stone-500">
-            {new Date(order.createdAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN")}
-          </p>
-        </article>
-      ))}
-    </div>
-  );
+function buildInventoryHref(locale: Locale, state: Partial<InventoryFilterState>) {
+  const params = new URLSearchParams();
+  if (state.q) params.set("q", state.q);
+  if (state.brand) params.set("brand", state.brand);
+  if (state.model) params.set("model", state.model);
+  if (state.category) params.set("category", state.category);
+  if (state.status && state.status !== "all") params.set("status", state.status);
+  const query = params.toString();
+  return `${localizePath(locale, "/admin/inventory")}${query ? `?${query}` : ""}`;
 }
 
-function InventoryMovementCards({
-  movements,
-  locale,
-}: Readonly<{
-  movements: Awaited<ReturnType<typeof getAdminInventoryMovements>>;
-  locale: Locale;
-}>) {
-  return (
-    <div className="grid gap-2">
-      {movements.map((movement) => (
-        <article key={movement.id} className="rounded-lg border border-black/5 bg-stone-50 p-3">
-          <div className="flex items-start justify-between gap-2">
-            <p className="break-all font-mono text-xs font-black text-stone-900">
-              {movement.sku}
-            </p>
-            <StatusPill status={movement.movementType} tone="slate" />
-          </div>
-          <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-            <MetricMini label="Qty" value={movement.quantity} />
-            <MetricMini label="Stock" value={movement.stockDelta} />
-            <MetricMini label="Incoming" value={movement.incomingDelta} />
-          </div>
-          {movement.note ? (
-            <p className="mt-2 break-words text-xs font-semibold text-stone-600">
-              {movement.note}
-            </p>
-          ) : null}
-          <p className="mt-2 text-xs font-semibold text-stone-500">
-            {new Date(movement.createdAt).toLocaleString(
-              locale === "it" ? "it-IT" : "zh-CN",
-            )}
-          </p>
-        </article>
-      ))}
-    </div>
-  );
+function getCountedOptions(values: string[]) {
+  const counts = new Map<string, number>();
+  values.filter(Boolean).forEach((value) => counts.set(value, (counts.get(value) ?? 0) + 1));
+  return [...counts.entries()]
+    .map(([value, count]) => ({ value, count }))
+    .sort((a, b) => a.value.localeCompare(b.value));
 }
 
-function MetricMini({
-  label,
-  value,
-}: Readonly<{ label: string; value: ReactNode }>) {
-  return (
-    <div className="min-w-0 rounded-md bg-white px-2 py-1.5">
-      <p className="truncate text-[11px] font-black uppercase text-stone-400">{label}</p>
-      <p className="mt-0.5 truncate font-black text-stone-950">{value}</p>
-    </div>
-  );
+function getCategoryLabel(categoryId: string, locale: Locale) {
+  return categories.find((category) => category.id === categoryId)?.label[locale] ?? categoryId;
 }
 
-function SmallNumberInput({ name, max }: Readonly<{ name: string; max: number }>) {
-  return (
-    <input
-      className="mt-1 h-9 w-full rounded-lg border border-black/10 bg-white px-2.5 text-sm font-semibold outline-none focus:border-stone-950 focus:ring-2 focus:ring-stone-950/10 sm:w-20"
-      defaultValue="0"
-      min="0"
-      max={max}
-      name={name}
-      type="number"
-    />
-  );
+function isLowStock(row: AdminProductRow) {
+  const available = row.stockOnHand - row.stockReserved;
+  return (row.safetyStock > 0 && available <= row.safetyStock) || (row.reorderPoint > 0 && available <= row.reorderPoint);
+}
+
+function normalizeSearch(value: string) {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 function valueOf(value: string | string[] | undefined) {

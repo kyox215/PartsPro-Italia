@@ -15,9 +15,14 @@ export async function POST(request: Request) {
   const locale = String(formData.get("locale") ?? "zh");
   const parsed = adminInventoryReceiveSchema.safeParse({
     locale,
+    purchaseOrderId: String(formData.get("purchaseOrderId") ?? ""),
     itemIds: String(formData.get("itemIds") ?? ""),
   });
-  const backUrl = new URL(`/${locale}/admin/inventory`, request.url);
+  const backUrl = new URL(`/${locale}/admin/inventory/incoming`, request.url);
+  const purchaseOrderId = String(formData.get("purchaseOrderId") ?? "");
+  if (purchaseOrderId) {
+    backUrl.searchParams.set("po", purchaseOrderId);
+  }
 
   if (!parsed.success) {
     backUrl.searchParams.set(
@@ -41,19 +46,45 @@ export async function POST(request: Request) {
     return NextResponse.redirect(backUrl, 303);
   }
 
-  const payload = parsed.data.itemIds
+  const itemIds = parsed.data.itemIds
     .split(",")
     .map((id) => id.trim())
-    .filter(Boolean)
-    .map((id) => ({
-      id,
-      received_qty: Number(formData.get(`received_${id}`) ?? 0),
-      missing_qty: Number(formData.get(`missing_${id}`) ?? 0),
-    }))
+    .filter(Boolean);
+
+  const { data: purchaseItems, error: loadError } = await getSupabaseAdminClient()
+    .from("supplier_purchase_order_items")
+    .select("id, ordered_qty, received_qty, missing_qty")
+    .eq("purchase_order_id", parsed.data.purchaseOrderId)
+    .in("id", itemIds)
+    .in("status", ["ordered", "partial"]);
+
+  if (loadError) {
+    backUrl.searchParams.set("error", loadError.message);
+    return NextResponse.redirect(backUrl, 303);
+  }
+
+  const payload = (purchaseItems ?? [])
+    .map((item) => {
+      const orderedQty = Number(item.ordered_qty ?? 0);
+      const alreadyReceived = Number(item.received_qty ?? 0);
+      const alreadyMissing = Number(item.missing_qty ?? 0);
+      const remainingQty = Math.max(orderedQty - alreadyReceived - alreadyMissing, 0);
+      const requestedMissing = Math.max(
+        0,
+        Number(formData.get(`missing_${item.id}`) ?? 0),
+      );
+      const missingQty = Math.min(requestedMissing, remainingQty);
+
+      return {
+        id: item.id,
+        received_qty: Math.max(remainingQty - missingQty, 0),
+        missing_qty: missingQty,
+      };
+    })
     .filter((item) => item.received_qty > 0 || item.missing_qty > 0);
 
   if (payload.length === 0) {
-    backUrl.searchParams.set("error", "No received or missing quantities entered");
+    backUrl.searchParams.set("error", "No open purchase items found");
     return NextResponse.redirect(backUrl, 303);
   }
 

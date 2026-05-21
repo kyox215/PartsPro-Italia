@@ -21,7 +21,7 @@ const defaultCartPath = "/Users/kyox215/Downloads/cart (1).xlsx";
 export async function POST(request: Request) {
   const formData = await request.formData();
   const locale = String(formData.get("locale") ?? "zh");
-  const backUrl = new URL(`/${locale}/admin/inventory`, request.url);
+  const backUrl = new URL(`/${locale}/admin/inventory/import`, request.url);
   const csrfRedirect = redirectOnInvalidAdminCsrf(request, formData, backUrl);
   if (csrfRedirect) return csrfRedirect;
 
