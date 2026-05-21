@@ -2,22 +2,19 @@
 
 import Link from "next/link";
 import * as React from "react";
-import { Menu, Search, ShoppingCart, X } from "lucide-react";
+import { Menu, Search, X } from "lucide-react";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import type { Locale } from "@/lib/i18n";
 import { localizePath } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 
 export function SiteMobileMenu({
   locale,
   navItems,
-  searchLabel,
-  cartLabel,
+  catalogLabel,
 }: Readonly<{
   locale: Locale;
   navItems: Array<{ href: string; label: string }>;
-  searchLabel: string;
-  cartLabel: string;
+  catalogLabel: string;
 }>) {
   const [open, setOpen] = React.useState(false);
 
@@ -82,33 +79,23 @@ export function SiteMobileMenu({
               className="grid min-h-14 grid-cols-[auto_1fr] items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base font-black text-slate-950"
             >
               <Search className="h-5 w-5 text-slate-500" />
-              <span className="min-w-0 truncate">{searchLabel}</span>
+              <span className="min-w-0 truncate">{catalogLabel}</span>
             </Link>
 
-            <Link
-              href={localizePath(locale, "/cart")}
-              onClick={() => setOpen(false)}
-              className="grid min-h-14 grid-cols-[auto_1fr] items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-base font-black text-slate-800 hover:bg-slate-50"
-            >
-              <ShoppingCart className="h-5 w-5 text-slate-500" />
-              <span className="min-w-0 truncate">{cartLabel}</span>
-            </Link>
-
-            <div className="mt-2 grid gap-1 border-t border-slate-100 pt-3">
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  className={cn(
-                    "flex min-h-12 items-center rounded-xl px-4 py-3 text-base font-black text-slate-800 hover:bg-slate-50 hover:text-slate-950",
-                    item.href.endsWith("/products") && "hidden",
-                  )}
-                >
-                  <span className="min-w-0 truncate">{item.label}</span>
-                </Link>
-              ))}
-            </div>
+            {navItems.length > 0 ? (
+              <div className="mt-2 grid gap-1 border-t border-slate-100 pt-3">
+                {navItems.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    className="flex min-h-12 items-center rounded-xl px-4 py-3 text-base font-black text-slate-800 hover:bg-slate-50 hover:text-slate-950"
+                  >
+                    <span className="min-w-0 truncate">{item.label}</span>
+                  </Link>
+                ))}
+              </div>
+            ) : null}
           </nav>
 
           <div className="mt-auto space-y-3 border-t border-slate-100 px-4 py-4">

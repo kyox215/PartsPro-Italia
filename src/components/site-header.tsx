@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { Search, ShoppingCart } from "lucide-react";
-import { ButtonLink } from "@/components/ui/button";
-import { LanguageSwitcher } from "@/components/language-switcher";
+import { ShoppingCart, UserRound } from "lucide-react";
 import { SiteMobileMenu } from "@/components/site-mobile-menu";
 import type { AuthContext } from "@/lib/auth";
 import type { Locale, Dictionary } from "@/lib/i18n";
@@ -14,28 +12,40 @@ export function SiteHeader({
 }: Readonly<{ locale: Locale; dictionary: Dictionary; auth: AuthContext }>) {
   const rawNavItems: Array<[string, string] | null> = [
     ["products", dictionary.nav.products as string],
-    auth.user
-      ? ["account", dictionary.nav.account as string]
-      : ["login", locale === "it" ? "Login" : "登录"],
     auth.isAdmin ? ["admin", dictionary.nav.admin as string] : null,
   ];
   const navItems = rawNavItems.filter((item): item is [string, string] =>
     Boolean(item),
   );
+  const accountHref = auth.user
+    ? localizePath(locale, "/account")
+    : localizePath(locale, "/login");
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-        <Link href={`/${locale}`} className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-950 text-sm font-black text-white">
-            PP
-          </span>
-          <span className="hidden text-sm font-bold text-slate-950 sm:block">
-            {dictionary.brand as string}
-          </span>
-        </Link>
+      <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-2 px-3 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 items-center gap-2">
+          <SiteMobileMenu
+            locale={locale}
+            navItems={navItems
+              .filter(([path]) => path !== "products")
+              .map(([path, label]) => ({
+                href: localizePath(locale, `/${path}`),
+                label,
+              }))}
+            catalogLabel={dictionary.nav.products as string}
+          />
+          <Link href={`/${locale}`} className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-sm font-black text-white">
+              PP
+            </span>
+            <span className="hidden truncate text-sm font-bold text-slate-950 sm:block">
+              {dictionary.brand as string}
+            </span>
+          </Link>
+        </div>
 
-        <nav className="hidden items-center gap-1 md:flex">
+        <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">
           {navItems.map(([path, label]) => (
             <Link
               key={path}
@@ -47,34 +57,23 @@ export function SiteHeader({
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <Link
-            href={localizePath(locale, "/products")}
-            className="hidden h-10 items-center justify-center rounded-lg border border-slate-200 px-3 text-slate-700 transition hover:border-blue-300 hover:text-blue-700 sm:flex"
-            aria-label={dictionary.common.search as string}
+            href={accountHref}
+            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-sm font-bold text-slate-800 transition hover:border-blue-300 hover:text-blue-700 sm:px-3"
+            aria-label={dictionary.nav.account as string}
           >
-            <Search className="h-4 w-4" />
+            <UserRound className="h-4 w-4" />
+            <span className="hidden sm:inline">{dictionary.nav.account as string}</span>
           </Link>
-          <div className="hidden sm:block">
-            <LanguageSwitcher locale={locale} />
-          </div>
-          <ButtonLink
+          <Link
             href={localizePath(locale, "/cart")}
-            variant="dark"
-            className="hidden h-10 px-3 sm:inline-flex"
+            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-slate-950 bg-slate-950 px-2.5 text-sm font-bold text-white transition hover:bg-slate-800 sm:px-3"
+            aria-label={dictionary.nav.cart as string}
           >
             <ShoppingCart className="h-4 w-4" />
             <span className="hidden sm:inline">{dictionary.nav.cart as string}</span>
-          </ButtonLink>
-          <SiteMobileMenu
-            locale={locale}
-            navItems={navItems.map(([path, label]) => ({
-              href: localizePath(locale, `/${path}`),
-              label,
-            }))}
-            searchLabel={dictionary.common.search as string}
-            cartLabel={dictionary.nav.cart as string}
-          />
+          </Link>
         </div>
       </div>
     </header>
