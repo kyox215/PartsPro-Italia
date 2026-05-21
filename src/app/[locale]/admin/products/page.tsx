@@ -78,6 +78,9 @@ export default async function AdminProductsPage({
         }
         actions={
           <>
+            <AdminButtonLink href={localizePath(locale, "/admin/products/new")}>
+              {locale === "it" ? "Nuovo prodotto" : "新增商品"}
+            </AdminButtonLink>
             <AdminButtonLink href={localizePath(locale, "/admin")} variant="secondary">
               {locale === "it" ? "Dashboard" : "后台首页"}
             </AdminButtonLink>
@@ -90,7 +93,7 @@ export default async function AdminProductsPage({
         }
       />
 
-      <SystemNotices configured={auth.configured} isAdmin={auth.isAdmin} hasUser={Boolean(auth.user)} locale={locale} />
+      <SystemNotices configured={auth.configured} canManageProducts={canManageProducts} hasUser={Boolean(auth.user)} locale={locale} />
       <FeedbackNotices query={query} locale={locale} />
 
       <AdminPanel title={locale === "it" ? "Cerca e filtra" : "查找商品"} toolbar={<StatusPill status={`${displayedRows.length} / ${rows.length} SKU`} tone="blue" />}>
@@ -166,13 +169,13 @@ export default async function AdminProductsPage({
 }
 
 function SystemNotices({
+  canManageProducts,
   configured,
-  isAdmin,
   hasUser,
   locale,
 }: Readonly<{
+  canManageProducts: boolean;
   configured: boolean;
-  isAdmin: boolean;
   hasUser: boolean;
   locale: Locale;
 }>) {
@@ -186,13 +189,13 @@ function SystemNotices({
     );
   }
 
-  if (!isAdmin) {
+  if (!canManageProducts) {
     return (
       <AdminNotice tone="danger">
         {hasUser
           ? locale === "it"
-            ? "Il tuo utente non ha ruolo admin."
-            : "当前用户不是 admin 角色。"
+            ? "Il tuo utente non ha permesso products:write."
+            : "当前用户没有 products:write 权限。"
           : locale === "it"
             ? "Effettua login admin per gestire prodotti reali."
             : "请使用管理员账户登录后管理真实商品。"}

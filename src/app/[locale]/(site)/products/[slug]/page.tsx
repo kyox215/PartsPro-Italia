@@ -198,6 +198,18 @@ function ProductMedia({
     );
   }
 
+  if (image) {
+    return (
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <img
+          src={image}
+          alt={name}
+          className="aspect-[4/3] w-full object-cover"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex aspect-[4/3] items-center justify-center rounded-lg border border-slate-200 bg-slate-100 p-6">
       <div className="text-center">

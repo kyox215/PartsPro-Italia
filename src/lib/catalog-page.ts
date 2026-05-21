@@ -1,6 +1,7 @@
 import { products, type Product } from "@/lib/catalog";
 import { canViewB2BPrice, getAuthContext } from "@/lib/auth";
 import type { Locale } from "@/lib/i18n";
+import { toProductImageHref } from "@/lib/product-image-storage";
 import {
   getSupabaseServerClient,
   hasSupabasePublicConfig,
@@ -806,7 +807,7 @@ function mapCatalogRow(
     description:
       (locale === "it" ? row.description_it : row.description_zh) ??
       (locale === "it" ? row.name_it : row.name_zh),
-    image: row.image_url ?? null,
+    image: toProductImageHref(row.image_url) ?? null,
     color: row.color ?? null,
     compatibility: row.compatibility ?? [],
     moq: Number(row.moq ?? 1),

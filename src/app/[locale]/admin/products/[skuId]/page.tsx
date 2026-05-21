@@ -18,6 +18,7 @@ import { getAuthContext } from "@/lib/auth";
 import { categories, qualityStyles } from "@/lib/catalog";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
 import { formatMoney } from "@/lib/pricing";
+import { toProductImageHref } from "@/lib/product-image-storage";
 
 export default async function AdminProductDetailPage({
   params,
@@ -39,6 +40,7 @@ export default async function AdminProductDetailPage({
   const attributesText = product.attributes
     .map((attribute) => `${attribute.key}=${attribute.value}`)
     .join("\n");
+  const productImageHref = toProductImageHref(product.imageUrl);
 
   return (
     <div className="space-y-3">
@@ -166,6 +168,15 @@ export default async function AdminProductDetailPage({
             <div className="grid gap-3 md:grid-cols-2">
               <AdminInput name="nameIt" label="Nome IT" defaultValue={product.nameIt} />
               <AdminInput name="nameZh" label="中文名" defaultValue={product.nameZh} />
+              {productImageHref ? (
+                <div className="md:col-span-2 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                  <img
+                    src={productImageHref}
+                    alt={product.nameIt}
+                    className="aspect-[4/3] w-full object-cover"
+                  />
+                </div>
+              ) : null}
               <AdminInput className="md:col-span-2" name="imageUrl" label="Image URL" defaultValue={product.imageUrl ?? ""} required={false} />
               <AdminInput className="md:col-span-2" name="compatibility" label="Compatibility" defaultValue={product.compatibility.join(", ")} required={false} />
               <AdminTextarea name="descriptionIt" label="Description IT" defaultValue={product.descriptionIt ?? ""} />

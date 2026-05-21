@@ -15,6 +15,7 @@ import {
   getSupabaseAdminClient,
   hasSupabaseAdminConfig,
 } from "@/lib/supabase/admin";
+import { uploadProductImageFile } from "@/lib/product-image-storage";
 import { adminProductSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
@@ -49,13 +50,14 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const rawBody = await parseRequestBody(request);
+  const { rawBody, imageFile } = await parseProductCreateRequest(request);
   const locale = String(rawBody.locale ?? "it");
   const parsed = adminProductSchema.safeParse(rawBody);
   const backUrl = getAdminBackUrl(request, {
     locale,
-    returnTo: null,
+    returnTo: rawBody.returnTo,
     fallbackPath: "/admin/products",
+    allowedPrefixes: ["/admin/products"],
   });
 
   if (!parsed.success) {
@@ -83,6 +85,22 @@ export async function POST(request: Request) {
 
   const payload = parsed.data;
   const supabase = getSupabaseAdminClient();
+  const now = new Date().toISOString();
+
+  let productImageUrl = payload.imageUrl || null;
+  try {
+    const uploaded = await uploadProductImageFile({
+      file: imageFile,
+      sku: payload.sku,
+    });
+    productImageUrl = uploaded?.reference ?? productImageUrl;
+  } catch (error) {
+    backUrl.searchParams.set(
+      "error",
+      error instanceof Error ? error.message : "Product image upload failed",
+    );
+    return NextResponse.redirect(backUrl, 303);
+  }
 
   try {
     await ensureCatalogReferenceRows(supabase, payload);
@@ -106,8 +124,9 @@ export async function POST(request: Request) {
       name_zh: payload.nameZh,
       description_it: payload.descriptionIt || null,
       description_zh: payload.descriptionZh || null,
-      image_url: payload.imageUrl || null,
-      is_active: true,
+      image_url: productImageUrl,
+      is_active: payload.isActive,
+      archived_at: payload.isActive ? null : now,
     })
     .select("id")
     .single();
@@ -133,7 +152,10 @@ export async function POST(request: Request) {
       retail_price: payload.retailPrice,
       b2b_price: payload.b2bPrice,
       vat_rate: 0.22,
-      is_active: true,
+      preorder_lead_time_min_days: payload.preorderLeadTimeMinDays,
+      preorder_lead_time_max_days: payload.preorderLeadTimeMaxDays,
+      is_active: payload.isActive,
+      archived_at: payload.isActive ? null : now,
     })
     .select("id")
     .single();
@@ -148,6 +170,8 @@ export async function POST(request: Request) {
     warehouse_code: "MAIN",
     stock_on_hand: payload.stockOnHand,
     incoming_qty: payload.incomingQty,
+    reorder_point: payload.reorderPoint,
+    safety_stock: payload.safetyStock,
   });
 
   if (inventoryError) {
@@ -185,11 +209,38 @@ export async function POST(request: Request) {
       qualityGrade: payload.qualityGrade,
       retailPrice: payload.retailPrice,
       b2bPrice: payload.b2bPrice,
+      costPrice: payload.costPrice ?? null,
       stockOnHand: payload.stockOnHand,
       incomingQty: payload.incomingQty,
+      reorderPoint: payload.reorderPoint,
+      safetyStock: payload.safetyStock,
+      preorderLeadTimeMinDays: payload.preorderLeadTimeMinDays,
+      preorderLeadTimeMaxDays: payload.preorderLeadTimeMaxDays,
+      isActive: payload.isActive,
+      imageUrl: productImageUrl,
     },
   });
 
-  backUrl.searchParams.set("saved", "1");
-  return NextResponse.redirect(backUrl, 303);
+  const successUrl = new URL(
+    `/${payload.locale}/admin/products/${encodeURIComponent(sku.id)}?saved=created`,
+    request.url,
+  );
+  return NextResponse.redirect(successUrl, 303);
+}
+
+async function parseProductCreateRequest(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
+
+  if (contentType.includes("multipart/form-data")) {
+    const formData = await request.formData();
+    return {
+      rawBody: Object.fromEntries(formData.entries()),
+      imageFile: formData.get("imageFile"),
+    };
+  }
+
+  return {
+    rawBody: await parseRequestBody(request),
+    imageFile: null,
+  };
 }

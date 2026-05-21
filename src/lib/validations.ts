@@ -70,7 +70,35 @@ export const accountNotificationReadSchema = z.object({
   returnTo: z.string().optional().or(z.literal("")),
 });
 
-export const adminProductSchema = z.object({
+const optionalMoneyInput = z.preprocess(
+  (value) => (value === "" || value === null ? undefined : value),
+  z.coerce.number().nonnegative().optional(),
+);
+
+const imageReferenceSchema = z
+  .string()
+  .trim()
+  .optional()
+  .or(z.literal(""))
+  .refine((value) => {
+    if (!value) return true;
+    if (value.startsWith("storage://product-images/")) return true;
+    if (value.startsWith("/api/files/product-image?")) return true;
+
+    try {
+      const url = new URL(value);
+      return url.protocol === "http:" || url.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }, "Image must be a URL or product image reference");
+
+const adminFormBoolean = z.preprocess(
+  (value) => value === true || value === "true" || value === "on" || value === "1",
+  z.boolean(),
+);
+
+const adminProductBaseSchema = z.object({
   slug: z.string().min(1),
   brand: z.string().min(1),
   model: z.string().min(1),
@@ -80,24 +108,37 @@ export const adminProductSchema = z.object({
   nameZh: z.string().min(1),
   descriptionIt: z.string().optional().or(z.literal("")),
   descriptionZh: z.string().optional().or(z.literal("")),
-  imageUrl: z.string().url().optional().or(z.literal("")),
+  imageUrl: imageReferenceSchema,
   sku: z.string().min(1),
   barcodeEan13: z.string().optional().or(z.literal("")),
-  costPrice: z.coerce.number().nonnegative().optional().or(z.literal("")),
+  costPrice: optionalMoneyInput,
   color: z.string().optional().or(z.literal("")),
   compatibility: z.string().optional().or(z.literal("")),
   moq: z.coerce.number().int().positive(),
   retailPrice: z.coerce.number().nonnegative(),
   b2bPrice: z.coerce.number().nonnegative(),
-  stockOnHand: z.coerce.number().int().nonnegative(),
-  incomingQty: z.coerce.number().int().nonnegative().default(0),
   attributes: z.string().optional().or(z.literal("")),
 });
 
-export const adminProductUpdateSchema = adminProductSchema.omit({
-  stockOnHand: true,
-  incomingQty: true,
-}).extend({
+export const adminProductSchema = adminProductBaseSchema.extend({
+  locale: z.enum(["it", "zh"]).default("it"),
+  returnTo: z.string().optional().or(z.literal("")),
+  isActive: adminFormBoolean.default(false),
+  stockOnHand: z.coerce.number().int().nonnegative(),
+  incomingQty: z.coerce.number().int().nonnegative().default(0),
+  reorderPoint: z.coerce.number().int().nonnegative().default(0),
+  safetyStock: z.coerce.number().int().nonnegative().default(0),
+  preorderLeadTimeMinDays: z.coerce.number().int().nonnegative().default(7),
+  preorderLeadTimeMaxDays: z.coerce.number().int().nonnegative().default(14),
+}).refine(
+  (value) => value.preorderLeadTimeMaxDays >= value.preorderLeadTimeMinDays,
+  {
+    message: "Maximum lead time must be greater than or equal to minimum lead time",
+    path: ["preorderLeadTimeMaxDays"],
+  },
+);
+
+export const adminProductUpdateSchema = adminProductBaseSchema.extend({
   locale: z.enum(["it", "zh"]).default("it"),
   productId: z.string().min(1),
   skuId: z.string().min(1),
