@@ -131,7 +131,7 @@ export default async function AdminPage({
       title: locale === "it" ? "Ordini e pagamenti" : "订单与付款",
       description:
         locale === "it"
-          ? "Controlla righe, bonifico, Stripe e fulfilment."
+          ? "Controlla righe, bonifico, Stripe e logistica."
           : "查看明细、转账、Stripe 和发货状态。",
       href: localizePath(locale, "/admin/orders"),
       tone: "bg-amber-50 text-amber-700",
@@ -143,7 +143,7 @@ export default async function AdminPage({
         locale === "it"
           ? "Schede cliente, price group, note e follow-up."
           : "客户档案、价格组、备注、任务和跟进。",
-      href: localizePath(locale, "/admin/accounts"),
+      href: localizePath(locale, "/admin/accounts/customers"),
       tone: "bg-indigo-50 text-indigo-700",
     },
     {

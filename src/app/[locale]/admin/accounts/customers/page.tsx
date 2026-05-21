@@ -4,11 +4,11 @@ import { AccountManagementTabs } from "@/components/admin/account-management-nav
 import {
   AdminActionRail,
   AdminButtonLink,
+  AdminDataTable,
   AdminEmptyState,
   AdminMetricCard,
   AdminPageHeader,
   AdminPanel,
-  AdminRecordList,
   AdminTabs,
   AdminWorkspaceGrid,
   StatusPill,
@@ -44,7 +44,8 @@ export default async function AdminAccountCustomersPage({
       ? await getAdminCustomerRows()
       : [];
   const filter = valueOf(query.filter) ?? "all";
-  const visibleCustomers = filterCustomers(customers, filter);
+  const visibleCustomers = filterCustomers(customers, filter)
+    .sort((a, b) => b.totalSpent - a.totalSpent || b.orderCount - a.orderCount);
   const customerCounts = getCustomerFilterCounts(customers);
   const totalSpent = customers.reduce((sum, customer) => sum + customer.totalSpent, 0);
   const filterItems = [
@@ -143,15 +144,31 @@ export default async function AdminAccountCustomersPage({
           }
         >
           {visibleCustomers.length ? (
-            <AdminRecordList>
-              {visibleCustomers.map((customer) => (
-                <CustomerRecord
-                  key={`${customer.source}-${customer.id}`}
-                  customer={customer}
-                  locale={locale}
-                />
-              ))}
-            </AdminRecordList>
+            <AdminDataTable minWidth={1080}>
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase text-slate-400">
+                  <tr className="border-b border-slate-100">
+                    <th className="px-3 py-3">{locale === "it" ? "Cliente" : "客户/联系方式"}</th>
+                    <th className="px-3 py-3">{locale === "it" ? "Tipo" : "客户类型"}</th>
+                    <th className="px-3 py-3">{locale === "it" ? "Fatturato" : "成交额"}</th>
+                    <th className="px-3 py-3">{locale === "it" ? "Ordini" : "订单数"}</th>
+                    <th className="px-3 py-3">{locale === "it" ? "Ultimo contatto" : "最近跟进"}</th>
+                    <th className="px-3 py-3">{locale === "it" ? "Tag" : "常买/标签"}</th>
+                    <th className="px-3 py-3">{locale === "it" ? "Stato" : "状态"}</th>
+                    <th className="px-3 py-3">{locale === "it" ? "Azione" : "操作"}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {visibleCustomers.map((customer) => (
+                    <CustomerTableRow
+                      key={`${customer.source}-${customer.id}`}
+                      customer={customer}
+                      locale={locale}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </AdminDataTable>
           ) : (
             <AdminEmptyState
               icon={UsersRound}
@@ -169,7 +186,7 @@ export default async function AdminAccountCustomersPage({
   );
 }
 
-function CustomerRecord({
+function CustomerTableRow({
   customer,
   locale,
 }: Readonly<{ customer: AdminCustomerRow; locale: Locale }>) {
@@ -177,69 +194,46 @@ function CustomerRecord({
   const account = formatAdminStatus("account", customer.accountStatus, locale);
   const crm = formatAdminStatus("crm", customer.crmStatus, locale);
   const priceGroup = formatCustomerType(customer.priceGroup, locale);
-  const staffRole = customer.staffRole && customer.staffStatus === "active"
-    ? formatAdminStatus("staffRole", customer.staffRole, locale)
-    : null;
   const nextAction = getCustomerNextAction(customer, locale);
 
   return (
-    <article className="grid min-w-0 gap-3 rounded-lg border border-black/5 bg-stone-50 p-3 transition hover:border-black/10 hover:bg-white xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,.9fr)_auto] xl:items-center">
-      <div className="min-w-0">
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <p className="min-w-0 break-words text-sm font-black text-stone-950 sm:text-base">
-            {customer.companyName}
-          </p>
-          <StatusPill status={source.label} tone={source.tone} />
-        </div>
-        <p className="mt-1 break-words text-xs font-semibold text-stone-500">
-          {customer.email ?? customer.vatNumber ?? "-"}
+    <tr className="hover:bg-blue-50/40">
+      <td className="px-3 py-3">
+        <p className="font-black text-slate-950">{customer.companyName}</p>
+        <p className="mt-1 text-xs font-semibold text-slate-500">
+          {[customer.contactName, customer.phone, customer.whatsapp, customer.email].filter(Boolean).join(" / ") || "-"}
         </p>
-        <div className="mt-2 flex flex-wrap gap-1">
+        <p className="mt-1 text-xs font-semibold text-slate-400">{customer.vatNumber ?? source.label}</p>
+      </td>
+      <td className="px-3 py-3"><StatusPill status={priceGroup.label} tone={priceGroup.tone} /></td>
+      <td className="px-3 py-3 font-black text-slate-950">{formatMoney(customer.totalSpent, locale)}</td>
+      <td className="px-3 py-3 font-black text-slate-950">{customer.orderCount}</td>
+      <td className="px-3 py-3 text-xs font-semibold text-slate-500">
+        {customer.lastContactedAt
+          ? new Date(customer.lastContactedAt).toLocaleDateString(locale === "it" ? "it-IT" : "zh-CN")
+          : customer.nextFollowUpAt
+            ? new Date(customer.nextFollowUpAt).toLocaleDateString(locale === "it" ? "it-IT" : "zh-CN")
+            : "-"}
+      </td>
+      <td className="px-3 py-3">
+        <div className="flex max-w-[240px] flex-wrap gap-1">
+          {(customer.tags.length ? customer.tags : [crm.label]).slice(0, 3).map((tag) => (
+            <StatusPill key={tag} status={tag} tone="slate" />
+          ))}
+        </div>
+      </td>
+      <td className="px-3 py-3">
+        <div className="flex flex-wrap gap-1">
           <StatusPill status={account.label} tone={account.tone} />
           <StatusPill status={crm.label} tone={crm.tone} />
-          <StatusPill status={priceGroup.label} tone={priceGroup.tone} />
-          {staffRole ? <StatusPill status={staffRole.label} tone={staffRole.tone} /> : null}
         </div>
-      </div>
-
-      <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-2">
-        <MetricMini label={locale === "it" ? "Ordini" : "订单"} value={String(customer.orderCount)} />
-        <MetricMini label={locale === "it" ? "Valore" : "成交额"} value={formatMoney(customer.totalSpent, locale)} />
-        <MetricMini
-          label={locale === "it" ? "Staff" : "员工"}
-          value={staffRole?.label ?? "-"}
-        />
-      </div>
-
-      <div className="min-w-0">
-        <p className="text-[11px] font-black uppercase text-stone-400">
-          {locale === "it" ? "Prossimo passo" : "下一步"}
-        </p>
-        <p className="mt-1 break-words text-sm font-black text-stone-950">{nextAction.label}</p>
-        <p className="mt-1 text-xs font-semibold text-stone-500">
-          {customer.nextFollowUpAt
-            ? new Date(customer.nextFollowUpAt).toLocaleDateString(locale === "it" ? "it-IT" : "zh-CN")
-            : locale === "it"
-              ? "Nessun follow-up pianificato"
-              : "未安排跟进"}
-        </p>
-      </div>
-
-      <div className="flex xl:justify-end">
+      </td>
+      <td className="px-3 py-3">
         <AdminButtonLink href={nextAction.href} variant="secondary">
           {nextAction.button}
         </AdminButtonLink>
-      </div>
-    </article>
-  );
-}
-
-function MetricMini({ label, value }: Readonly<{ label: string; value: string }>) {
-  return (
-    <div className="min-w-0 rounded-lg bg-white px-2.5 py-2 ring-1 ring-black/5">
-      <p className="truncate text-[11px] font-black uppercase text-stone-400">{label}</p>
-      <p className="mt-1 truncate text-sm font-black text-stone-950">{value}</p>
-    </div>
+      </td>
+    </tr>
   );
 }
 

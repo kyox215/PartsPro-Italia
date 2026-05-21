@@ -75,12 +75,12 @@ export function AdminPanel({
   return (
     <section
       className={cn(
-        "content-visibility-auto rounded-lg border border-black/5 bg-white shadow-sm",
+        "content-visibility-auto rounded-lg border border-slate-200 bg-white shadow-sm",
         className,
       )}
     >
       {(title || description || toolbar) ? (
-        <div className="flex flex-col gap-2 border-b border-black/5 px-3 py-2.5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-2 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             {title ? (
               <h3 className="text-sm font-black leading-5 text-stone-950">{title}</h3>
@@ -189,10 +189,10 @@ export function AdminTabs({
           key={item.href}
           href={item.href}
           className={cn(
-            "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-black transition",
+            "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md px-3 text-sm font-black transition",
             item.active
-              ? "bg-stone-950 text-white"
-              : "text-stone-500 hover:bg-stone-100 hover:text-stone-950",
+              ? "bg-white text-blue-700 shadow-sm ring-1 ring-blue-200"
+              : "text-slate-500 hover:bg-white hover:text-blue-700",
           )}
         >
           {item.label}
@@ -200,7 +200,7 @@ export function AdminTabs({
             <span
               className={cn(
                 "rounded-md px-1.5 py-0.5 text-[11px]",
-                item.active ? "bg-white text-stone-950" : "bg-stone-100 text-stone-500",
+                item.active ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-500",
               )}
             >
               {item.count}
@@ -519,8 +519,8 @@ export function AdminButtonLink({
       className={cn(
         "inline-flex h-9 items-center justify-center rounded-lg px-3 text-xs font-black transition",
         variant === "primary"
-          ? "bg-stone-950 text-white hover:bg-stone-800"
-          : "border border-black/10 bg-white text-stone-800 hover:border-black/20 hover:text-stone-950",
+          ? "bg-blue-600 text-white hover:bg-blue-700"
+          : "border border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:text-blue-700",
       )}
     >
       {children}

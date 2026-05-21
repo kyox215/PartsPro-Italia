@@ -16,8 +16,6 @@ import type {
 import type { AccountCompany } from "@/lib/account-company";
 import {
   formatAccountRole,
-  formatFulfillmentStatus,
-  formatFulfillmentType,
   formatOrderStatus,
   formatPaymentMethod,
   formatPaymentStatus,
@@ -91,9 +89,7 @@ export function AccountTodoPanel({
     if (!order.reservationExpiresAt) return false;
     return Date.parse(order.reservationExpiresAt) - generatedAtMs < 6 * 60 * 60 * 1000;
   });
-  const preorderOrders = activity.orders.filter(
-    (order) => order.fulfillmentStatus === "awaiting_preorder",
-  );
+  const preorderOrders = activity.orders.filter(hasArrivalHint);
   const shippedOrders = activity.orders.filter((order) => order.status === "shipped");
   const todos = [
     ...pendingPayments.slice(0, 3).map((order) => ({
@@ -118,7 +114,10 @@ export function AccountTodoPanel({
     ...preorderOrders.slice(0, 2).map((order) => ({
       key: `preorder-${order.id}`,
       title: locale === "it" ? "Preorder in attesa" : "预购等待到货",
-      description: formatFulfillmentStatus(order.fulfillmentStatus, locale).description,
+      description:
+        locale === "it"
+          ? "Una parte dell'ordine ha arrivo stimato."
+          : "订单中包含预计到货商品。",
       href: localizePath(locale, `/account/orders/${orderRouteId(order)}`),
       tone: "blue" as const,
     })),
@@ -309,9 +308,9 @@ export function AccountOrdersTable({
                       </span>
                       {" x "}
                       {item.quantity}
-                      {item.fulfillmentType ? (
-                        <Badge className="ml-2 border-blue-200 bg-blue-50 text-blue-700">
-                          {formatFulfillmentType(item.fulfillmentType, locale)}
+                      {item.preorderLeadTimeMinDays && item.preorderLeadTimeMaxDays ? (
+                        <Badge className="ml-2 border-amber-200 bg-amber-50 text-amber-700">
+                          {locale === "it" ? "Arrivo" : "预计到货"} {item.preorderLeadTimeMinDays}-{item.preorderLeadTimeMaxDays}d
                         </Badge>
                       ) : null}
                     </li>
@@ -333,9 +332,9 @@ export function AccountOrdersTable({
                 <Badge className={statusBadgeClass(formatOrderStatus(order.status, locale).tone)}>
                   {formatOrderStatus(order.status, locale).label}
                 </Badge>
-                {order.fulfillmentStatus ? (
+                {hasArrivalHint(order) ? (
                   <p className="mt-2 text-xs font-semibold text-slate-500">
-                    {formatFulfillmentStatus(order.fulfillmentStatus, locale).label}
+                    {locale === "it" ? "Arrivo stimato presente" : "含预计到货商品"}
                   </p>
                 ) : null}
               </td>
@@ -426,6 +425,12 @@ export function AccountFeedback({
           : `订单 ${orderId} 已创建。状态：${formatPaymentStatus(status, locale).label}。`
         : null}
     </div>
+  );
+}
+
+function hasArrivalHint(order: AccountOrderRow) {
+  return order.items.some(
+    (item) => item.preorderLeadTimeMinDays && item.preorderLeadTimeMaxDays,
   );
 }
 

@@ -111,12 +111,6 @@ export const adminProductStateSchema = z.object({
   returnTo: z.string().optional().or(z.literal("")),
 });
 
-export const adminProductBulkSchema = z.object({
-  locale: z.enum(["it", "zh"]).default("it"),
-  action: z.enum(["publish", "archive"]),
-  ids: z.string().min(1),
-});
-
 export const adminCatalogImportSchema = z.object({
   locale: z.enum(["it", "zh"]).default("it"),
   batchSize: z.coerce.number().int().positive().max(5000).default(500),
@@ -196,11 +190,8 @@ export const adminInventoryReorderSettingsSchema = z.object({
 export const adminOrderStatusSchema = z.object({
   id: z.string().min(1),
   status: z.enum([
-    "draft",
-    "checkout_created",
     "pending_payment",
     "paid",
-    "processing",
     "shipped",
     "completed",
     "cancelled",
@@ -212,13 +203,6 @@ export const adminOrderStatusSchema = z.object({
 export const adminOrderPaymentSchema = z.object({
   id: z.string().min(1),
   action: z.enum(["confirm_cash", "confirm_bank_transfer"]),
-  locale: z.enum(["it", "zh"]).default("it"),
-  returnTo: z.string().optional().or(z.literal("")),
-});
-
-export const adminOrderFulfillmentSchema = z.object({
-  id: z.string().min(1),
-  action: z.enum(["start_picking", "mark_shipped", "mark_picked_up", "complete"]),
   locale: z.enum(["it", "zh"]).default("it"),
   returnTo: z.string().optional().or(z.literal("")),
 });
@@ -313,7 +297,10 @@ export const adminAccountCustomerAccessSchema = z.object({
     "archived",
   ]).default("active"),
   nextFollowUpAt: z.string().optional().or(z.literal("")),
-  staffRole: z.enum(["none", "owner", "manager", "sales", "catalog", "warehouse", "finance", "support"]).optional(),
+  staffRole: z
+    .string()
+    .regex(/^(none|[a-z][a-z0-9_-]{1,40})$/)
+    .optional(),
   staffStatus: z.enum(["active", "suspended", "archived"]).default("active").optional(),
 });
 
@@ -330,14 +317,28 @@ export const adminStaffMemberSchema = z.object({
   locale: z.enum(["it", "zh"]).default("it"),
   returnTo: z.string().optional().or(z.literal("")),
   email: z.string().email(),
-  role: z.enum(["owner", "manager", "sales", "catalog", "warehouse", "finance", "support"]),
+  role: z.string().regex(/^[a-z][a-z0-9_-]{1,40}$/),
   status: z.enum(["active", "suspended", "archived"]).default("active"),
 });
 
 export const adminStaffPermissionMatrixSchema = z.object({
   locale: z.enum(["it", "zh"]).default("it"),
   returnTo: z.string().optional().or(z.literal("")),
-  role: z.enum(["manager", "sales", "catalog", "warehouse", "finance", "support"]),
+  role: z.string().regex(/^[a-z][a-z0-9_-]{1,40}$/).refine((role) => role !== "owner", {
+    message: "owner role is read-only",
+  }),
+});
+
+export const adminStaffRoleSchema = z.object({
+  locale: z.enum(["it", "zh"]).default("it"),
+  returnTo: z.string().optional().or(z.literal("")),
+  action: z.enum(["create", "rename", "deactivate"]),
+  role: z.string().regex(/^[a-z][a-z0-9_-]{1,40}$/),
+  newRole: z
+    .string()
+    .regex(/^[a-z][a-z0-9_-]{1,40}$/)
+    .optional()
+    .or(z.literal("")),
 });
 
 export const adminCustomerNoteSchema = z.object({

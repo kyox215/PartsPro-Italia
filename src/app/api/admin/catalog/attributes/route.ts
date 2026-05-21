@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { recordAdminActivity } from "@/lib/admin-audit";
 import { redirectOnInvalidAdminCsrf } from "@/lib/admin-security";
-import { assertAdmin } from "@/lib/auth";
+import { assertAdminPermission } from "@/lib/auth";
 import { normalizeAttributeKey } from "@/lib/admin-catalog";
 import { parseRequestBody } from "@/lib/request";
 import {
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
   if (csrfRedirect) return csrfRedirect;
 
-  const admin = await assertAdmin();
+  const admin = await assertAdminPermission("products:write");
   if (!admin.ok) {
     backUrl.searchParams.set("error", admin.error);
     return NextResponse.redirect(backUrl, 303);

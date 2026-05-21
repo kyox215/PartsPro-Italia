@@ -20,11 +20,8 @@ import { displayOrderNumber, orderRouteId } from "@/lib/order-number";
 import { formatMoney } from "@/lib/pricing";
 
 const orderStatuses = [
-  "draft",
-  "checkout_created",
   "pending_payment",
   "paid",
-  "processing",
   "shipped",
   "completed",
   "cancelled",
@@ -50,15 +47,10 @@ export default async function AdminOrdersPage({
   const saved = valueOf(query.saved);
   const error = valueOf(query.error);
   const orderStatusLabels = getStatusSelectLabels("order", orderStatuses, locale);
-  const paymentQueueCount =
-    orderCounts.pending_cash + orderCounts.pending_bank_transfer + orderCounts.pending_card;
-
   const filterItems = [
     ["all", locale === "it" ? "Tutti" : "全部"],
     ["pending_payment", locale === "it" ? "Da pagare" : "待付款"],
     ["paid", locale === "it" ? "Pagati" : "已付款"],
-    ["preorder", locale === "it" ? "Preorder" : "预购待分配"],
-    ["processing", locale === "it" ? "In lavorazione" : "处理中"],
     ["shipped", locale === "it" ? "Spediti" : "已发货"],
     ["completed", locale === "it" ? "Completati" : "已完成"],
     ["refunded", locale === "it" ? "Rimborsati" : "已退款"],
@@ -80,11 +72,6 @@ export default async function AdminOrdersPage({
             ? "Cerca, filtra e apri l'ordine con il numero breve. UUID resta solo come ID interno."
             : "先搜索/筛选，再进入订单处理；页面显示短订单号，UUID 仅作为内部 ID。"
         }
-        actions={
-          <AdminButtonLink href={localizePath(locale, "/admin/orders/payments")}>
-            {locale === "it" ? "Pagamenti" : "处理付款"}
-          </AdminButtonLink>
-        }
       />
 
       <SystemNotice configured={auth.configured} isAdmin={auth.isAdmin} locale={locale} />
@@ -93,8 +80,6 @@ export default async function AdminOrdersPage({
         active="overview"
         counts={{
           overview: orders.length,
-          payments: paymentQueueCount,
-          fulfillment: orderCounts.preorder + orderCounts.processing + orderCounts.shipped,
           timeline: orders.reduce((sum, order) => sum + order.timelineEvents.length, 0),
         }}
         locale={locale}
@@ -176,8 +161,6 @@ export default async function AdminOrdersPage({
                 {visibleOrders.map((order) => {
                   const paymentStatus = formatAdminStatus("payment", order.paymentStatus ?? "-", locale);
                   const paymentMethod = formatAdminStatus("paymentMethod", order.paymentMethod, locale);
-                  const fulfillmentStatus = formatAdminStatus("fulfillment", order.fulfillmentStatus ?? "-", locale);
-
                   return (
                     <tr key={order.id} className="align-top hover:bg-stone-50">
                       <td className="w-[160px] px-2 py-2">
@@ -226,9 +209,6 @@ export default async function AdminOrdersPage({
                           statuses={orderStatuses}
                           submitLabel={locale === "it" ? "Salva" : "保存"}
                         />
-                        <div className="mt-1">
-                          <StatusPill status={fulfillmentStatus.label} tone={fulfillmentStatus.tone} />
-                        </div>
                       </td>
                       <td className="w-[74px] px-2 py-2">
                         <AdminButtonLink
@@ -284,7 +264,6 @@ function MobileOrderCard({ order, locale }: Readonly<{ order: AdminOrder; locale
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-stone-500">
         <LocalizedStatusPill kind="payment" locale={locale} value={order.paymentStatus ?? "-"} />
-        <LocalizedStatusPill kind="fulfillment" locale={locale} value={order.fulfillmentStatus ?? "-"} />
         <span>{formatMoney(order.total, locale)}</span>
       </div>
       <div className="mt-3">
@@ -437,10 +416,6 @@ function filterAdminOrders(
       if (!["pending_card", "pending_cash", "pending_bank_transfer"].includes(order.paymentStatus ?? "")) return false;
     } else if (filter === "paid") {
       if (order.paymentStatus !== "paid") return false;
-    } else if (filter === "preorder") {
-      if (order.fulfillmentStatus !== "awaiting_preorder") return false;
-    } else if (filter === "processing") {
-      if (order.status !== "processing") return false;
     } else if (filter === "shipped") {
       if (order.status !== "shipped") return false;
     } else if (filter === "completed") {
@@ -462,14 +437,13 @@ function filterAdminOrders(
         order.email,
         order.paymentMethod,
         order.paymentStatus,
-        order.fulfillmentStatus,
         order.shippingCarrier,
         order.trackingNumber,
         order.trackingUrl,
         order.shipmentNote,
         order.customerNote,
         order.status,
-        ...order.items.flatMap((item) => [item.sku, item.name, item.fulfillmentType]),
+        ...order.items.flatMap((item) => [item.sku, item.name]),
       ]
         .filter(Boolean)
         .join(" "),
@@ -483,8 +457,6 @@ function getOrderFilterCounts(orders: Awaited<ReturnType<typeof getAdminOrderRow
     all: orders.length,
     pending_payment: 0,
     paid: 0,
-    preorder: 0,
-    processing: 0,
     shipped: 0,
     completed: 0,
     refunded: 0,
@@ -504,8 +476,6 @@ function getOrderFilterCounts(orders: Awaited<ReturnType<typeof getAdminOrderRow
       counts.pending_payment += 1;
     }
     if (order.paymentStatus === "paid") counts.paid += 1;
-    if (order.fulfillmentStatus === "awaiting_preorder") counts.preorder += 1;
-    if (order.status === "processing") counts.processing += 1;
     if (order.status === "shipped") counts.shipped += 1;
     if (order.status === "completed") counts.completed += 1;
     if (order.paymentStatus === "refunded" || (order.refundTotal ?? 0) > 0) {

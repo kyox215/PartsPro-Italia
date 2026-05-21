@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
 import { recordAdminActivity } from "@/lib/admin-audit";
 import { redirectOnInvalidAdminCsrf } from "@/lib/admin-security";
-import { assertAdmin } from "@/lib/auth";
+import { assertAdminPermission } from "@/lib/auth";
 import {
   parseSupplierCartWorkbook,
   toSupplierCartPayload,
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   const csrfRedirect = redirectOnInvalidAdminCsrf(request, formData, backUrl);
   if (csrfRedirect) return csrfRedirect;
 
-  const admin = await assertAdmin();
+  const admin = await assertAdminPermission("inventory:write");
 
   if (!admin.ok) {
     backUrl.searchParams.set("error", admin.error);

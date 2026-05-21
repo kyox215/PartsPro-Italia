@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { assertAdmin } from "@/lib/auth";
+import { assertAdminPermission } from "@/lib/auth";
 import { getSystemHealth } from "@/lib/system-health";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const admin = await assertAdmin();
+  const admin = await assertAdminPermission("system:read");
   if (!admin.ok) {
     return NextResponse.json({ error: admin.error }, { status: admin.status });
   }

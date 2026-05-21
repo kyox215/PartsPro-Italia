@@ -3,7 +3,7 @@ import {
   AdminShell,
   type AdminNavItem,
 } from "@/components/admin/admin-shell";
-import { hasAdminPermission, staffRoleLabels, type AdminPermission } from "@/lib/admin-permissions";
+import { getStaffRoleLabel, hasAdminPermission, type AdminPermission } from "@/lib/admin-permissions";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
 
@@ -39,20 +39,20 @@ export default async function AdminLayout({
   const rawNavItems: GuardedAdminNavItem[] = [
     {
       href: localizePath(locale, "/admin"),
-      label: locale === "it" ? "Dashboard" : "后台总览",
-      description: locale === "it" ? "Metriche operative" : "运营指标",
+      label: locale === "it" ? "Dashboard" : "总览",
+      description: locale === "it" ? "Vendite e task" : "销售与待办",
       icon: "home",
     },
     {
       href: localizePath(locale, "/admin/products"),
-      label: locale === "it" ? "Prodotti" : "商品 SKU",
+      label: locale === "it" ? "Prodotti" : "商品管理",
       description: locale === "it" ? "Catalogo e prezzi" : "目录与价格",
       icon: "package",
       permission: "products:write",
     },
     {
       href: localizePath(locale, "/admin/inventory"),
-      label: locale === "it" ? "Inventario" : "库存预购",
+      label: locale === "it" ? "Inventario" : "库存管理",
       description: locale === "it" ? "Arrivi e ammanchi" : "到货与缺货",
       icon: "warehouse",
       permission: "inventory:write",
@@ -85,8 +85,8 @@ export default async function AdminLayout({
     },
     {
       href: localizePath(locale, "/admin/orders"),
-      label: locale === "it" ? "Ordini" : "订单付款",
-      description: locale === "it" ? "Fulfilment e stati" : "履约与状态",
+      label: locale === "it" ? "Ordini" : "订单管理",
+      description: locale === "it" ? "Stati e logistica" : "状态、收款与物流",
       icon: "clipboard",
       permission: "orders:write",
       children: [
@@ -94,18 +94,6 @@ export default async function AdminLayout({
           href: localizePath(locale, "/admin/orders"),
           label: locale === "it" ? "Panoramica" : "订单总览",
           icon: "clipboard",
-          permission: "orders:write",
-        },
-        {
-          href: localizePath(locale, "/admin/orders/payments"),
-          label: locale === "it" ? "Pagamenti" : "付款处理",
-          icon: "settings",
-          permission: "payments:confirm",
-        },
-        {
-          href: localizePath(locale, "/admin/orders/fulfillment"),
-          label: locale === "it" ? "Fulfilment" : "履约处理",
-          icon: "warehouse",
           permission: "orders:write",
         },
         {
@@ -117,38 +105,56 @@ export default async function AdminLayout({
       ],
     },
     {
-      href: localizePath(locale, "/admin/accounts"),
-      label: locale === "it" ? "Account" : "账号管理",
-      description: locale === "it" ? "Clienti e ruoli" : "客户与权限",
+      href: localizePath(locale, "/admin/accounts/customers"),
+      label: locale === "it" ? "Clienti" : "客户管理",
+      description: locale === "it" ? "CRM e fatturato" : "CRM 与成交",
       icon: "users",
       permission: "accounts:read",
+    },
+    {
+      href: localizePath(locale, "/admin/settings"),
+      label: locale === "it" ? "Impostazioni" : "设置",
+      description: locale === "it" ? "Permessi e strumenti" : "权限与工具",
+      icon: "settings",
+      permission: "system:read",
       children: [
         {
-          href: localizePath(locale, "/admin/accounts/customers"),
-          label: locale === "it" ? "Clienti" : "客户管理",
-          icon: "users",
-          permission: "accounts:read",
-        },
-        {
-          href: localizePath(locale, "/admin/accounts/permissions"),
-          label: locale === "it" ? "Permessi" : "权限管理",
+          href: localizePath(locale, "/admin/settings/permissions"),
+          label: locale === "it" ? "Permessi" : "权限设置",
           icon: "settings",
           permission: "staff:manage",
         },
         {
-          href: localizePath(locale, "/admin/accounts/audit-log"),
+          href: localizePath(locale, "/admin/settings/products"),
+          label: locale === "it" ? "Prodotti" : "商品设置",
+          icon: "package",
+          permission: "products:write",
+        },
+        {
+          href: localizePath(locale, "/admin/settings/inventory"),
+          label: locale === "it" ? "Inventario" : "库存设置",
+          icon: "warehouse",
+          permission: "inventory:write",
+        },
+        {
+          href: localizePath(locale, "/admin/settings/orders"),
+          label: locale === "it" ? "Ordini" : "订单设置",
+          icon: "clipboard",
+          permission: "orders:write",
+        },
+        {
+          href: localizePath(locale, "/admin/settings/audit-log"),
           label: locale === "it" ? "Audit log" : "操作日志",
           icon: "activity",
           permission: "audit:read",
         },
+        {
+          href: localizePath(locale, "/admin/system"),
+          label: locale === "it" ? "Sistema" : "系统健康",
+          icon: "activity",
+          permission: "system:read",
+        },
       ],
-    },
-    {
-      href: localizePath(locale, "/admin/system"),
-      label: locale === "it" ? "Sistema" : "系统状态",
-      description: locale === "it" ? "Env e database" : "环境与数据库",
-      icon: "settings",
-      permission: "system:read",
     },
   ];
 
@@ -159,8 +165,8 @@ export default async function AdminLayout({
 
   return (
     <AdminShell
-      title={locale === "it" ? "Admin" : "管理员后台"}
-      subtitle={locale === "it" ? "Pannello operativo" : "运营工作台"}
+      title="PartsPro"
+      subtitle={locale === "it" ? "Pannello admin" : "管理后台"}
       navItems={navItems}
       locale={locale}
       identityEmail={auth.user?.email ?? (!auth.configured ? "demo-admin" : undefined)}
@@ -186,6 +192,6 @@ function getIdentityRoleLabel(
   locale: Locale,
 ) {
   if (auth.isAdmin) return locale === "it" ? "Admin owner" : "总管理员";
-  if (auth.staffRole) return staffRoleLabels[auth.staffRole][locale];
+  if (auth.staffRole) return getStaffRoleLabel(auth.staffRole, locale);
   return locale === "it" ? "Admin" : "管理员";
 }

@@ -22,7 +22,7 @@ export type CheckoutLine = {
   total: number;
   availableStock: number;
   incomingAvailable: number;
-  fulfillmentType: "stock" | "preorder" | "mixed";
+  stockSourceType: "stock" | "preorder" | "mixed";
   preorderLeadTimeMinDays: number;
   preorderLeadTimeMaxDays: number;
 };
@@ -105,7 +105,7 @@ export async function loadCheckoutLines({
               total: subtotal + vat,
               availableStock,
               incomingAvailable,
-              fulfillmentType: getFulfillmentType(
+              stockSourceType: getStockSourceType(
                 item.quantity,
                 availableStock,
                 incomingAvailable,
@@ -152,7 +152,7 @@ export async function loadCheckoutLines({
           total: totals.subtotal + totals.vat,
           availableStock: product.stock,
           incomingAvailable: product.incoming ?? 0,
-          fulfillmentType: getFulfillmentType(
+          stockSourceType: getStockSourceType(
             item.quantity,
             product.stock,
             product.incoming ?? 0,
@@ -167,7 +167,7 @@ export async function loadCheckoutLines({
   };
 }
 
-export function getFulfillmentType(
+export function getStockSourceType(
   quantity: number,
   availableStock: number,
   incomingAvailable: number,

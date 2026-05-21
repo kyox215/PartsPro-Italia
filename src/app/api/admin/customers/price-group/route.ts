@@ -5,7 +5,7 @@ import {
   redirectOnInvalidAdminCsrf,
 } from "@/lib/admin-security";
 import { normalizeCustomerType, toStoredCustomerPriceGroup } from "@/lib/admin-display";
-import { assertAdmin } from "@/lib/auth";
+import { assertAdminPermission } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
 import {
   getSupabaseAdminClient,
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
   if (csrfRedirect) return csrfRedirect;
 
-  const admin = await assertAdmin();
+  const admin = await assertAdminPermission("accounts:write");
   if (!admin.ok) {
     backUrl.searchParams.set("error", admin.error);
     return NextResponse.redirect(backUrl, 303);

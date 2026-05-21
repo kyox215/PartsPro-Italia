@@ -9,7 +9,7 @@ import {
   getAdminBackUrl,
   redirectOnInvalidAdminCsrf,
 } from "@/lib/admin-security";
-import { assertAdmin } from "@/lib/auth";
+import { assertAdminPermission } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
 import {
   getSupabaseAdminClient,
@@ -20,7 +20,7 @@ import { adminProductSchema } from "@/lib/validations";
 export const runtime = "nodejs";
 
 export async function GET() {
-  const admin = await assertAdmin();
+  const admin = await assertAdminPermission("products:write");
 
   if (!admin.ok) {
     return NextResponse.json({ error: admin.error }, { status: admin.status });
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
   const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
   if (csrfRedirect) return csrfRedirect;
 
-  const admin = await assertAdmin();
+  const admin = await assertAdminPermission("products:write");
 
   if (!admin.ok) {
     backUrl.searchParams.set("error", admin.error);

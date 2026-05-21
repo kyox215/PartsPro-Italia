@@ -30,9 +30,9 @@ export function AdminShell({
   const siteHomeHref = `/${locale}`;
 
   return (
-    <div className="min-h-screen bg-[#eeeeec] text-stone-950">
+    <div className="min-h-screen bg-slate-50 text-slate-950">
       <div className="mx-auto flex min-h-screen w-full max-w-[1760px]">
-        <aside className="hidden w-[252px] shrink-0 border-r border-black/5 bg-[#f8f8f6] px-3 py-3 lg:block">
+        <aside className="hidden w-[248px] shrink-0 border-r border-slate-200 bg-white px-4 py-5 lg:block">
           <div className="sticky top-3 flex h-[calc(100vh-24px)] flex-col">
             <AdminBrand title={title} subtitle={subtitle} />
             <AdminDesktopNav items={navItems} locale={locale} />
@@ -58,7 +58,7 @@ export function AdminShell({
             showSignOut={showSignOut}
             siteHomeHref={siteHomeHref}
           />
-          <main className="min-w-0 px-3 py-3 sm:px-4 lg:px-5 lg:py-4">{children}</main>
+          <main className="min-w-0 px-3 py-3 sm:px-4 lg:px-6 lg:py-5">{children}</main>
         </div>
       </div>
     </div>

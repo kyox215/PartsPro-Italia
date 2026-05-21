@@ -18,7 +18,6 @@ type OwnedOrder = {
   status: string;
   payment_method: string;
   payment_status: string | null;
-  fulfillment_status: string | null;
   total: number | string | null;
   currency: string | null;
   released_at?: string | null;

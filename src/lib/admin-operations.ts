@@ -12,7 +12,6 @@ export type AdminOrderRow = {
   profileId?: string | null;
   status: string;
   paymentStatus?: string | null;
-  fulfillmentStatus?: string | null;
   paymentMethod: string;
   email: string | null;
   customerName: string | null;
@@ -31,7 +30,6 @@ export type AdminOrderRow = {
   releasedAt?: string | null;
   paidAt?: string | null;
   cancelledAt?: string | null;
-  fulfilledAt?: string | null;
   shippingCarrier?: string | null;
   trackingNumber?: string | null;
   trackingUrl?: string | null;
@@ -47,9 +45,6 @@ export type AdminOrderRow = {
     nameZh?: string | null;
     quantity: number;
     unitPrice: number;
-    fulfillmentType?: string;
-    stockQty?: number;
-    preorderQty?: number;
     preorderLeadTimeMinDays?: number | null;
     preorderLeadTimeMaxDays?: number | null;
   }>;
@@ -124,7 +119,6 @@ export async function getAdminOrderRows(): Promise<AdminOrderRow[]> {
         status: "pending_payment",
         profileId: "demo-profile",
         paymentStatus: "pending_bank_transfer",
-        fulfillmentStatus: "awaiting_preorder",
         paymentMethod: "bank_transfer",
         email: "riparatore@example.it",
         customerName: "Marco Rossi",
@@ -140,7 +134,6 @@ export async function getAdminOrderRows(): Promise<AdminOrderRow[]> {
         releasedAt: null,
         paidAt: null,
         cancelledAt: null,
-        fulfilledAt: null,
         shippingCarrier: "DHL",
         trackingNumber: "DEMO123456",
         trackingUrl: "https://www.dhl.com/",
@@ -155,18 +148,12 @@ export async function getAdminOrderRows(): Promise<AdminOrderRow[]> {
             name: products[0].names.it,
             quantity: 5,
             unitPrice: products[0].b2bPrice,
-            fulfillmentType: "stock",
-            stockQty: 5,
-            preorderQty: 0,
           },
           {
             sku: products[1].sku,
             name: products[1].names.it,
             quantity: 10,
             unitPrice: products[1].b2bPrice,
-            fulfillmentType: "mixed",
-            stockQty: 5,
-            preorderQty: 5,
             preorderLeadTimeMinDays: 7,
             preorderLeadTimeMaxDays: 14,
           },
@@ -383,7 +370,7 @@ export async function getAdminDashboardMetrics() {
     pendingBankTransferCount: orderSummary.pendingBankTransferCount,
     pendingCardCount: orderSummary.pendingCardCount,
     expiringReservationCount: orderSummary.expiringReservationCount,
-    preorderAllocationCount: orderSummary.preorderAllocationCount,
+    preorderAllocationCount: 0,
     preorderIncomingTotal,
     revenueTotal: orderSummary.revenueTotal,
   };
@@ -409,9 +396,7 @@ function summarizeDashboardMetrics({
     pendingCardCount: orders.filter((order) => order.paymentStatus === "pending_card")
       .length,
     expiringReservationCount: orders.filter(isAdminReservationExpiringSoon).length,
-    preorderAllocationCount: orders.filter(
-      (order) => order.fulfillmentStatus === "awaiting_preorder",
-    ).length,
+    preorderAllocationCount: 0,
     preorderIncomingTotal,
     revenueTotal: orders.reduce(
       (sum, order) => sum + order.total - (order.refundTotal ?? 0),
@@ -425,7 +410,7 @@ async function getAdminOrderMetricRows() {
   const { data, error, count } = await supabase
     .from("orders")
     .select(
-      "status, payment_status, fulfillment_status, total, refund_total, reservation_expires_at, released_at",
+      "status, payment_status, total, refund_total, reservation_expires_at, released_at",
       { count: "exact" },
     )
     .order("created_at", { ascending: false })
@@ -440,7 +425,6 @@ async function getAdminOrderMetricRows() {
       pendingBankTransferCount: 0,
       pendingCardCount: 0,
       expiringReservationCount: 0,
-      preorderAllocationCount: 0,
       revenueTotal: 0,
     };
   }
@@ -452,7 +436,6 @@ async function getAdminOrderMetricRows() {
     pendingBankTransferCount: 0,
     pendingCardCount: 0,
     expiringReservationCount: 0,
-    preorderAllocationCount: 0,
     revenueTotal: 0,
   };
 
@@ -465,9 +448,6 @@ async function getAdminOrderMetricRows() {
     if (paymentStatus === "pending_card") summary.pendingCardCount += 1;
     if (["pending_cash", "pending_bank_transfer", "pending_card"].includes(paymentStatus)) {
       summary.pendingPaymentCount += 1;
-    }
-    if (order.fulfillment_status === "awaiting_preorder") {
-      summary.preorderAllocationCount += 1;
     }
     if (
       order.reservation_expires_at &&
@@ -578,7 +558,6 @@ function mapAdminOrder(order: {
   profile_id?: string | null;
   status: string;
   payment_status?: string | null;
-  fulfillment_status?: string | null;
   payment_method: string;
   email: string | null;
   customer_name: string | null;
@@ -597,7 +576,6 @@ function mapAdminOrder(order: {
   released_at?: string | null;
   paid_at?: string | null;
   cancelled_at?: string | null;
-  fulfilled_at?: string | null;
   shipping_carrier?: string | null;
   tracking_number?: string | null;
   tracking_url?: string | null;
@@ -611,9 +589,6 @@ function mapAdminOrder(order: {
     name: string;
     quantity: number;
     unit_price: number | string;
-    fulfillment_type?: string;
-    stock_qty?: number;
-    preorder_qty?: number;
     preorder_lead_time_min_days?: number | null;
     preorder_lead_time_max_days?: number | null;
   }> | null;
@@ -669,7 +644,6 @@ function mapAdminOrder(order: {
     profileId: order.profile_id ?? null,
     status: order.status,
     paymentStatus: order.payment_status ?? null,
-    fulfillmentStatus: order.fulfillment_status ?? null,
     paymentMethod: order.payment_method,
     email: order.email,
     customerName: order.customer_name,
@@ -688,7 +662,6 @@ function mapAdminOrder(order: {
     releasedAt: order.released_at ?? null,
     paidAt: order.paid_at ?? null,
     cancelledAt: order.cancelled_at ?? null,
-    fulfilledAt: order.fulfilled_at ?? null,
     shippingCarrier: order.shipping_carrier ?? null,
     trackingNumber: order.tracking_number ?? null,
     trackingUrl: order.tracking_url ?? null,
@@ -704,9 +677,6 @@ function mapAdminOrder(order: {
       nameZh: null,
       quantity: item.quantity,
       unitPrice: Number(item.unit_price ?? 0),
-      fulfillmentType: item.fulfillment_type,
-      stockQty: item.stock_qty,
-      preorderQty: item.preorder_qty,
       preorderLeadTimeMinDays: item.preorder_lead_time_min_days ?? null,
       preorderLeadTimeMaxDays: item.preorder_lead_time_max_days ?? null,
     })),

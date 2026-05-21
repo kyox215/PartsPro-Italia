@@ -31,9 +31,9 @@ import {
   formatCustomerType,
   normalizeCustomerType,
 } from "@/lib/admin-display";
-import { getCustomerAuditEvents, type CustomerAuditEventRow } from "@/lib/admin-accounts";
+import { getCustomerAuditEvents, getStaffRoleSummaries, type CustomerAuditEventRow } from "@/lib/admin-accounts";
 import { getAdminCustomerDetail, type AdminCustomerDetail } from "@/lib/admin-customers";
-import { hasAdminPermission, staffRoleLabels, staffRoleOptions } from "@/lib/admin-permissions";
+import { hasAdminPermission } from "@/lib/admin-permissions";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
 import { displayOrderNumber, orderRouteId } from "@/lib/order-number";
@@ -63,6 +63,8 @@ export default async function AdminAccountCustomerDetailPage({
   if (!customer) notFound();
 
   const auditEvents = auth.configured ? await getCustomerAuditEvents(120) : [];
+  const canManageStaff = !auth.configured || hasAdminPermission(auth, "staff:manage");
+  const roleSummaries = canManageStaff ? await getStaffRoleSummaries(locale) : [];
   const customerPath = localizePath(locale, `/admin/accounts/customers/${customer.id}`);
   const source = formatAdminStatus("customerSource", customer.source, locale);
   const account = formatAdminStatus("account", customer.accountStatus, locale);
@@ -78,7 +80,6 @@ export default async function AdminAccountCustomerDetailPage({
       ? formatAdminStatus("staffRole", "admin", locale)
       : formatCustomerType(customer.profileRole, locale)
     : null;
-  const canManageStaff = !auth.configured || hasAdminPermission(auth, "staff:manage");
   const timeline = buildTimeline(customer, auditEvents, locale);
 
   return (
@@ -148,8 +149,8 @@ export default async function AdminAccountCustomerDetailPage({
               <>
                 <AdminSelect name="staffRole" label={locale === "it" ? "Ruolo staff" : "员工角色"} defaultValue={customer.staffRole && customer.staffStatus !== "archived" ? customer.staffRole : "none"}>
                   <option value="none">{locale === "it" ? "Nessun accesso admin" : "无后台权限"}</option>
-                  {staffRoleOptions.map((roleOption) => (
-                    <option key={roleOption} value={roleOption}>{staffRoleLabels[roleOption][locale]}</option>
+                  {roleSummaries.map((roleOption) => (
+                    <option key={roleOption.role} value={roleOption.role}>{roleOption.label}</option>
                   ))}
                 </AdminSelect>
                 <AdminSelect name="staffStatus" label={locale === "it" ? "Stato staff" : "员工状态"} defaultValue={customer.staffStatus ?? "active"}>

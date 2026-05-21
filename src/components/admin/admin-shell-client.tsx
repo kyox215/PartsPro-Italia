@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Activity,
   Bell,
@@ -77,11 +77,10 @@ export function AdminTopBarClient({
 }>) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const hideGlobalSearch = /\/admin\/orders(?:\/|$)/.test(pathname);
 
   return (
     <>
-      <header className="mobile-no-blur sticky top-0 z-20 border-b border-black/5 bg-[#eeeeec]/95 px-3 py-2 backdrop-blur sm:px-4 lg:px-5">
+      <header className="mobile-no-blur sticky top-0 z-20 border-b border-slate-200/80 bg-slate-50/95 px-3 py-3 backdrop-blur sm:px-4 lg:px-6">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -93,28 +92,7 @@ export function AdminTopBarClient({
             <Menu className="h-5 w-5" />
           </button>
 
-          {hideGlobalSearch ? (
-            <div className="hidden min-w-0 flex-1 md:block">
-              <p className="truncate text-sm font-black text-stone-950">{subtitle}</p>
-              <p className="truncate text-xs font-semibold text-stone-500">{title}</p>
-            </div>
-          ) : (
-            <div className="hidden min-w-0 flex-1 items-center rounded-lg border border-black/5 bg-white px-2.5 py-1.5 shadow-sm md:flex">
-              <Search className="h-4 w-4 shrink-0 text-stone-400" />
-              <input
-                className="h-6 min-w-0 flex-1 border-0 bg-transparent px-2.5 text-sm font-medium text-stone-900 outline-none placeholder:text-stone-400"
-                placeholder={
-                  locale === "it"
-                    ? "Cerca ordini, SKU, clienti..."
-                    : "搜索订单、SKU、客户..."
-                }
-                aria-label={locale === "it" ? "Cerca" : "搜索"}
-              />
-              <span className="rounded-md bg-stone-100 px-2 py-1 text-xs font-bold text-stone-500">
-                ⌘K
-              </span>
-            </div>
-          )}
+          <AdminGlobalSearch locale={locale} />
 
           <div className="min-w-0 flex-1 md:hidden">
             <p className="truncate text-sm font-bold text-stone-950">{subtitle}</p>
@@ -134,8 +112,8 @@ export function AdminTopBarClient({
             </Link>
             <IconButton label={locale === "it" ? "Messaggi" : "消息"} icon={MessageCircle} />
             <IconButton label={locale === "it" ? "Notifiche" : "通知"} icon={Bell} />
-            <div className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-black/5 bg-white px-2 shadow-sm">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-stone-950 text-[10px] font-black text-white">
+            <div className="flex h-9 min-w-0 items-center gap-2 rounded-full border border-slate-200 bg-white px-2 shadow-sm">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-black text-white">
                 {shortName}
               </span>
               <span className="hidden max-w-[160px] truncate text-xs font-bold text-stone-800 sm:block">
@@ -154,7 +132,7 @@ export function AdminTopBarClient({
             onClick={() => setMobileOpen(false)}
             aria-label={locale === "it" ? "Chiudi menu" : "关闭菜单"}
           />
-          <aside className="absolute inset-y-0 left-0 flex w-[min(88vw,300px)] flex-col bg-[#f8f8f6] px-3 py-3 shadow-xl">
+          <aside className="absolute inset-y-0 left-0 flex w-[min(88vw,300px)] flex-col bg-white px-3 py-3 shadow-xl">
             <div className="mb-4 flex items-start justify-between gap-3">
               <AdminBrand title={title} subtitle={subtitle} compact />
               <button
@@ -187,6 +165,128 @@ export function AdminTopBarClient({
         </div>
       ) : null}
     </>
+  );
+}
+
+type SearchResult = {
+  label: string;
+  description: string;
+  href: string;
+  type: "customer" | "order" | "product";
+};
+
+function AdminGlobalSearch({ locale }: Readonly<{ locale: "it" | "zh" }>) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      try {
+        const response = await fetch(
+          `/api/admin/search?q=${encodeURIComponent(trimmed)}&locale=${locale}`,
+          { signal: controller.signal },
+        );
+        if (!response.ok) throw new Error("Search failed");
+        const data = (await response.json()) as { results?: SearchResult[] };
+        setResults(data.results ?? []);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error(error);
+          setResults([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }, 180);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timeout);
+    };
+  }, [locale, query]);
+
+  const open = focused && query.trim().length >= 2;
+  const handleQueryChange = (value: string) => {
+    setQuery(value);
+    if (value.trim().length < 2) {
+      setResults([]);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+  };
+
+  return (
+    <div className="relative hidden min-w-0 flex-1 md:block">
+      <div className="flex h-10 min-w-0 items-center rounded-full border border-slate-200 bg-white px-3 shadow-sm focus-within:border-blue-300 focus-within:ring-4 focus-within:ring-blue-100">
+        <Search className="h-4 w-4 shrink-0 text-slate-400" />
+        <input
+          className="h-8 min-w-0 flex-1 border-0 bg-transparent px-2.5 text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400"
+          placeholder={
+            locale === "it"
+              ? "Cerca clienti, telefono, email, ordini, SKU..."
+              : "搜索客户名称、电话、邮箱、订单、SKU..."
+          }
+          aria-label={locale === "it" ? "Cerca" : "搜索"}
+          value={query}
+          onBlur={() => window.setTimeout(() => setFocused(false), 160)}
+          onChange={(event) => handleQueryChange(event.target.value)}
+          onFocus={() => setFocused(true)}
+        />
+        <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-bold text-slate-500">
+          即时
+        </span>
+      </div>
+
+      {open ? (
+        <div className="absolute left-0 right-0 top-12 z-30 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+          <div className="border-b border-slate-100 px-3 py-2 text-xs font-black text-slate-400">
+            {loading
+              ? locale === "it" ? "Ricerca..." : "搜索中..."
+              : locale === "it" ? "Risultati rapidi" : "快速结果"}
+          </div>
+          {results.length ? (
+            <div className="max-h-96 overflow-auto p-1">
+              {results.map((result) => (
+                <Link
+                  className="grid gap-0.5 rounded-lg px-3 py-2 text-sm transition hover:bg-blue-50"
+                  href={result.href}
+                  key={`${result.type}-${result.href}`}
+                >
+                  <span className="flex items-center gap-2 font-black text-slate-950">
+                    <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] uppercase text-blue-700">
+                      {result.type === "customer"
+                        ? locale === "it" ? "Cliente" : "客户"
+                        : result.type === "order"
+                          ? locale === "it" ? "Ordine" : "订单"
+                          : "SKU"}
+                    </span>
+                    {result.label}
+                  </span>
+                  <span className="truncate text-xs font-semibold text-slate-500">
+                    {result.description}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="px-3 py-5 text-center text-xs font-semibold text-slate-500">
+              {loading
+                ? locale === "it" ? "Caricamento" : "正在加载"
+                : locale === "it" ? "Nessun risultato" : "没有匹配结果"}
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -242,14 +342,14 @@ function AdminNavLink({
         className={cn(
           "grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-lg px-2 py-2 text-xs transition-colors",
           active
-            ? "bg-stone-950 text-white shadow-sm"
-            : "text-stone-700 hover:bg-white hover:text-stone-950",
+            ? "bg-blue-600 text-white shadow-sm shadow-blue-200"
+            : "text-slate-600 hover:bg-blue-50 hover:text-blue-700",
         )}
       >
         <span
           className={cn(
             "flex h-7 w-7 items-center justify-center rounded-md",
-            active ? "bg-white/12 text-white" : "bg-white text-stone-500",
+            active ? "bg-white/15 text-white" : "bg-white text-slate-500",
           )}
         >
           <Icon className="h-4 w-4" />
@@ -260,7 +360,7 @@ function AdminNavLink({
             <span
               className={cn(
                 "mt-0.5 block truncate text-xs font-semibold",
-                active ? "text-stone-300" : "text-stone-500",
+                active ? "text-blue-100" : "text-slate-400",
               )}
             >
               {item.description}
@@ -271,7 +371,7 @@ function AdminNavLink({
           <span
             className={cn(
               "rounded-md px-2 py-1 text-[11px] font-black",
-              active ? "bg-white text-stone-950" : "bg-stone-200 text-stone-700",
+              active ? "bg-white text-blue-700" : "bg-slate-100 text-slate-600",
             )}
           >
             {item.badge}

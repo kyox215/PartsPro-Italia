@@ -27,7 +27,7 @@ type QuoteLine = {
   total: number | null;
   availableStock: number | null;
   incomingAvailable: number | null;
-  fulfillmentType: "stock" | "preorder" | "mixed" | "unknown";
+  stockSourceType: "stock" | "preorder" | "mixed" | "unknown";
   preorderLeadTimeMinDays: number;
   preorderLeadTimeMaxDays: number;
   canOrder: boolean;
@@ -232,7 +232,7 @@ export function CartClient({
                   <CartMetaPill className="bg-slate-100 text-slate-700">
                     MOQ {line.moq}
                   </CartMetaPill>
-                  <FulfillmentPill line={line} locale={locale} />
+                  <StockPill line={line} locale={locale} />
                 </div>
               </div>
 
@@ -328,11 +328,11 @@ export function CartClient({
   );
 }
 
-function FulfillmentPill({
+function StockPill({
   line,
   locale,
 }: Readonly<{ line: QuoteLine; locale: Locale }>) {
-  if (line.fulfillmentType === "unknown") {
+  if (line.stockSourceType === "unknown") {
     return (
       <span className="rounded-md bg-amber-50 px-2 py-1 font-semibold text-amber-700">
         {locale === "it" ? "Verifica dopo login" : "登录后校验库存"}
@@ -340,7 +340,7 @@ function FulfillmentPill({
     );
   }
 
-  if (line.fulfillmentType === "stock") {
+  if (line.stockSourceType === "stock") {
     return (
       <span className="rounded-md bg-emerald-50 px-2 py-1 font-semibold text-emerald-700">
         {locale === "it" ? "Stock" : "现货"}
@@ -348,7 +348,7 @@ function FulfillmentPill({
     );
   }
 
-  if (line.fulfillmentType === "preorder") {
+  if (line.stockSourceType === "preorder") {
     return (
       <span className="rounded-md bg-violet-50 px-2 py-1 font-semibold text-violet-700">
         {locale === "it"

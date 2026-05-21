@@ -194,7 +194,7 @@ export default async function CheckoutPage({
                       MOQ {line.moq}
                     </CheckoutMetaPill>
                     <CheckoutMetaPill className="bg-emerald-50 text-emerald-700">
-                      {checkoutFulfillmentLabel(line, locale)}
+                      {checkoutStockLabel(line, locale)}
                     </CheckoutMetaPill>
                   </div>
                 </div>
@@ -321,19 +321,19 @@ function CheckoutMetaPill({
   );
 }
 
-function checkoutFulfillmentLabel(
+function checkoutStockLabel(
   line: {
-    fulfillmentType: "stock" | "preorder" | "mixed";
+    stockSourceType: "stock" | "preorder" | "mixed";
     preorderLeadTimeMinDays: number;
     preorderLeadTimeMaxDays: number;
   },
   locale: Locale,
 ) {
-  if (line.fulfillmentType === "stock") {
+  if (line.stockSourceType === "stock") {
     return locale === "it" ? "Da stock disponibile" : "现货发货";
   }
 
-  if (line.fulfillmentType === "preorder") {
+  if (line.stockSourceType === "preorder") {
     return locale === "it"
       ? `Preordine ${line.preorderLeadTimeMinDays}-${line.preorderLeadTimeMaxDays} giorni`
       : `预购 ${line.preorderLeadTimeMinDays}-${line.preorderLeadTimeMaxDays} 天到货`;

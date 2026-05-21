@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { Boxes, ClipboardList, CreditCard, PackageCheck, RotateCcw, TimerReset } from "lucide-react";
+import { Boxes, ClipboardList, CreditCard, RotateCcw, Truck } from "lucide-react";
 import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
 import { OrderSubnav } from "@/components/admin/order-subnav";
 import { StatusSelectForm } from "@/components/admin/status-select-form";
@@ -21,11 +21,8 @@ import { displayOrderNumber, orderRouteId } from "@/lib/order-number";
 import { formatMoney } from "@/lib/pricing";
 
 const orderStatuses = [
-  "draft",
-  "checkout_created",
   "pending_payment",
   "paid",
-  "processing",
   "shipped",
   "completed",
   "cancelled",
@@ -53,16 +50,11 @@ export default async function AdminOrderDetailPage({
   }
 
   const returnTo = localizePath(locale, `/admin/orders/${orderRouteId(order)}`);
-  const stockQty = order.items.reduce((sum, item) => sum + (item.stockQty ?? 0), 0);
-  const preorderQty = order.items.reduce(
-    (sum, item) => sum + (item.preorderQty ?? 0),
-    0,
-  );
+  const totalQty = order.items.reduce((sum, item) => sum + item.quantity, 0);
   const orderStatusLabels = getStatusSelectLabels("order", orderStatuses, locale);
   const orderStatus = formatAdminStatus("order", order.status, locale);
   const paymentStatus = formatAdminStatus("payment", order.paymentStatus ?? "-", locale);
   const paymentMethod = formatAdminStatus("paymentMethod", order.paymentMethod, locale);
-  const fulfillmentStatus = formatAdminStatus("fulfillment", order.fulfillmentStatus ?? "-", locale);
 
   return (
     <div className="mx-auto max-w-7xl space-y-3 rounded-2xl border border-black/10 bg-white p-3 shadow-2xl sm:p-4">
@@ -71,16 +63,13 @@ export default async function AdminOrderDetailPage({
         title={<span className="font-mono">{displayOrderNumber(order, locale)}</span>}
         description={
           locale === "it"
-            ? "Dettaglio operativo con pagamento, cliente, righe prodotto e fulfilment stock/preorder."
-            : "后台订单处理详情，包含付款、客户、商品明细和现货/预购履约。"
+            ? "Dettaglio operativo con pagamento, cliente, righe prodotto e tracking."
+            : "后台订单处理详情，包含付款、客户、商品明细和物流。"
         }
         actions={
           <>
             <AdminButtonLink href={localizePath(locale, "/admin/orders")} variant="secondary">
               {locale === "it" ? "Torna ordini" : "返回订单"}
-            </AdminButtonLink>
-            <AdminButtonLink href={localizePath(locale, "/admin/orders/payments")} variant="secondary">
-              {locale === "it" ? "Pagamenti" : "付款处理"}
             </AdminButtonLink>
             <AdminButtonLink href={localizePath(locale, "/admin/inventory")} variant="secondary">
               {locale === "it" ? "Inventario" : "库存"}
@@ -91,7 +80,7 @@ export default async function AdminOrderDetailPage({
       <Feedback saved={valueOf(query.saved)} error={valueOf(query.error)} locale={locale} />
       <OrderSubnav active="overview" locale={locale} />
 
-      <AdminMetricStrip className="md:grid-cols-2 xl:grid-cols-6">
+      <AdminMetricStrip className="md:grid-cols-2 xl:grid-cols-5">
         <AdminMetricCard icon={ClipboardList} label={locale === "it" ? "Stato" : "状态"} value={<StatusPill status={orderStatus.label} tone={orderStatus.tone} />} tone="blue" />
         <AdminMetricCard
           icon={CreditCard}
@@ -107,14 +96,8 @@ export default async function AdminOrderDetailPage({
           value={formatMoney(order.refundTotal ?? 0, locale)}
           tone="amber"
         />
-        <AdminMetricCard icon={PackageCheck} label={locale === "it" ? "Stock" : "现货履约"} value={stockQty} tone="slate" />
-        <AdminMetricCard
-          icon={TimerReset}
-          label={locale === "it" ? "Preorder" : "预购履约"}
-          value={preorderQty}
-          tone="violet"
-          trend={order.fulfillmentStatus ? <StatusPill status={fulfillmentStatus.label} tone={fulfillmentStatus.tone} /> : null}
-        />
+        <AdminMetricCard icon={Truck} label={locale === "it" ? "Tracking" : "物流"} value={order.trackingNumber ? locale === "it" ? "Inserito" : "已填写" : "-"} tone={order.trackingNumber ? "green" : "slate"} />
+        <AdminMetricCard icon={Boxes} label={locale === "it" ? "Pezzi" : "商品数量"} value={totalQty} tone="slate" />
       </AdminMetricStrip>
 
       <details className="rounded-lg border border-black/5 bg-white px-3 py-2 text-xs font-semibold text-stone-500 shadow-sm">
@@ -134,8 +117,8 @@ export default async function AdminOrderDetailPage({
           title={locale === "it" ? "Pannello operativo" : "订单操作面板"}
           description={
             locale === "it"
-              ? "Stato, incasso, fulfilment e tracking sono nello stesso pannello."
-              : "状态、收款、履约和物流集中在主内容区处理。"
+              ? "Stato, incasso, tracking e operazioni ad alto rischio sono nello stesso pannello."
+              : "状态、收款、物流和高风险操作集中在主内容区处理。"
           }
           contentClassName="space-y-3 p-3"
         >
@@ -182,9 +165,9 @@ export default async function AdminOrderDetailPage({
                 {locale === "it" ? "Azioni rapide" : "快捷操作"}
               </h3>
               <p className="mt-1 text-xs font-semibold text-stone-500">
-                {locale === "it" ? "Incasso, fulfilment e lock." : "收款、履约与锁库。"}
+                {locale === "it" ? "Incasso, lock e annullamento." : "收款、锁库与取消。"}
               </p>
-              <div className="mt-3 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
                 {order.paymentMethod === "cash" && order.paymentStatus === "pending_cash" ? (
                   <ActionForm action="/api/admin/orders/payment" id={order.id} locale={locale} returnTo={returnTo} value="confirm_cash">
                     {locale === "it" ? "Conferma contanti" : "确认现金收款"}
@@ -196,30 +179,20 @@ export default async function AdminOrderDetailPage({
                     {locale === "it" ? "Conferma bonifico" : "确认转账到账"}
                   </ActionForm>
                 ) : null}
-                <ActionForm action="/api/admin/orders/fulfillment" id={order.id} locale={locale} returnTo={returnTo} value="start_picking">
-                  {locale === "it" ? "Inizia picking" : "开始备货"}
-                </ActionForm>
-                {preorderQty > 0 ? (
-                  <ActionForm action="/api/admin/orders/allocate-preorders" id={order.id} locale={locale} returnTo={returnTo}>
-                    {locale === "it" ? "Alloca preorder" : "分配预购到货"}
-                  </ActionForm>
-                ) : null}
-                <ActionForm action="/api/admin/orders/fulfillment" id={order.id} locale={locale} returnTo={returnTo} value="mark_shipped">
-                  {locale === "it" ? "Segna spedito" : "标记发货"}
-                </ActionForm>
-                <ActionForm action="/api/admin/orders/fulfillment" id={order.id} locale={locale} returnTo={returnTo} value="mark_picked_up">
-                  {locale === "it" ? "Ritiro completato" : "已自提完成"}
-                </ActionForm>
-                <ActionForm action="/api/admin/orders/fulfillment" id={order.id} locale={locale} returnTo={returnTo} value="complete">
-                  {locale === "it" ? "Completa" : "完成订单"}
-                </ActionForm>
                 <ActionForm action="/api/admin/orders/extend-reservation" id={order.id} locale={locale} returnTo={returnTo} variant="secondary">
                   {locale === "it" ? "Estendi 24h" : "延长锁库 24 小时"}
                 </ActionForm>
-                <ActionForm action="/api/admin/orders/release" id={order.id} locale={locale} returnTo={returnTo} variant="danger">
-                  {locale === "it" ? "Annulla e libera" : "取消并释放库存"}
-                </ActionForm>
               </div>
+              <details className="mt-3 rounded-lg border border-rose-100 bg-white p-2">
+                <summary className="cursor-pointer text-xs font-black text-rose-700">
+                  {locale === "it" ? "Altre operazioni rischiose" : "更多高风险操作"}
+                </summary>
+                <div className="mt-2">
+                  <ActionForm action="/api/admin/orders/release" id={order.id} locale={locale} returnTo={returnTo} variant="danger">
+                    {locale === "it" ? "Annulla e libera" : "取消并释放库存"}
+                  </ActionForm>
+                </div>
+              </details>
             </section>
           </div>
 
@@ -401,9 +374,9 @@ export default async function AdminOrderDetailPage({
           <AdminPanel
             title={locale === "it" ? "Timeline ordine" : "订单时间线"}
             description={
-              locale === "it"
-                ? "Traccia operativa delle azioni admin."
-                : "记录后台处理、收款、释放和履约动作。"
+            locale === "it"
+              ? "Traccia operativa delle azioni admin."
+                : "记录后台处理、收款、释放和物流动作。"
             }
           >
             {order.timelineEvents.length > 0 ? (
@@ -452,7 +425,7 @@ export default async function AdminOrderDetailPage({
         </AdminPanel>
 
         <AdminPanel
-          title={locale === "it" ? "Righe e fulfilment" : "商品与履约"}
+          title={locale === "it" ? "Righe ordine" : "商品明细"}
           description={new Date(order.createdAt).toLocaleString(locale === "it" ? "it-IT" : "zh-CN")}
         >
           <AdminDataTable minWidth={940}>
@@ -462,8 +435,7 @@ export default async function AdminOrderDetailPage({
                   <th className="px-2.5 py-2">SKU</th>
                   <th className="px-2.5 py-2">{locale === "it" ? "Nome" : "商品名"}</th>
                   <th className="px-2.5 py-2">{locale === "it" ? "Qta" : "数量"}</th>
-                  <th className="px-2.5 py-2">{locale === "it" ? "Stock" : "现货"}</th>
-                  <th className="px-2.5 py-2">{locale === "it" ? "Preorder" : "预购"}</th>
+                  <th className="px-2.5 py-2">{locale === "it" ? "Stato stock" : "库存状态"}</th>
                   <th className="px-2.5 py-2">{locale === "it" ? "Totale riga" : "行小计"}</th>
                 </tr>
               </thead>
@@ -477,16 +449,17 @@ export default async function AdminOrderDetailPage({
                       {getOrderItemName(item, locale)}
                     </td>
                     <td className="px-2.5 py-2.5 font-black text-stone-950">{item.quantity}</td>
-                    <td className="px-2.5 py-2.5">{item.stockQty ?? 0}</td>
                     <td className="px-2.5 py-2.5">
-                      <span>{item.preorderQty ?? 0}</span>
-                      {item.preorderQty &&
-                      item.preorderLeadTimeMinDays &&
-                      item.preorderLeadTimeMaxDays ? (
-                        <span className="ml-2 text-xs font-semibold text-stone-500">
+                      {item.preorderLeadTimeMinDays && item.preorderLeadTimeMaxDays ? (
+                        <span className="text-xs font-semibold text-amber-700">
+                          {locale === "it" ? "Arrivo stimato" : "预计到货"}{" "}
                           {item.preorderLeadTimeMinDays}-{item.preorderLeadTimeMaxDays}d
                         </span>
-                      ) : null}
+                      ) : (
+                        <span className="text-xs font-semibold text-emerald-700">
+                          {locale === "it" ? "Disponibile" : "库存可用"}
+                        </span>
+                      )}
                     </td>
                     <td className="px-2.5 py-2.5 font-black text-stone-950">
                       {formatMoney(item.unitPrice * item.quantity, locale)}

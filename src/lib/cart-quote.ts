@@ -27,7 +27,7 @@ export type CartQuoteLine = {
   total: number | null;
   availableStock: number | null;
   incomingAvailable: number | null;
-  fulfillmentType: "stock" | "preorder" | "mixed" | "unknown";
+  stockSourceType: "stock" | "preorder" | "mixed" | "unknown";
   preorderLeadTimeMinDays: number;
   preorderLeadTimeMaxDays: number;
   canOrder: boolean;
@@ -173,8 +173,8 @@ export async function loadCartQuote({
         total: isPriceVisible ? totals.total : null,
         availableStock: isPriceVisible ? availableStock : null,
         incomingAvailable: isPriceVisible ? incomingAvailable : null,
-        fulfillmentType: isPriceVisible
-          ? getFulfillmentType(item.quantity, availableStock, incomingAvailable)
+        stockSourceType: isPriceVisible
+          ? getStockSourceType(item.quantity, availableStock, incomingAvailable)
           : "unknown",
         preorderLeadTimeMinDays: 7,
         preorderLeadTimeMaxDays: 14,
@@ -235,8 +235,8 @@ function mapSupabaseQuoteLine(
     total: isPriceVisible ? subtotal + vat : null,
     availableStock: isPriceVisible ? availableStock : null,
     incomingAvailable: isPriceVisible ? incomingAvailable : null,
-    fulfillmentType: isPriceVisible
-      ? getFulfillmentType(quantity, availableStock, incomingAvailable)
+    stockSourceType: isPriceVisible
+      ? getStockSourceType(quantity, availableStock, incomingAvailable)
       : "unknown",
     preorderLeadTimeMinDays: Number(row.preorder_lead_time_min_days ?? 7),
     preorderLeadTimeMaxDays: Number(row.preorder_lead_time_max_days ?? 14),
@@ -313,7 +313,7 @@ function buildLineErrors({
   return errors;
 }
 
-export function getFulfillmentType(
+export function getStockSourceType(
   quantity: number,
   availableStock: number,
   incomingAvailable: number,

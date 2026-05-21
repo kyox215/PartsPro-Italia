@@ -29,8 +29,8 @@ export default async function AccountOrdersPage({
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
               {locale === "it"
-                ? "Rivedi importi, righe SKU, metodo pagamento e stato di fulfilment collegati al tuo account."
-                : "查看当前账户下的订单金额、SKU 明细、付款方式和履约状态。"}
+                ? "Rivedi importi, righe SKU, metodo pagamento e stato stock collegati al tuo account."
+                : "查看当前账户下的订单金额、SKU 明细、付款方式和库存状态。"}
             </p>
           </div>
           <ButtonLink href={localizePath(locale, "/products")} variant="secondary">

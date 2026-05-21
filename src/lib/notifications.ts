@@ -54,7 +54,6 @@ export async function notifyOrderCustomer({
       orderNumber: order.order_number,
       status: order.status,
       paymentStatus: order.payment_status,
-      fulfillmentStatus: order.fulfillment_status,
       total: Number(order.total ?? 0),
       currency: order.currency ?? "EUR",
       shippingCarrier: order.shipping_carrier,
@@ -207,7 +206,6 @@ function buildOrderNotification({
     orderNumber?: string | null;
     status?: string | null;
     paymentStatus?: string | null;
-    fulfillmentStatus?: string | null;
     total: number;
     currency: string;
     shippingCarrier?: string | null;
@@ -251,7 +249,7 @@ function buildOrderNotification({
     }
     return {
       subject: `PartsPro 订单状态已更新 ${displayNumber}`,
-      body: `您的订单状态已更新。\n\n订单状态：${order.status || "-"}\n履约状态：${order.fulfillmentStatus || "-"}\n\n查看订单：${url}`,
+      body: `您的订单状态已更新。\n\n订单状态：${order.status || "-"}\n\n查看订单：${url}`,
     };
   }
 
@@ -281,7 +279,7 @@ function buildOrderNotification({
   }
   return {
     subject: `PartsPro stato ordine aggiornato ${displayNumber}`,
-    body: `Lo stato del tuo ordine e stato aggiornato.\n\nStato ordine: ${order.status || "-"}\nFulfilment: ${order.fulfillmentStatus || "-"}\n\nApri ordine: ${url}`,
+    body: `Lo stato del tuo ordine e stato aggiornato.\n\nStato ordine: ${order.status || "-"}\n\nApri ordine: ${url}`,
   };
 }
 

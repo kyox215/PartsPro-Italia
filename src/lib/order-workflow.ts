@@ -1,4 +1,4 @@
-import { getFulfillmentType, normalizeCartItems, type CartInputItem } from "@/lib/cart-quote";
+import { getStockSourceType, normalizeCartItems, type CartInputItem } from "@/lib/cart-quote";
 import { notifyOrderCustomer } from "@/lib/notifications";
 import {
   getSupabaseAdminClient,
@@ -28,7 +28,7 @@ export type OrderLine = {
     subtotal: number;
     vat: number;
   };
-  fulfillmentType: "stock" | "preorder" | "mixed";
+  stockSourceType: "stock" | "preorder" | "mixed";
   stockQty: number;
   preorderQty: number;
   preorderLeadTimeMinDays: number | null;
@@ -68,14 +68,12 @@ type WorkflowOrder = {
   status: string;
   payment_method: string;
   payment_status?: string | null;
-  fulfillment_status?: string | null;
   total?: number | string | null;
   currency?: string | null;
   stripe_checkout_session_id?: string | null;
   stripe_payment_intent_id?: string | null;
   refund_total?: number | string | null;
   released_at?: string | null;
-  fulfilled_at?: string | null;
   order_items?: WorkflowOrderItem[] | null;
 };
 
@@ -83,9 +81,6 @@ type WorkflowOrderItem = {
   id: string;
   sku: string;
   quantity: number;
-  stock_qty?: number | null;
-  preorder_qty?: number | null;
-  fulfillment_type?: string | null;
 };
 
 export function getPaymentStatus(paymentMethod: PaymentMethod) {
@@ -96,10 +91,6 @@ export function getPaymentStatus(paymentMethod: PaymentMethod) {
 
 export function getInitialOrderStatus(paymentMethod: PaymentMethod) {
   return paymentMethod === "stripe" ? "checkout_created" : "pending_payment";
-}
-
-export function getInitialFulfillmentStatus(lines: OrderLine[]) {
-  return lines.some((line) => line.preorderQty > 0) ? "awaiting_preorder" : "reserved";
 }
 
 export function getReservationExpiry(now = new Date()) {
@@ -193,7 +184,7 @@ export async function loadSupabaseOrderLines(
         subtotal: unitPrice * item.quantity,
         vat: unitPrice * item.quantity * vatRate,
       },
-      fulfillmentType: getFulfillmentType(
+      stockSourceType: getStockSourceType(
         item.quantity,
         availableStock,
         incomingAvailable,
@@ -267,7 +258,6 @@ export async function createSupabaseOrderWithReservations({
   profileId,
   status,
   paymentStatus,
-  fulfillmentStatus,
   reservationExpiresAt,
   reservedAt,
   paymentMethod,
@@ -288,7 +278,6 @@ export async function createSupabaseOrderWithReservations({
   profileId: string;
   status: string;
   paymentStatus: string;
-  fulfillmentStatus: string;
   reservationExpiresAt: string;
   reservedAt: string;
   paymentMethod: PaymentMethod;
@@ -309,7 +298,6 @@ export async function createSupabaseOrderWithReservations({
     profile_id: profileId,
     status,
     payment_status: paymentStatus,
-    fulfillment_status: fulfillmentStatus,
     reservation_expires_at: reservationExpiresAt,
     reserved_at: reservedAt,
     payment_method: paymentMethod,
@@ -331,6 +319,8 @@ export async function createSupabaseOrderWithReservations({
       quantity: line.quantity,
       unit_price: line.totals.unitPrice,
       vat_rate: line.vatRate,
+      preorder_lead_time_min_days: line.preorderLeadTimeMinDays,
+      preorder_lead_time_max_days: line.preorderLeadTimeMaxDays,
     })),
   };
 
@@ -346,7 +336,6 @@ export async function createSupabaseOrderWithReservations({
     vat: number;
     total: number;
     line_count: number;
-    fulfillment_status: string;
     reservation_expires_at: string;
   };
 }
@@ -882,7 +871,7 @@ export async function updateOrderShipment({
 }) {
   const supabase = getSupabaseAdminClient();
   const now = new Date().toISOString();
-  const shipmentPayload = {
+  const shipmentPayload: Record<string, string | null> = {
     shipping_carrier: shippingCarrier || null,
     tracking_number: trackingNumber || null,
     tracking_url: trackingUrl || null,
@@ -891,6 +880,7 @@ export async function updateOrderShipment({
     shipped_at: trackingNumber || trackingUrl ? now : null,
     updated_at: now,
   };
+  if (trackingNumber || trackingUrl) shipmentPayload.status = "shipped";
   const { error } = await supabase
     .from("orders")
     .update(shipmentPayload)
@@ -930,100 +920,6 @@ export async function updateOrderShipment({
   });
 
   return shipmentPayload;
-}
-
-export async function startOrderPicking(orderId: string, actorProfileId?: string | null) {
-  const supabase = getSupabaseAdminClient();
-  const now = new Date().toISOString();
-  const { error } = await supabase
-    .from("orders")
-    .update({
-      status: "processing",
-      fulfillment_status: "picking",
-      updated_at: now,
-    })
-    .eq("id", orderId);
-  if (error) throw new Error(error.message);
-  await tryRecordOrderEvent({
-    supabase,
-    orderId,
-    eventType: "picking_started",
-    title: "Picking started",
-    body: "Admin moved the order into picking.",
-    actorProfileId,
-  });
-}
-
-export async function allocatePreorderStock(
-  orderId: string,
-  actorProfileId?: string | null,
-) {
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase.rpc("allocate_order_preorders", {
-    p_order_id: orderId,
-  });
-  if (error) throw new Error(error.message);
-  const result = {
-    ...((data as Record<string, unknown> | null) ?? {}),
-    allocated: Number((data as { allocated?: number } | null)?.allocated ?? 0),
-  };
-  await tryRecordOrderEvent({
-    supabase,
-    orderId,
-    eventType: "preorder_allocated",
-    title: "Preorder stock allocated",
-    body: `Allocated ${result.allocated} preorder units to this order.`,
-    actorProfileId,
-    metadata: result,
-  });
-  return result;
-}
-
-export async function shipOrPickupOrder({
-  orderId,
-  mode,
-  actorProfileId,
-}: {
-  orderId: string;
-  mode: "shipped" | "picked_up";
-  actorProfileId?: string | null;
-}) {
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase.rpc("ship_or_pickup_order", {
-    p_order_id: orderId,
-    p_mode: mode,
-  });
-  if (error) throw new Error(error.message);
-  const result = {
-    ...((data as Record<string, unknown> | null) ?? {}),
-    deducted: Number((data as { deducted?: number } | null)?.deducted ?? 0),
-  };
-  await tryRecordOrderEvent({
-    supabase,
-    orderId,
-    eventType: mode === "shipped" ? "order_shipped" : "order_picked_up",
-    title: mode === "shipped" ? "Order shipped" : "Order picked up",
-    body: `Deducted ${result.deducted} physical stock units.`,
-    actorProfileId,
-    metadata: result,
-  });
-  return result;
-}
-
-export async function completeOrder(orderId: string, actorProfileId?: string | null) {
-  const supabase = getSupabaseAdminClient();
-  const { error } = await supabase.rpc("complete_order_workflow", {
-    p_order_id: orderId,
-  });
-  if (error) throw new Error(error.message);
-  await tryRecordOrderEvent({
-    supabase,
-    orderId,
-    eventType: "order_completed",
-    title: "Order completed",
-    body: "Admin marked the order as completed.",
-    actorProfileId,
-  });
 }
 
 export async function extendOrderReservation(
@@ -1205,7 +1101,7 @@ async function loadWorkflowOrder(supabase: SupabaseClient, orderId: string) {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, status, payment_method, payment_status, fulfillment_status, total, currency, stripe_checkout_session_id, stripe_payment_intent_id, refund_total, released_at, fulfilled_at, order_items ( id, sku, quantity, stock_qty, preorder_qty, fulfillment_type )",
+      "id, status, payment_method, payment_status, total, currency, stripe_checkout_session_id, stripe_payment_intent_id, refund_total, released_at, order_items ( id, sku, quantity )",
     )
     .eq("id", orderId)
     .maybeSingle();

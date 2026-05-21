@@ -44,8 +44,8 @@ export async function POST(request: Request) {
   const backUrl = getAdminBackUrl(request, {
     locale,
     returnTo: rawBody.returnTo,
-    fallbackPath: "/admin/accounts/permissions",
-    allowedPrefixes: ["/admin/accounts/permissions"],
+    fallbackPath: "/admin/settings/permissions",
+    allowedPrefixes: ["/admin/settings/permissions", "/admin/accounts/permissions"],
   });
 
   if (!parsed.success) {

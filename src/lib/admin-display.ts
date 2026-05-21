@@ -7,8 +7,8 @@ export type AdminStatusKind =
   | "auditAction"
   | "crm"
   | "customerSource"
-  | "fulfillment"
-  | "fulfillmentType"
+  | "stockStatus"
+  | "stockSource"
   | "notification"
   | "order"
   | "payment"
@@ -199,8 +199,8 @@ const rawStatusLabels = {
     company: entry("公司档案", "Azienda", "slate"),
     profile: entry("已注册账号", "Account registrato", "blue"),
   },
-  fulfillment: {
-    unfulfilled: entry("未履约", "Da evadere", "slate"),
+  stockStatus: {
+    unfulfilled: entry("待确认", "Da confermare", "slate"),
     reserved: entry("已锁库", "Stock riservato", "blue"),
     awaiting_preorder: entry("等待预购到货", "Attesa preorder", "amber"),
     picking: entry("备货中", "Picking", "blue"),
@@ -210,7 +210,7 @@ const rawStatusLabels = {
     cancelled: entry("已取消", "Annullato", "red"),
     "-": entry("未记录", "Non registrato", "slate"),
   },
-  fulfillmentType: {
+  stockSource: {
     stock: entry("现货", "Stock", "green"),
     preorder: entry("预购", "Preorder", "amber"),
     mixed: entry("混合", "Misto", "blue"),

@@ -12,7 +12,6 @@ export type AccountOrderRow = {
   orderNumber?: string | null;
   status: string;
   paymentStatus?: string | null;
-  fulfillmentStatus?: string | null;
   paymentMethod: string;
   total: number;
   refundTotal?: number;
@@ -31,9 +30,6 @@ export type AccountOrderRow = {
     name: string;
     quantity: number;
     unitPrice: number;
-    fulfillmentType?: string;
-    stockQty?: number;
-    preorderQty?: number;
     preorderLeadTimeMinDays?: number | null;
     preorderLeadTimeMaxDays?: number | null;
   }>;
@@ -102,7 +98,6 @@ export async function getAccountActivity(
           orderNumber: "PP-260521-0001",
           status: "pending_payment",
           paymentStatus: "pending_bank_transfer",
-          fulfillmentStatus: "awaiting_preorder",
           paymentMethod: "bank_transfer",
           total: 519.24,
           refundTotal: 0,
@@ -122,18 +117,12 @@ export async function getAccountActivity(
               name: products[0].names.it,
               quantity: 5,
               unitPrice: products[0].b2bPrice,
-              fulfillmentType: "stock",
-              stockQty: 5,
-              preorderQty: 0,
             },
             {
               sku: products[1].sku,
               name: products[1].names.it,
               quantity: 10,
               unitPrice: products[1].b2bPrice,
-              fulfillmentType: "preorder",
-              stockQty: 0,
-              preorderQty: 10,
               preorderLeadTimeMinDays: 7,
               preorderLeadTimeMaxDays: 14,
             },
@@ -243,7 +232,6 @@ function mapAccountOrder(order: {
   order_number?: string | null;
   status: string;
   payment_status?: string | null;
-  fulfillment_status?: string | null;
   payment_method: string;
   total: number | string | null;
   refund_total?: number | string | null;
@@ -262,9 +250,6 @@ function mapAccountOrder(order: {
     name: string;
     quantity: number;
     unit_price: number | string;
-    fulfillment_type?: string | null;
-    stock_qty?: number | null;
-    preorder_qty?: number | null;
     preorder_lead_time_min_days?: number | null;
     preorder_lead_time_max_days?: number | null;
   }> | null;
@@ -307,7 +292,6 @@ function mapAccountOrder(order: {
     orderNumber: order.order_number ?? null,
     status: order.status,
     paymentStatus: order.payment_status ?? null,
-    fulfillmentStatus: order.fulfillment_status ?? null,
     paymentMethod: order.payment_method,
     total: Number(order.total ?? 0),
     refundTotal: Number(order.refund_total ?? 0),
@@ -326,9 +310,6 @@ function mapAccountOrder(order: {
       name: item.name,
       quantity: item.quantity,
       unitPrice: Number(item.unit_price ?? 0),
-      fulfillmentType: item.fulfillment_type ?? undefined,
-      stockQty: item.stock_qty ?? undefined,
-      preorderQty: item.preorder_qty ?? undefined,
       preorderLeadTimeMinDays: item.preorder_lead_time_min_days ?? null,
       preorderLeadTimeMaxDays: item.preorder_lead_time_max_days ?? null,
     })),

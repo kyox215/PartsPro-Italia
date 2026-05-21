@@ -151,49 +151,6 @@ export function formatPaymentStatus(status: string | null | undefined, locale: L
   });
 }
 
-export function formatFulfillmentStatus(status: string | null | undefined, locale: Locale) {
-  return mapStatus(status, locale, {
-    unfulfilled: {
-      it: ["Da evadere", "Ordine non ancora preparato.", "slate"],
-      zh: ["待履约", "订单尚未开始履约。", "slate"],
-    },
-    reserved: {
-      it: ["Stock riservato", "La quantita disponibile e bloccata per questo ordine.", "emerald"],
-      zh: ["现货已锁定", "可用现货已为此订单锁定。", "emerald"],
-    },
-    awaiting_preorder: {
-      it: ["In attesa preorder", "Parte della merce attende arrivo fornitore.", "orange"],
-      zh: ["等待预购到货", "部分商品等待供应商到货。", "orange"],
-    },
-    picking: {
-      it: ["Picking", "Il magazzino sta preparando i prodotti.", "blue"],
-      zh: ["拣货中", "仓库正在拣货。", "blue"],
-    },
-    allocated: {
-      it: ["Preorder allocato", "La merce in arrivo e stata allocata all'ordine.", "blue"],
-      zh: ["预购已分配", "到货库存已分配给此订单。", "blue"],
-    },
-    shipped: {
-      it: ["Spedito", "Ordine spedito o ritirato.", "blue"],
-      zh: ["已发货", "订单已发货或已自提。", "blue"],
-    },
-    fulfilled: {
-      it: ["Completato", "Fulfilment completato.", "emerald"],
-      zh: ["履约完成", "订单履约已完成。", "emerald"],
-    },
-    cancelled: {
-      it: ["Annullato", "Fulfilment annullato.", "slate"],
-      zh: ["履约取消", "履约已取消。", "slate"],
-    },
-  });
-}
-
-export function formatFulfillmentType(type: string | null | undefined, locale: Locale) {
-  if (type === "preorder") return locale === "it" ? "Preorder" : "预购";
-  if (type === "mixed") return locale === "it" ? "Stock + preorder" : "现货 + 预购";
-  return locale === "it" ? "Stock" : "现货";
-}
-
 export function formatTimelineEvent(type: string | null | undefined, locale: Locale) {
   const labels: Record<string, Record<Locale, string>> = {
     order_created: { it: "Ordine creato", zh: "订单创建" },

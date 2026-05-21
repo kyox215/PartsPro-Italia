@@ -4,7 +4,7 @@ import {
   getAdminBackUrl,
   redirectOnInvalidAdminCsrf,
 } from "@/lib/admin-security";
-import { assertAdmin } from "@/lib/auth";
+import { assertAdminPermission } from "@/lib/auth";
 import { confirmManualPayment } from "@/lib/order-workflow";
 import { parseRequestBody } from "@/lib/request";
 import { hasSupabaseAdminConfig } from "@/lib/supabase/admin";
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
   if (csrfRedirect) return csrfRedirect;
 
-  const admin = await assertAdmin();
+  const admin = await assertAdminPermission("payments:confirm");
   if (!admin.ok) {
     backUrl.searchParams.set("error", admin.error);
     return NextResponse.redirect(backUrl, 303);

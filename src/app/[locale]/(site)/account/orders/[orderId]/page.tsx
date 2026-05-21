@@ -4,8 +4,6 @@ import { ButtonLink } from "@/components/ui/button";
 import { getAccountOrderById, type AccountOrderRow } from "@/lib/account-activity";
 import {
   canSubmitPaymentProof,
-  formatFulfillmentStatus,
-  formatFulfillmentType,
   formatOrderStatus,
   formatPaymentMethod,
   formatPaymentStatus,
@@ -38,12 +36,26 @@ export default async function AccountOrderDetailPage({
 
   const orderStatus = formatOrderStatus(order.status, locale);
   const paymentStatus = formatPaymentStatus(order.paymentStatus, locale);
-  const fulfillmentStatus = formatFulfillmentStatus(order.fulfillmentStatus, locale);
-  const stockQty = order.items.reduce((sum, item) => sum + (item.stockQty ?? 0), 0);
-  const preorderQty = order.items.reduce(
-    (sum, item) => sum + (item.preorderQty ?? 0),
-    0,
+  const hasArrivalHint = order.items.some(
+    (item) => item.preorderLeadTimeMinDays && item.preorderLeadTimeMaxDays,
   );
+  const stockStatus = {
+    label: hasArrivalHint
+      ? locale === "it"
+        ? "Arrivo stimato"
+        : "含预计到货"
+      : locale === "it"
+        ? "Stock disponibile"
+        : "库存可用",
+    description: hasArrivalHint
+      ? locale === "it"
+        ? "Una parte dell'ordine ha arrivo stimato."
+        : "订单中有商品带预计到货提示。"
+      : locale === "it"
+        ? "Nessun arrivo stimato registrato."
+        : "暂无在途到货提示。",
+    tone: hasArrivalHint ? "orange" : "emerald",
+  } as const;
   const nextActions = getAccountNextActions(order, locale);
   const saved = valueOf(query.saved);
   const error = valueOf(query.error);
@@ -100,9 +112,9 @@ export default async function AccountOrderDetailPage({
           value={formatMoney(order.refundTotal ?? 0, locale)}
         />
         <MetricCard
-          label={locale === "it" ? "Fulfilment" : "履约状态"}
-          display={fulfillmentStatus}
-          extra={`${locale === "it" ? "Stock" : "现货"} ${stockQty} / ${locale === "it" ? "Preorder" : "预购"} ${preorderQty}`}
+          label={locale === "it" ? "Stock" : "库存状态"}
+          display={stockStatus}
+          extra={stockStatus.description}
         />
       </section>
 
@@ -491,7 +503,7 @@ function OrderItemsPanel({
               <th className="px-4 py-3">SKU</th>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Qty</th>
-              <th className="px-4 py-3">Fulfillment</th>
+              <th className="px-4 py-3">{locale === "it" ? "Stock" : "库存"}</th>
               <th className="px-4 py-3">Price</th>
             </tr>
           </thead>
@@ -506,7 +518,7 @@ function OrderItemsPanel({
                   {item.quantity}
                 </td>
                 <td className="px-4 py-3">
-                  <FulfillmentBadges item={item} locale={locale} />
+                  <StockBadges item={item} locale={locale} />
                 </td>
                 <td className="px-4 py-3 font-bold text-slate-950">
                   {formatMoney(item.unitPrice * item.quantity, locale)}
@@ -540,32 +552,26 @@ function OrderItemCard({
         </Badge>
       </div>
       <div className="mt-3">
-        <FulfillmentBadges item={item} locale={locale} />
+        <StockBadges item={item} locale={locale} />
       </div>
     </article>
   );
 }
 
-function FulfillmentBadges({
+function StockBadges({
   item,
   locale,
 }: Readonly<{ item: AccountOrderRow["items"][number]; locale: Locale }>) {
   return (
     <div className="flex flex-wrap gap-2">
       <Badge className="border-slate-300 bg-slate-100 text-slate-800">
-        {formatFulfillmentType(item.fulfillmentType ?? "stock", locale)}
+        {item.preorderLeadTimeMinDays && item.preorderLeadTimeMaxDays
+          ? locale === "it" ? "Arrivo stimato" : "预计到货"
+          : locale === "it" ? "Stock disponibile" : "库存可用"}
       </Badge>
-      {item.stockQty ? (
-        <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
-          {locale === "it" ? "Stock" : "现货"} {item.stockQty}
-        </Badge>
-      ) : null}
-      {item.preorderQty ? (
+      {item.preorderLeadTimeMinDays && item.preorderLeadTimeMaxDays ? (
         <Badge className="border-orange-200 bg-orange-50 text-orange-700">
-          {locale === "it" ? "Preorder" : "预购"} {item.preorderQty}
-          {item.preorderLeadTimeMinDays && item.preorderLeadTimeMaxDays
-            ? ` / ${item.preorderLeadTimeMinDays}-${item.preorderLeadTimeMaxDays}d`
-            : ""}
+          {item.preorderLeadTimeMinDays}-{item.preorderLeadTimeMaxDays}d
         </Badge>
       ) : null}
     </div>

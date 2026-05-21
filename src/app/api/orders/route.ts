@@ -8,7 +8,6 @@ import { checkoutCartCookieName } from "@/lib/checkout-cart-cookie";
 import { getSiteUrl } from "@/lib/env";
 import {
   createSupabaseOrderWithReservations,
-  getInitialFulfillmentStatus,
   getInitialOrderStatus,
   getPaymentStatus,
   getReservationExpiry,
@@ -110,7 +109,6 @@ export async function POST(request: Request) {
       profileId: auth.user.id,
       status: getInitialOrderStatus(paymentMethod),
       paymentStatus: getPaymentStatus(paymentMethod),
-      fulfillmentStatus: getInitialFulfillmentStatus(lines),
       reservationExpiresAt: reservationExpiresAt.toISOString(),
       reservedAt: now.toISOString(),
       paymentMethod,

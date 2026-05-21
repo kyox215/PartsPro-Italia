@@ -89,8 +89,8 @@ export default async function AccountPage({
           title={locale === "it" ? "Storico ordini" : "历史订单"}
           description={
             locale === "it"
-              ? "Consulta pagamenti, righe SKU, fulfilment e importi."
-              : "查看付款、SKU 明细、履约方式和历史金额。"
+              ? "Consulta pagamenti, righe SKU, stock e importi."
+              : "查看付款、SKU 明细、库存状态和历史金额。"
           }
           href={localizePath(locale, "/account/orders")}
           cta={locale === "it" ? "Apri ordini" : "查看订单"}

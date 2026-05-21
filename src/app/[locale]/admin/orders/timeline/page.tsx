@@ -53,8 +53,6 @@ export default async function AdminOrderTimelinePage({
         active="timeline"
         counts={{
           overview: orders.length,
-          payments: orders.filter((order) => ["pending_cash", "pending_bank_transfer", "pending_card"].includes(order.paymentStatus ?? "")).length,
-          fulfillment: orders.filter((order) => ["awaiting_preorder", "reserved", "picking"].includes(order.fulfillmentStatus ?? "")).length,
           timeline: events.length,
         }}
         locale={locale}

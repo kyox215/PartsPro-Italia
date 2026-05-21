@@ -1,16 +1,15 @@
 import { ChevronDown, ShieldCheck, UserCog, UsersRound } from "lucide-react";
 import { redirect } from "next/navigation";
-import { AccountManagementTabs } from "@/components/admin/account-management-nav";
 import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
 import {
-  AdminActionRail,
   AdminEmptyState,
-  AdminButtonLink,
+  AdminInput,
   AdminMetricCard,
   AdminNotice,
   AdminPageHeader,
   AdminPanel,
   AdminRecordList,
+  AdminSelect,
   AdminWorkspaceGrid,
   StatusPill,
 } from "@/components/admin/admin-ui";
@@ -20,8 +19,8 @@ import {
   type AdminPermission,
   type StaffRole,
   getConfigurableAdminPermissions,
+  getStaffRoleLabel,
   hasAdminPermission,
-  staffRoleLabels,
 } from "@/lib/admin-permissions";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
@@ -48,34 +47,61 @@ export default async function AdminAccountPermissionsPage({
   return (
     <div className="space-y-3">
       <AdminPageHeader
-        eyebrow={locale === "it" ? "Area account" : "账号管理"}
+        eyebrow={locale === "it" ? "Centro impostazioni" : "设置中心"}
         title={locale === "it" ? "Permessi staff" : "权限管理"}
         description={
           locale === "it"
-            ? "Configura quali menu e azioni puo usare ogni ruolo staff."
-            : "配置每个员工角色可以访问哪些后台菜单和操作能力。"
+            ? "Assegna staff registrato e configura menu/azioni per ruoli predefiniti o personalizzati."
+            : "用已注册邮箱分配员工，并为默认或自定义职位配置菜单与关键操作权限。"
         }
       />
 
-      <AccountManagementTabs auth={auth} locale={locale} active="permissions" counts={{ staff: staff.length }} />
       <Feedback query={query} locale={locale} />
 
       <AdminWorkspaceGrid
         rail={
-          <AdminActionRail
-            title={locale === "it" ? "Assegna staff dai clienti" : "员工分配在客户管理完成"}
-            description={
-              locale === "it"
-                ? "Apri un cliente registrato e scegli il ruolo staff nella scheda identita."
-                : "打开已注册客户详情，在“身份与权限”里选择员工角色。"
-            }
-          >
-            <AdminPanel>
-              <AdminButtonLink href={localizePath(locale, "/admin/accounts/customers?filter=staff")} variant="secondary">
-                {locale === "it" ? "Apri staff" : "查看员工账号"}
-              </AdminButtonLink>
+          <div className="space-y-3">
+            <AdminPanel title={locale === "it" ? "Assegna staff" : "分配员工"}>
+              <form action="/api/admin/accounts/staff" method="post" className="space-y-2">
+                <AdminCsrfField />
+                <input type="hidden" name="locale" value={locale} />
+                <input type="hidden" name="returnTo" value={localizePath(locale, "/admin/settings/permissions")} />
+                <AdminInput name="email" type="email" label={locale === "it" ? "Email registrata" : "已注册邮箱"} placeholder="user@company.com" />
+                <AdminSelect name="role" label={locale === "it" ? "Ruolo" : "职位"} defaultValue="sales">
+                  {summaries.map((summary) => (
+                    <option key={summary.role} value={summary.role}>
+                      {summary.label}
+                    </option>
+                  ))}
+                </AdminSelect>
+                <AdminSelect name="status" label={locale === "it" ? "Stato" : "状态"} defaultValue="active">
+                  <option value="active">{formatAdminStatus("account", "active", locale).label}</option>
+                  <option value="suspended">{formatAdminStatus("account", "suspended", locale).label}</option>
+                  <option value="archived">{formatAdminStatus("account", "archived", locale).label}</option>
+                </AdminSelect>
+                <button className="h-9 w-full rounded-lg bg-blue-600 px-3 text-xs font-black text-white" type="submit">
+                  {locale === "it" ? "Salva staff" : "保存员工"}
+                </button>
+              </form>
             </AdminPanel>
-          </AdminActionRail>
+            <AdminPanel title={locale === "it" ? "Ruolo personalizzato" : "自定义职位"}>
+              <form action="/api/admin/accounts/roles" method="post" className="space-y-2">
+                <AdminCsrfField />
+                <input type="hidden" name="locale" value={locale} />
+                <input type="hidden" name="returnTo" value={localizePath(locale, "/admin/settings/permissions")} />
+                <input type="hidden" name="action" value="create" />
+                <AdminInput
+                  name="role"
+                  label={locale === "it" ? "Codice ruolo" : "职位代码"}
+                  placeholder="after_sales"
+                  pattern="[a-z][a-z0-9_-]{1,40}"
+                />
+                <button className="h-9 w-full rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-black text-blue-700" type="submit">
+                  {locale === "it" ? "Crea ruolo" : "新增职位"}
+                </button>
+              </form>
+            </AdminPanel>
+          </div>
         }
       >
         <section className="grid gap-2 md:grid-cols-3">
@@ -124,7 +150,7 @@ export default async function AdminAccountPermissionsPage({
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-1 md:justify-end">
-                      <StatusPill status={staffRoleLabels[member.role][locale]} tone={member.role === "owner" ? "violet" : "blue"} />
+                      <StatusPill status={getStaffRoleLabel(member.role, locale)} tone={member.role === "owner" ? "violet" : "blue"} />
                       <StatusPill status={status.label} tone={status.tone} />
                       {profileRole ? <StatusPill status={profileRole.label} tone={profileRole.tone} /> : null}
                     </div>
@@ -201,7 +227,7 @@ function RolePermissionRow({
           <form action="/api/admin/accounts/permissions/matrix" method="post" className="grid gap-2">
             <AdminCsrfField />
             <input type="hidden" name="locale" value={locale} />
-            <input type="hidden" name="returnTo" value={localizePath(locale, "/admin/accounts/permissions")} />
+            <input type="hidden" name="returnTo" value={localizePath(locale, "/admin/settings/permissions")} />
             <input type="hidden" name="role" value={role} />
             <div className="grid gap-1.5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
               {configurablePermissions.map((permission) => (
@@ -213,11 +239,27 @@ function RolePermissionRow({
                 />
               ))}
             </div>
-            <button className="h-8 rounded-lg bg-stone-950 px-3 text-xs font-black text-white sm:justify-self-start" type="submit">
-              {locale === "it" ? "Salva matrice" : "保存权限矩阵"}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button className="h-8 rounded-lg bg-blue-600 px-3 text-xs font-black text-white" type="submit">
+                {locale === "it" ? "Salva matrice" : "保存权限矩阵"}
+              </button>
+            </div>
           </form>
         )}
+        {!isOwner && !["manager", "sales", "catalog", "warehouse", "finance", "support"].includes(role) ? (
+          <div className="mt-2 flex flex-wrap gap-2 border-t border-black/5 pt-2">
+            <form action="/api/admin/accounts/roles" method="post" className="flex flex-wrap gap-2">
+              <AdminCsrfField />
+              <input type="hidden" name="locale" value={locale} />
+              <input type="hidden" name="returnTo" value={localizePath(locale, "/admin/settings/permissions")} />
+              <input type="hidden" name="action" value="deactivate" />
+              <input type="hidden" name="role" value={role} />
+              <button className="h-8 rounded-lg border border-red-200 px-3 text-xs font-black text-red-600" type="submit">
+                {locale === "it" ? "Disattiva ruolo" : "停用职位"}
+              </button>
+            </form>
+          </div>
+        ) : null}
       </div>
     </details>
   );

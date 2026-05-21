@@ -4,14 +4,7 @@ import {
   hasSupabaseAdminConfig,
 } from "@/lib/supabase/admin";
 
-export type StaffRole =
-  | "owner"
-  | "manager"
-  | "sales"
-  | "catalog"
-  | "warehouse"
-  | "finance"
-  | "support";
+export type StaffRole = string;
 
 export type AdminPermission =
   | "admin:access"
@@ -35,7 +28,7 @@ export const staffRoleOptions: StaffRole[] = [
   "support",
 ];
 
-export const staffRoleLabels: Record<StaffRole, { zh: string; it: string }> = {
+export const staffRoleLabels: Record<string, { zh: string; it: string }> = {
   owner: { zh: "总管理员", it: "Owner" },
   manager: { zh: "运营管理", it: "Responsabile operativo" },
   sales: { zh: "销售 / 客户经理", it: "Vendite" },
@@ -45,7 +38,7 @@ export const staffRoleLabels: Record<StaffRole, { zh: string; it: string }> = {
   support: { zh: "客服 / 跟进", it: "Supporto" },
 };
 
-export const staffRoleDescriptions: Record<StaffRole, { zh: string; it: string }> = {
+export const staffRoleDescriptions: Record<string, { zh: string; it: string }> = {
   owner: {
     zh: "全部后台权限，可管理员工、角色权限、客户、订单、库存、财务和系统配置。",
     it: "Accesso completo a staff, clienti, ordini, stock, finanza e sistema.",
@@ -76,6 +69,21 @@ export const staffRoleDescriptions: Record<StaffRole, { zh: string; it: string }
   },
 };
 
+export function getStaffRoleLabel(role: StaffRole | null | undefined, locale: "it" | "zh") {
+  if (!role) return locale === "it" ? "Staff" : "员工";
+  return staffRoleLabels[role]?.[locale] ?? role;
+}
+
+export function getStaffRoleDescription(role: StaffRole | null | undefined, locale: "it" | "zh") {
+  if (!role) return "";
+  return (
+    staffRoleDescriptions[role]?.[locale] ??
+    (locale === "it"
+      ? "Ruolo personalizzato configurato nel centro impostazioni."
+      : "设置中心配置的自定义职位。")
+  );
+}
+
 const allPermissions: AdminPermission[] = [
   "admin:access",
   "accounts:read",
@@ -91,7 +99,7 @@ const allPermissions: AdminPermission[] = [
 
 const configurablePermissions: AdminPermission[] = allPermissions;
 
-const staffPermissions: Record<StaffRole, AdminPermission[]> = {
+const staffPermissions: Record<string, AdminPermission[]> = {
   owner: allPermissions,
   manager: [
     "admin:access",
@@ -152,7 +160,7 @@ export async function getStaffPermissionsForRole(role: StaffRole | null | undefi
 export async function getStaffPermissionMatrix() {
   const matrix = Object.fromEntries(
     staffRoleOptions.map((role) => [role, getStaffPermissions(role)]),
-  ) as Record<StaffRole, AdminPermission[]>;
+  ) as Record<string, AdminPermission[]>;
 
   if (!hasSupabaseAdminConfig()) return matrix;
 
@@ -174,12 +182,9 @@ export async function getStaffPermissionMatrix() {
     if (row.enabled) grouped.set(row.role, [...(grouped.get(row.role) ?? []), row.permission]);
   });
 
-  staffRoleOptions.forEach((role) => {
-    if (role === "owner") {
-      matrix[role] = getStaffPermissions(role);
-      return;
-    }
-    if (seenRoles.has(role)) matrix[role] = grouped.get(role) ?? [];
+  seenRoles.forEach((role) => {
+    if (role === "owner") matrix[role] = getStaffPermissions(role);
+    else matrix[role] = grouped.get(role) ?? matrix[role] ?? [];
   });
 
   return matrix;
@@ -194,7 +199,7 @@ export function getConfigurableAdminPermissions() {
 }
 
 export function isStaffRole(value: string | null | undefined): value is StaffRole {
-  return Boolean(value && value in staffPermissions);
+  return Boolean(value && /^[a-z][a-z0-9_-]{1,40}$/.test(value));
 }
 
 export function isAdminPermission(value: string | null | undefined): value is AdminPermission {

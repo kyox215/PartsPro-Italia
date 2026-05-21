@@ -1,10 +1,9 @@
 import {
   getAllAdminPermissions,
+  getStaffRoleDescription,
+  getStaffRoleLabel,
   getStaffPermissionMatrix,
   isStaffRole,
-  staffRoleOptions,
-  staffRoleDescriptions,
-  staffRoleLabels,
   type AdminPermission,
   type StaffRole,
 } from "@/lib/admin-permissions";
@@ -221,12 +220,18 @@ export async function findProfileByEmail(email: string) {
 
 export async function getStaffRoleSummaries(locale: "it" | "zh"): Promise<StaffRoleSummary[]> {
   const matrix = await getStaffPermissionMatrix();
-  return staffRoleOptions.map((role) => ({
-    role,
-    label: staffRoleLabels[role][locale],
-    description: staffRoleDescriptions[role][locale],
-    permissions: role === "owner" ? getAllAdminPermissions() : matrix[role],
-  }));
+  return Object.keys(matrix)
+    .sort((a, b) => {
+      if (a === "owner") return -1;
+      if (b === "owner") return 1;
+      return getStaffRoleLabel(a, locale).localeCompare(getStaffRoleLabel(b, locale));
+    })
+    .map((role) => ({
+      role,
+      label: getStaffRoleLabel(role, locale),
+      description: getStaffRoleDescription(role, locale),
+      permissions: role === "owner" ? getAllAdminPermissions() : matrix[role],
+    }));
 }
 
 function asRecordOrNull(value: unknown): Record<string, unknown> | null {
