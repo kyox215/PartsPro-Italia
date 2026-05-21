@@ -19,7 +19,7 @@ import { formatAdminStatus, type AdminStatusKind } from "@/lib/admin-display";
 import { getAdminOrderById } from "@/lib/admin-operations";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
-import { displayOrderNumber, orderRouteId, shortInternalOrderId } from "@/lib/order-number";
+import { displayOrderNumber, orderRouteId } from "@/lib/order-number";
 import { formatMoney } from "@/lib/pricing";
 
 const orderStatuses = [
@@ -33,6 +33,8 @@ const orderStatuses = [
   "cancelled",
   "refunded",
 ];
+
+type AdminOrderDetail = NonNullable<Awaited<ReturnType<typeof getAdminOrderById>>>;
 
 export default async function AdminOrderDetailPage({
   params,
@@ -68,16 +70,11 @@ export default async function AdminOrderDetailPage({
     <div className="space-y-3">
       <AdminPageHeader
         eyebrow={locale === "it" ? "Order detail" : "订单详情"}
-        title={<span className="font-mono">{displayOrderNumber(order)}</span>}
+        title={<span className="font-mono">{displayOrderNumber(order, locale)}</span>}
         description={
-          <span>
-            {locale === "it"
-              ? "Dettaglio operativo con pagamento, cliente, righe SKU e fulfilment stock/preorder."
-              : "后台订单处理详情，包含付款、客户、SKU 明细和现货/预购履约。"}
-            <span className="mt-1 block font-mono text-[11px] text-stone-400">
-              {locale === "it" ? "ID interno" : "内部 ID"}: {shortInternalOrderId(order.id)}
-            </span>
-          </span>
+          locale === "it"
+            ? "Dettaglio operativo con pagamento, cliente, righe prodotto e fulfilment stock/preorder."
+            : "后台订单处理详情，包含付款、客户、商品明细和现货/预购履约。"
         }
         actions={
           <>
@@ -121,6 +118,18 @@ export default async function AdminOrderDetailPage({
           trend={order.fulfillmentStatus ? <StatusPill status={fulfillmentStatus.label} tone={fulfillmentStatus.tone} /> : null}
         />
       </AdminMetricStrip>
+
+      <details className="rounded-lg border border-black/5 bg-white px-3 py-2 text-xs font-semibold text-stone-500 shadow-sm">
+        <summary className="cursor-pointer font-black text-stone-700">
+          {locale === "it" ? "Informazioni interne" : "内部信息"}
+        </summary>
+        <div className="mt-2 grid gap-1">
+          <p>
+            {locale === "it" ? "ID interno" : "内部 ID"}:{" "}
+            <span className="break-all font-mono">{order.id}</span>
+          </p>
+        </div>
+      </details>
 
       <AdminWorkspaceGrid
         className="xl:!grid-cols-[minmax(0,1fr)_280px] 2xl:!grid-cols-[minmax(0,1fr)_300px]"
@@ -453,7 +462,9 @@ export default async function AdminOrderDetailPage({
                     <td className="px-2.5 py-2.5 font-mono text-xs font-black text-stone-900">
                       {item.sku}
                     </td>
-                    <td className="px-2.5 py-2.5 font-semibold text-stone-700">{item.name}</td>
+                    <td className="px-2.5 py-2.5 font-semibold text-stone-700">
+                      {getOrderItemName(item, locale)}
+                    </td>
                     <td className="px-2.5 py-2.5 font-black text-stone-950">{item.quantity}</td>
                     <td className="px-2.5 py-2.5">{item.stockQty ?? 0}</td>
                     <td className="px-2.5 py-2.5">
@@ -809,6 +820,19 @@ function LocalizedStatusPill({
 }: Readonly<{ kind: AdminStatusKind; value: string | null | undefined; locale: Locale }>) {
   const status = formatAdminStatus(kind, value, locale);
   return <StatusPill status={status.label} tone={status.tone} />;
+}
+
+function getOrderItemName(
+  item: AdminOrderDetail["items"][number],
+  locale: Locale,
+) {
+  const localizedName = locale === "zh" ? item.nameZh : item.nameIt;
+  const name = (localizedName || item.name || "").trim();
+  return name && name !== item.sku
+    ? name
+    : locale === "it"
+      ? "Nome prodotto da completare"
+      : "商品名待补全";
 }
 
 function getStatusSelectLabels(

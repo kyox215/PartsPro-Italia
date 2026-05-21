@@ -304,7 +304,7 @@ export default async function AdminAccountCustomerDetailPage({
               return (
                 <article key={order.id} className="grid gap-2 rounded-lg bg-stone-50 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
                   <div className="min-w-0">
-                    <p className="break-words font-mono text-xs font-black text-stone-900">{displayOrderNumber(order)}</p>
+                    <p className="break-words font-mono text-xs font-black text-stone-900">{displayOrderNumber(order, locale)}</p>
                     <div className="mt-2 flex flex-wrap gap-1">
                       <StatusPill status={orderStatus.label} tone={orderStatus.tone} />
                       <StatusPill status={paymentStatus.label} tone={paymentStatus.tone} />
@@ -388,7 +388,7 @@ function buildTimeline(
     ...customer.orders.map((order) => ({
       id: `order-${order.id}`,
       title: locale === "it" ? "Ordine creato" : "订单创建",
-      body: `${displayOrderNumber(order)} / ${formatMoney(order.total, locale)}`,
+      body: `${displayOrderNumber(order, locale)} / ${formatMoney(order.total, locale)}`,
       createdAt: order.createdAt,
     })),
   ].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));

@@ -43,6 +43,8 @@ export type AdminOrderRow = {
   items: Array<{
     sku: string;
     name: string;
+    nameIt?: string | null;
+    nameZh?: string | null;
     quantity: number;
     unitPrice: number;
     fulfillmentType?: string;
@@ -198,7 +200,7 @@ export async function getAdminOrderRows(): Promise<AdminOrderRow[]> {
     return [];
   }
 
-  return (data ?? []).map(mapAdminOrder);
+  return hydrateAdminOrderItemNames((data ?? []).map(mapAdminOrder));
 }
 
 export async function getAdminOrderRowsForCustomer({
@@ -268,9 +270,10 @@ export async function getAdminOrderRowsForCustomer({
     });
   });
 
-  return [...rowsById.values()].sort(
+  const rows = [...rowsById.values()].sort(
     (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
   );
+  return hydrateAdminOrderItemNames(rows);
 }
 
 export async function getAdminOrderById(
@@ -300,7 +303,10 @@ export async function getAdminOrderById(
     return null;
   }
 
-  return data ? mapAdminOrder(data) : null;
+  if (!data) return null;
+
+  const [order] = await hydrateAdminOrderItemNames([mapAdminOrder(data)]);
+  return order ?? null;
 }
 
 export async function getAdminOrderTimelineRows(
@@ -511,6 +517,61 @@ async function getPreorderIncomingTotal() {
   );
 }
 
+async function hydrateAdminOrderItemNames(orders: AdminOrderRow[]) {
+  if (orders.length === 0 || !hasSupabaseAdminConfig()) return orders;
+
+  const skus = [
+    ...new Set(
+      orders.flatMap((order) =>
+        order.items
+          .filter((item) => !item.name || item.name === item.sku)
+          .map((item) => item.sku),
+      ),
+    ),
+  ];
+
+  if (skus.length === 0) return orders;
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("catalog_private_items")
+    .select("sku, name_it, name_zh")
+    .in("sku", skus);
+
+  if (error) {
+    console.error("Failed to hydrate order item product names", error);
+    return orders;
+  }
+
+  const namesBySku = new Map(
+    (data ?? []).map((row) => [
+      row.sku,
+      {
+        it: row.name_it ?? null,
+        zh: row.name_zh ?? null,
+      },
+    ]),
+  );
+
+  return orders.map((order) => ({
+    ...order,
+    items: order.items.map((item) => {
+      const catalogName = namesBySku.get(item.sku);
+      if (!catalogName) return item;
+
+      return {
+        ...item,
+        name:
+          item.name && item.name !== item.sku
+            ? item.name
+            : catalogName.it ?? catalogName.zh ?? item.name,
+        nameIt: catalogName.it,
+        nameZh: catalogName.zh,
+      };
+    }),
+  }));
+}
+
 function mapAdminOrder(order: {
   id: string;
   order_number?: string | null;
@@ -639,6 +700,8 @@ function mapAdminOrder(order: {
     items: (order.order_items ?? []).map((item) => ({
       sku: item.sku,
       name: item.name,
+      nameIt: null,
+      nameZh: null,
       quantity: item.quantity,
       unitPrice: Number(item.unit_price ?? 0),
       fulfillmentType: item.fulfillment_type,

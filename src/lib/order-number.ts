@@ -7,12 +7,12 @@ export function isUuid(value: string) {
 export function displayOrderNumber(order: {
   id: string;
   orderNumber?: string | null;
-}) {
-  return order.orderNumber || shortInternalOrderId(order.id);
+}, locale: "it" | "zh" = "zh") {
+  return order.orderNumber || (locale === "it" ? "Numero in generazione" : "订单号待生成");
 }
 
 export function orderRouteId(order: { id: string; orderNumber?: string | null }) {
-  return encodeURIComponent(displayOrderNumber(order));
+  return encodeURIComponent(order.orderNumber || order.id);
 }
 
 export function shortInternalOrderId(value: string) {

@@ -77,6 +77,7 @@ export function AdminTopBarClient({
 }>) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const hideGlobalSearch = /\/admin\/orders(?:\/|$)/.test(pathname);
 
   return (
     <>
@@ -92,21 +93,28 @@ export function AdminTopBarClient({
             <Menu className="h-5 w-5" />
           </button>
 
-          <div className="hidden min-w-0 flex-1 items-center rounded-lg border border-black/5 bg-white px-2.5 py-1.5 shadow-sm md:flex">
-            <Search className="h-4 w-4 shrink-0 text-stone-400" />
-            <input
-              className="h-6 min-w-0 flex-1 border-0 bg-transparent px-2.5 text-sm font-medium text-stone-900 outline-none placeholder:text-stone-400"
-              placeholder={
-                locale === "it"
-                  ? "Cerca ordini, SKU, clienti..."
-                  : "搜索订单、SKU、客户..."
-              }
-              aria-label={locale === "it" ? "Cerca" : "搜索"}
-            />
-            <span className="rounded-md bg-stone-100 px-2 py-1 text-xs font-bold text-stone-500">
-              ⌘K
-            </span>
-          </div>
+          {hideGlobalSearch ? (
+            <div className="hidden min-w-0 flex-1 md:block">
+              <p className="truncate text-sm font-black text-stone-950">{subtitle}</p>
+              <p className="truncate text-xs font-semibold text-stone-500">{title}</p>
+            </div>
+          ) : (
+            <div className="hidden min-w-0 flex-1 items-center rounded-lg border border-black/5 bg-white px-2.5 py-1.5 shadow-sm md:flex">
+              <Search className="h-4 w-4 shrink-0 text-stone-400" />
+              <input
+                className="h-6 min-w-0 flex-1 border-0 bg-transparent px-2.5 text-sm font-medium text-stone-900 outline-none placeholder:text-stone-400"
+                placeholder={
+                  locale === "it"
+                    ? "Cerca ordini, SKU, clienti..."
+                    : "搜索订单、SKU、客户..."
+                }
+                aria-label={locale === "it" ? "Cerca" : "搜索"}
+              />
+              <span className="rounded-md bg-stone-100 px-2 py-1 text-xs font-bold text-stone-500">
+                ⌘K
+              </span>
+            </div>
+          )}
 
           <div className="min-w-0 flex-1 md:hidden">
             <p className="truncate text-sm font-bold text-stone-950">{subtitle}</p>

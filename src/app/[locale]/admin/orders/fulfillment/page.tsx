@@ -145,7 +145,7 @@ function FulfillmentOrderCard({ order, locale }: Readonly<{ order: AdminOrderRow
             className="font-mono text-xs font-black text-stone-950 hover:text-blue-700"
             href={localizePath(locale, `/admin/orders/${orderRouteId(order)}`)}
           >
-            {displayOrderNumber(order)}
+            {displayOrderNumber(order, locale)}
           </a>
           <p className="mt-1 truncate text-sm font-black text-stone-950">
             {order.companyName || order.customerName || "-"}

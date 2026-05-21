@@ -1,4 +1,4 @@
-import { Banknote, CreditCard, PackageCheck, ReceiptText, Search, TimerReset } from "lucide-react";
+import { Search } from "lucide-react";
 import Link from "next/link";
 import { OrderSubnav } from "@/components/admin/order-subnav";
 import { StatusSelectForm } from "@/components/admin/status-select-form";
@@ -6,8 +6,6 @@ import {
   AdminButtonLink,
   AdminDataTable,
   AdminEmptyState,
-  AdminInput,
-  AdminMetricCard,
   AdminNotice,
   AdminPageHeader,
   AdminPanel,
@@ -18,7 +16,7 @@ import { formatAdminStatus, type AdminStatusKind } from "@/lib/admin-display";
 import { getAdminOrderRows } from "@/lib/admin-operations";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
-import { displayOrderNumber, orderRouteId, shortInternalOrderId } from "@/lib/order-number";
+import { displayOrderNumber, orderRouteId } from "@/lib/order-number";
 import { formatMoney } from "@/lib/pricing";
 
 const orderStatuses = [
@@ -102,42 +100,45 @@ export default async function AdminOrdersPage({
         locale={locale}
       />
 
-      <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-        <AdminMetricCard icon={Banknote} label={locale === "it" ? "Contanti" : "待收现金"} value={orderCounts.pending_cash} tone="amber" />
-        <AdminMetricCard icon={ReceiptText} label={locale === "it" ? "Bonifico" : "待确认转账"} value={orderCounts.pending_bank_transfer} tone="blue" />
-        <AdminMetricCard icon={CreditCard} label={locale === "it" ? "Carta" : "Stripe 待支付"} value={orderCounts.pending_card} tone="violet" />
-        <AdminMetricCard icon={PackageCheck} label={locale === "it" ? "Preorder" : "待分配预购"} value={orderCounts.preorder} tone="green" />
-        <AdminMetricCard icon={TimerReset} label={locale === "it" ? "Lock scade" : "即将过期锁库"} value={orderCounts.expiring} tone="red" />
-      </section>
-
-      <AdminPanel
-        title={locale === "it" ? "Cerca ordini" : "搜索订单"}
-        toolbar={<StatusPill status={`${visibleOrders.length} / ${orders.length}`} tone="blue" />}
-      >
+      <AdminPanel contentClassName="space-y-2 p-2">
         <form
           action={localizePath(locale, "/admin/orders")}
-          className="grid gap-2 lg:grid-cols-[minmax(260px,1fr)_auto] lg:items-end"
+          className="grid gap-2 lg:grid-cols-[minmax(260px,1fr)_auto_auto] lg:items-center"
           method="get"
         >
           <input type="hidden" name="filter" value={filter === "all" ? "" : filter} />
-          <AdminInput
-            defaultValue={q}
-            label={locale === "it" ? "Cerca tutto" : "全局搜索"}
-            name="q"
-            placeholder={
-              locale === "it"
-                ? "PP-260521-0001, cliente, email, SKU, pagamento..."
-                : "短订单号、UUID、客户、邮箱、公司、SKU、付款方式、状态..."
-            }
-            required={false}
-          />
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+            <span className="sr-only">{locale === "it" ? "Cerca ordini" : "搜索订单"}</span>
+            <input
+              className="h-10 w-full rounded-lg border border-black/10 bg-white pl-8 pr-3 text-sm font-semibold text-stone-950 outline-none transition placeholder:text-stone-400 focus:border-stone-950 focus:ring-2 focus:ring-stone-950/10"
+              defaultValue={q}
+              name="q"
+              placeholder={
+                locale === "it"
+                  ? "PP-260521-0001, cliente, email, SKU, pagamento..."
+                  : "短订单号、客户、邮箱、公司、SKU、付款方式、状态..."
+              }
+            />
+          </label>
           <button className="h-10 rounded-lg bg-stone-950 px-4 text-sm font-black text-white" type="submit">
             {locale === "it" ? "Cerca" : "搜索"}
           </button>
+          {q ? (
+            <AdminButtonLink
+              href={buildOrdersHref(locale, { filter: filter === "all" ? "" : filter })}
+              variant="secondary"
+            >
+              {locale === "it" ? "Reset" : "清空"}
+            </AdminButtonLink>
+          ) : null}
         </form>
-      </AdminPanel>
 
-      <AdminTabs items={filterItems} wrap />
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+          <AdminTabs items={filterItems} wrap className="bg-stone-50 shadow-none" />
+          <StatusPill status={`${visibleOrders.length} / ${orders.length}`} tone="blue" />
+        </div>
+      </AdminPanel>
 
       <AdminPanel
         title={locale === "it" ? "Lista ordini" : "订单列表"}
@@ -183,13 +184,9 @@ export default async function AdminOrdersPage({
                         <Link
                           className="font-mono text-[11px] font-black text-stone-950 hover:text-blue-700"
                           href={localizePath(locale, `/admin/orders/${orderRouteId(order)}`)}
-                          title={order.id}
                         >
-                          {displayOrderNumber(order)}
+                          {displayOrderNumber(order, locale)}
                         </Link>
-                        <p className="mt-0.5 font-mono text-[10px] font-semibold text-stone-400">
-                          {shortInternalOrderId(order.id)}
-                        </p>
                         <p className="mt-0.5 text-[11px] font-medium text-stone-500">
                           {formatDateTime(order.createdAt, locale)}
                         </p>
@@ -271,7 +268,7 @@ function MobileOrderCard({ order, locale }: Readonly<{ order: AdminOrder; locale
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-mono text-xs font-black text-stone-950">
-            {displayOrderNumber(order)}
+            {displayOrderNumber(order, locale)}
           </p>
           <p className="mt-1 truncate text-sm font-black text-stone-950">
             {order.companyName || order.customerName || "-"}
@@ -310,30 +307,36 @@ function OrderItemsSummary({
   const hiddenCount = Math.max(order.items.length - visibleItems.length, 0);
 
   return (
-    <div className="max-w-[360px] space-y-0.5">
+    <div className="max-w-[420px] space-y-1">
       {visibleItems.map((item) => {
         const fulfillmentType = formatAdminStatus(
           "fulfillmentType",
           item.fulfillmentType ?? "-",
           locale,
         );
+        const displayName = getOrderItemName(item, locale);
         return (
-          <p
+          <div
             key={`${order.id}-${item.sku}`}
-            className="truncate text-[11px] font-semibold text-stone-600"
-            title={`${item.sku} x ${item.quantity}`}
+            className="min-w-0"
+            title={`${displayName} · ${item.sku} x ${item.quantity}`}
           >
-            <span className="font-mono font-black text-stone-800">{item.sku}</span>{" "}
-            <span>x {item.quantity}</span>
-            <span className="mx-1 text-stone-300">·</span>
-            <span>{fulfillmentType.label}</span>
-            {item.preorderQty ? (
-              <span className="text-amber-700">
-                {" "}
-                {locale === "it" ? "preorder" : "预购"} {item.preorderQty}
+            <p className="truncate text-[11px] font-black text-stone-800">
+              {displayName}
+              <span className="ml-1 font-semibold text-stone-500">x {item.quantity}</span>
+            </p>
+            <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1 text-[10px] font-bold text-stone-500">
+              <span className="max-w-[170px] truncate rounded bg-stone-100 px-1.5 py-0.5 font-mono text-stone-500">
+                {item.sku}
               </span>
-            ) : null}
-          </p>
+              <span>{fulfillmentType.label}</span>
+              {item.preorderQty ? (
+                <span className="text-amber-700">
+                  {locale === "it" ? "preorder" : "预购"} {item.preorderQty}
+                </span>
+              ) : null}
+            </p>
+          </div>
         );
       })}
       {hiddenCount > 0 ? (
@@ -343,6 +346,19 @@ function OrderItemsSummary({
       ) : null}
     </div>
   );
+}
+
+function getOrderItemName(
+  item: AdminOrder["items"][number],
+  locale: Locale,
+) {
+  const localizedName = locale === "zh" ? item.nameZh : item.nameIt;
+  const name = (localizedName || item.name || "").trim();
+  return name && name !== item.sku
+    ? name
+    : locale === "it"
+      ? "Nome prodotto da completare"
+      : "商品名待补全";
 }
 
 function LocalizedStatusPill({

@@ -13,7 +13,6 @@ import { formatAdminStatus } from "@/lib/admin-display";
 import { getAdminOrderRows, getAdminOrderTimelineRows, type AdminOrderTimelineRow } from "@/lib/admin-operations";
 import { getAuthContext } from "@/lib/auth";
 import { isLocale, type Locale, localizePath } from "@/lib/i18n";
-import { shortInternalOrderId } from "@/lib/order-number";
 
 export default async function AdminOrderTimelinePage({
   params,
@@ -107,7 +106,7 @@ function TimelineEventCard({
   locale,
 }: Readonly<{ event: AdminOrderTimelineRow; locale: Locale }>) {
   const status = formatAdminStatus("timelineEvent", event.eventType, locale);
-  const orderLabel = event.orderNumber || shortInternalOrderId(event.orderId);
+  const orderLabel = event.orderNumber || (locale === "it" ? "Numero in generazione" : "订单号待生成");
   const orderRoute = event.orderNumber || event.orderId;
 
   return (

@@ -125,7 +125,7 @@ export function AccountTodoPanel({
     ...shippedOrders.slice(0, 2).map((order) => ({
       key: `shipment-${order.id}`,
       title: locale === "it" ? "Tracking disponibile" : "物流可查看",
-      description: order.trackingNumber ?? order.shippingCarrier ?? displayOrderNumber(order),
+      description: order.trackingNumber ?? order.shippingCarrier ?? displayOrderNumber(order, locale),
       href: localizePath(locale, `/account/orders/${orderRouteId(order)}`),
       tone: "blue" as const,
     })),
@@ -293,7 +293,7 @@ export function AccountOrdersTable({
           {orders.map((order) => (
             <tr key={order.id}>
               <td className="px-4 py-3">
-                <p className="font-mono text-xs font-bold text-slate-900">{displayOrderNumber(order)}</p>
+                <p className="font-mono text-xs font-bold text-slate-900">{displayOrderNumber(order, locale)}</p>
                 <p className="mt-1 text-xs text-slate-500">
                   {new Date(order.createdAt).toLocaleString(
                     locale === "it" ? "it-IT" : "zh-CN",
