@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Lock,
   PackageSearch,
+  Search,
   SlidersHorizontal,
   X,
 } from "lucide-react";
@@ -13,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   catalogStateToParams,
   loadCatalogPage,
-  type CatalogFacet,
   type CatalogItem,
   type CatalogPageData,
 } from "@/lib/catalog-page";
@@ -42,13 +42,13 @@ export default async function ProductsPage({
             <Badge className="border-blue-200 bg-blue-50 text-blue-700">
               {locale === "it" ? "Catalogo wholesale" : "批发商品目录"}
             </Badge>
-            <h1 className="mt-4 text-3xl font-bold text-slate-950">
+            <h1 className="mt-4 text-2xl font-bold leading-tight text-slate-950 sm:text-3xl">
               {dictionary.products.title}
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
               {locale === "it"
-                ? "Trova ricambi per brand, modello, categoria e parametri tecnici. Prezzi e stock sono visibili dopo il login."
-                : "按品牌、型号、品类和技术参数快速找货。登录后显示价格、库存和下单入口。"}
+                ? "Cerca tutti i ricambi per nome, SKU, EAN, brand e modello. Prezzi e stock sono visibili dopo il login."
+                : "可按配件名、SKU、EAN、品牌和型号搜索全部商品。登录后显示价格、库存和下单入口。"}
             </p>
           </div>
 
@@ -70,6 +70,8 @@ export default async function ProductsPage({
         </div>
       </section>
 
+      <GlobalCatalogSearch catalog={catalog} locale={locale} />
+
       <div className="mt-6 grid gap-6 lg:grid-cols-[288px_1fr]">
         <aside className="hidden lg:block">
           <FilterPanel catalog={catalog} locale={locale} />
@@ -80,7 +82,7 @@ export default async function ProductsPage({
             <summary className="flex h-12 cursor-pointer items-center justify-between px-4 text-sm font-bold text-slate-900">
               <span className="inline-flex items-center gap-2">
                 <SlidersHorizontal className="h-4 w-4" />
-                {locale === "it" ? "Filtri" : "筛选"}
+                {locale === "it" ? "Dispositivi" : "品牌 / 型号"}
               </span>
               <span className="text-xs font-semibold text-slate-500">
                 {locale === "it" ? "Apri" : "展开"}
@@ -148,110 +150,59 @@ function FilterPanel({
   locale,
 }: Readonly<{ catalog: CatalogPageData; locale: Locale }>) {
   return (
-    <nav className="rounded-lg border border-slate-200 bg-white p-4" aria-label={locale === "it" ? "Filtri catalogo" : "筛选目录"}>
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-bold text-slate-950">
-          {locale === "it" ? "Filtra catalogo" : "筛选目录"}
-        </h2>
-        <Link
-          href={localizePath(locale, "/products")}
-          className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-900"
-        >
-          <X className="h-3.5 w-3.5" />
-          {locale === "it" ? "Reset" : "清空"}
-        </Link>
-      </div>
-
+    <nav className="rounded-lg border border-slate-200 bg-white p-4" aria-label={locale === "it" ? "Device list" : "设备列表"}>
       <CatalogDeviceMenu
         key={catalogStateToParams(catalog.state).toString()}
         brandModelGroups={catalog.brandModelGroups}
         state={catalog.state}
         locale={locale}
       />
-
-      <div className="mt-5 space-y-3">
-        {catalog.facets.map((facet) => (
-          <FacetGroup key={facet.key} catalog={catalog} facet={facet} locale={locale} />
-        ))}
-      </div>
     </nav>
   );
 }
 
-function FacetGroup({
+function GlobalCatalogSearch({
   catalog,
-  facet,
   locale,
-}: Readonly<{
-  catalog: CatalogPageData;
-  facet: CatalogFacet;
-  locale: Locale;
-}>) {
-  const activeCount = facet.options.filter((option) => option.active).length;
-
+}: Readonly<{ catalog: CatalogPageData; locale: Locale }>) {
   return (
-    <details className="group border-t border-slate-200 pt-3">
-      <summary className="grid min-h-9 cursor-pointer list-none grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg px-1 text-sm font-bold text-slate-950 marker:hidden [&::-webkit-details-marker]:hidden">
-        <span className="truncate">{facet.label}</span>
-        <span
-          className={cn(
-            "rounded-md px-1.5 py-0.5 text-xs font-semibold",
-            activeCount > 0
-              ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200"
-              : "bg-slate-100 text-slate-500",
-          )}
-        >
-          {activeCount > 0 ? `${activeCount}/${facet.options.length}` : facet.options.length}
-        </span>
-        <ChevronRight className="h-3.5 w-3.5 text-slate-400 transition group-open:rotate-90 group-open:text-blue-500" />
-      </summary>
-      <div className="mt-2 max-h-56 space-y-1 overflow-auto pr-1">
-        {facet.options.map((option) => (
-          <FacetOptionLink
-            key={option.value}
-            catalog={catalog}
-            facet={facet}
-            locale={locale}
-            option={option}
-          />
-        ))}
-      </div>
-    </details>
-  );
-}
-
-function FacetOptionLink({
-  catalog,
-  facet,
-  locale,
-  option,
-}: Readonly<{
-  catalog: CatalogPageData;
-  facet: CatalogFacet;
-  locale: Locale;
-  option: CatalogFacet["options"][number];
-}>) {
-  return (
-    <Link
-      href={facetOptionHref(locale, catalog, facet, option)}
-      aria-current={option.active ? "true" : undefined}
-      className={cn(
-        "grid min-h-9 grid-cols-[1fr_auto] items-center gap-2 rounded-md px-2.5 py-1 text-sm transition",
-        option.active
-          ? "bg-slate-900 font-bold text-white"
-          : "text-slate-700 hover:bg-slate-50 hover:text-blue-700",
-      )}
+    <form
+      action={localizePath(locale, "/products")}
+      className="mt-5 rounded-xl border border-slate-200 bg-white p-2 shadow-sm"
     >
-      <span className="min-w-0 flex-1 truncate">{option.label}</span>
-      <span
-        className={cn(
-          "rounded-md px-1.5 py-0.5 text-xs font-semibold",
-          option.active ? "bg-white/15 text-white" : "bg-slate-100 text-slate-500",
-        )}
-      >
-        {option.count}
-      </span>
-    </Link>
+      <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+        <label className="relative min-w-0">
+          <span className="sr-only">
+            {locale === "it" ? "Cerca ricambi" : "搜索所有配件"}
+          </span>
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            name="q"
+            defaultValue={catalog.state.q}
+            placeholder={
+              locale === "it"
+                ? "Cerca nome, SKU, EAN, brand, modello..."
+                : "搜索配件名、SKU、EAN、品牌、型号..."
+            }
+            className="h-11 w-full rounded-lg border border-transparent bg-slate-50 pl-10 pr-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
+          />
+        </label>
+        <button
+          type="submit"
+          className="inline-flex h-11 items-center justify-center rounded-lg bg-slate-950 px-5 text-sm font-black text-white hover:bg-slate-800"
+        >
+          {locale === "it" ? "Cerca" : "搜索"}
+        </button>
+        {catalog.state.q ? (
+          <Link
+            href={localizePath(locale, "/products")}
+            className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-black text-slate-700 hover:border-blue-300 hover:text-blue-700"
+          >
+            {locale === "it" ? "Reset" : "清空"}
+          </Link>
+        ) : null}
+      </div>
+    </form>
   );
 }
 
@@ -259,8 +210,19 @@ function CatalogToolbar({
   catalog,
   locale,
 }: Readonly<{ catalog: CatalogPageData; locale: Locale }>) {
+  const ctaHref = catalog.isPriceVisible
+    ? localizePath(locale, "/account/company")
+    : localizePath(locale, "/login");
+  const ctaLabel = catalog.isPriceVisible
+    ? locale === "it"
+      ? "Profilo account"
+      : "账户资料"
+    : locale === "it"
+      ? "Login per prezzi"
+      : "登录查看价格";
+
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
       <div>
         <p className="text-sm font-bold text-slate-950">
           {locale === "it" ? "Risultati catalogo" : "商品结果"}
@@ -272,10 +234,10 @@ function CatalogToolbar({
         </p>
       </div>
       <Link
-        href={localizePath(locale, "/account/company")}
-        className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 px-3 text-sm font-bold text-slate-900 hover:border-blue-300 hover:text-blue-700"
+        href={ctaHref}
+        className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-slate-300 px-3 text-sm font-bold text-slate-900 hover:border-blue-300 hover:text-blue-700 sm:w-auto"
       >
-        {locale === "it" ? "Profilo aziendale" : "完善账户资料"}
+        {ctaLabel}
       </Link>
     </div>
   );
@@ -563,70 +525,6 @@ function buildActiveChips(catalog: CatalogPageData) {
   }
 
   return chips.filter((chip) => fixed.has(chip.key) || chip.key.startsWith("attr_") || chip.key);
-}
-
-function facetOptionHref(
-  locale: Locale,
-  catalog: CatalogPageData,
-  facet: CatalogFacet,
-  option: CatalogFacet["options"][number],
-) {
-  if (facet.key === "category") {
-    return productsHref(
-      locale,
-      catalogStateToParams(catalog.state, {
-        category: option.active ? "" : option.value,
-        page: 1,
-      }),
-    );
-  }
-
-  if (facet.key === "quality") {
-    return productsHref(
-      locale,
-      catalogStateToParams(catalog.state, {
-        quality: option.active ? "" : option.value,
-        page: 1,
-      }),
-    );
-  }
-
-  if (facet.key === "availability") {
-    return productsHref(
-      locale,
-      catalogStateToParams(catalog.state, {
-        availability: option.active ? "" : option.value,
-        page: 1,
-      }),
-    );
-  }
-
-  if (facet.key.startsWith("attr_")) {
-    const attrKey = facet.key.slice(5);
-    const values = new Set(catalog.state.attrs[attrKey] ?? []);
-    if (option.active) {
-      values.delete(option.value);
-    } else {
-      values.add(option.value);
-    }
-
-    const attrs = { ...catalog.state.attrs };
-    if (values.size > 0) {
-      attrs[attrKey] = [...values];
-    } else {
-      delete attrs[attrKey];
-    }
-
-    return productsHref(
-      locale,
-      catalogStateToParams(catalog.state, {
-        attrs,
-        page: 1,
-      }),
-    );
-  }
-
-  return productsHref(locale, catalogStateToParams(catalog.state, { page: 1 }));
 }
 
 function productsHref(locale: Locale, params: URLSearchParams) {

@@ -469,8 +469,15 @@ function applyCatalogFilters(
         `barcode_ean13.ilike.${pattern}`,
         `brand.ilike.${pattern}`,
         `model.ilike.${pattern}`,
+        `category.ilike.${pattern}`,
+        `category_name_it.ilike.${pattern}`,
+        `category_name_zh.ilike.${pattern}`,
+        `quality_grade.ilike.${pattern}`,
         `name_it.ilike.${pattern}`,
         `name_zh.ilike.${pattern}`,
+        `description_it.ilike.${pattern}`,
+        `description_zh.ilike.${pattern}`,
+        `color.ilike.${pattern}`,
       ].join(","),
     );
   }
@@ -897,8 +904,14 @@ function matchesLocalProduct(
     product.sku.toLowerCase().includes(q) ||
     product.brand.toLowerCase().includes(q) ||
     product.model.toLowerCase().includes(q) ||
+    product.category.toLowerCase().includes(q) ||
+    product.quality.toLowerCase().includes(q) ||
+    product.color.toLowerCase().includes(q) ||
     product.names.it.toLowerCase().includes(q) ||
-    product.names.zh.toLowerCase().includes(q);
+    product.names.zh.toLowerCase().includes(q) ||
+    product.descriptions.it.toLowerCase().includes(q) ||
+    product.descriptions.zh.toLowerCase().includes(q) ||
+    product.compatibility.some((value) => value.toLowerCase().includes(q));
 
   return (
     matchesQuery &&

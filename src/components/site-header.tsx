@@ -55,11 +55,13 @@ export function SiteHeader({
           >
             <Search className="h-4 w-4" />
           </Link>
-          <LanguageSwitcher locale={locale} />
+          <div className="hidden sm:block">
+            <LanguageSwitcher locale={locale} />
+          </div>
           <ButtonLink
             href={localizePath(locale, "/cart")}
             variant="dark"
-            className="h-10 px-3"
+            className="hidden h-10 px-3 sm:inline-flex"
           >
             <ShoppingCart className="h-4 w-4" />
             <span className="hidden sm:inline">{dictionary.nav.cart as string}</span>
@@ -71,6 +73,7 @@ export function SiteHeader({
               label,
             }))}
             searchLabel={dictionary.common.search as string}
+            cartLabel={dictionary.nav.cart as string}
           />
         </div>
       </div>

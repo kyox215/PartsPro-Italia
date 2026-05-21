@@ -7,8 +7,6 @@ import type { BrandModelGroup, CatalogSearchState } from "@/lib/catalog-page";
 import { type Locale, localizePath } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-const visibleModelLimit = 18;
-
 type CatalogDeviceMenuProps = Readonly<{
   brandModelGroups: BrandModelGroup[];
   state: CatalogSearchState;
@@ -21,36 +19,27 @@ export function CatalogDeviceMenu({
   locale,
 }: CatalogDeviceMenuProps) {
   const initialOpenBrands = useMemo(() => {
+    if (!state.brand && !state.model && brandModelGroups.length > 0) {
+      return { [brandModelGroups[0].value]: true };
+    }
+
     return Object.fromEntries(
       brandModelGroups
         .filter((group) => group.active)
         .map((group) => [group.value, true]),
     );
-  }, [brandModelGroups]);
-
-  const initialExpandedModels = useMemo(() => {
-    return Object.fromEntries(
-      brandModelGroups
-        .filter((group) => {
-          const activeModelIndex = group.models.findIndex((model) => model.active);
-          return activeModelIndex >= visibleModelLimit;
-        })
-        .map((group) => [group.value, true]),
-    );
-  }, [brandModelGroups]);
+  }, [brandModelGroups, state.brand, state.model]);
 
   const [openBrands, setOpenBrands] =
     useState<Record<string, boolean>>(initialOpenBrands);
-  const [expandedModels, setExpandedModels] =
-    useState<Record<string, boolean>>(initialExpandedModels);
 
   if (brandModelGroups.length === 0) return null;
 
   return (
-    <section className="mt-5 border-t border-slate-200 pt-4">
+    <section>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-bold text-slate-950">
-          {locale === "it" ? "Brand & Model" : "选择设备"}
+        <h3 className="text-sm font-black text-slate-950">
+          {locale === "it" ? "Dispositivi" : "品牌 / 型号"}
         </h3>
         {state.brand || state.model ? (
           <Link
@@ -69,14 +58,9 @@ export function CatalogDeviceMenu({
         ) : null}
       </div>
 
-      <div className="mt-3 max-h-[420px] space-y-1 overflow-auto pr-1">
+      <div className="mt-3 max-h-[calc(100dvh-220px)] space-y-1 overflow-auto pr-1 lg:max-h-[calc(100dvh-180px)]">
         {brandModelGroups.map((group) => {
           const isOpen = openBrands[group.value] ?? false;
-          const isExpanded = expandedModels[group.value] ?? false;
-          const models = isExpanded
-            ? group.models
-            : group.models.slice(0, visibleModelLimit);
-          const hiddenCount = Math.max(0, group.models.length - visibleModelLimit);
 
           return (
             <div key={group.value} className="rounded-lg">
@@ -91,7 +75,7 @@ export function CatalogDeviceMenu({
                   }))
                 }
                 className={cn(
-                  "grid min-h-10 w-full grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-bold transition",
+                  "grid min-h-10 w-full grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-black transition",
                   group.active
                     ? "bg-blue-50 text-blue-800 ring-1 ring-blue-200"
                     : "text-slate-700 hover:bg-slate-50 hover:text-blue-700",
@@ -127,11 +111,15 @@ export function CatalogDeviceMenu({
                         : "text-blue-700 hover:bg-blue-50",
                     )}
                   >
-                    <span>{locale === "it" ? "Filtra brand" : "筛选此品牌"}</span>
+                    <span>
+                      {locale === "it"
+                        ? `Tutti ${group.label}`
+                        : `${group.label} 全部型号`}
+                    </span>
                     <span>{group.count}</span>
                   </Link>
 
-                  {models.map((model) => (
+                  {group.models.map((model) => (
                     <Link
                       key={model.value}
                       href={productsHref(
@@ -163,32 +151,6 @@ export function CatalogDeviceMenu({
                       </span>
                     </Link>
                   ))}
-
-                  {hiddenCount > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setExpandedModels((current) => ({
-                          ...current,
-                          [group.value]: !isExpanded,
-                        }))
-                      }
-                      className="flex min-h-8 w-full items-center justify-between rounded-md px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-50 hover:text-blue-900"
-                    >
-                      <span>
-                        {isExpanded
-                          ? locale === "it"
-                            ? "Mostra meno"
-                            : "收起型号"
-                          : locale === "it"
-                            ? "Mostra tutti"
-                            : "显示全部"}
-                      </span>
-                      <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-blue-700">
-                        {isExpanded ? group.models.length : `+${hiddenCount}`}
-                      </span>
-                    </button>
-                  ) : null}
                 </div>
               ) : null}
             </div>
