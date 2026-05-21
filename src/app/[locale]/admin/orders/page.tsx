@@ -116,8 +116,8 @@ export default async function AdminOrdersPage({
               name="q"
               placeholder={
                 locale === "it"
-                  ? "PP-260521-0001, cliente, email, SKU, pagamento..."
-                  : "短订单号、客户、邮箱、公司、SKU、付款方式、状态..."
+                  ? "PP-260521-0001, cliente, email, SKU, tracking, pagamento..."
+                  : "短订单号、客户、邮箱、公司、SKU、快递单号、付款方式、状态..."
               }
             />
           </label>
@@ -165,7 +165,7 @@ export default async function AdminOrdersPage({
                 <tr className="border-b border-black/5">
                   <th className="px-2 py-1.5">{locale === "it" ? "Ordine" : "订单"}</th>
                   <th className="px-2 py-1.5">{locale === "it" ? "Cliente" : "客户"}</th>
-                  <th className="px-2 py-1.5">{locale === "it" ? "Articoli" : "商品"}</th>
+                  <th className="px-2 py-1.5">{locale === "it" ? "Tracking" : "快递单号"}</th>
                   <th className="px-2 py-1.5">{locale === "it" ? "Pagamento" : "付款"}</th>
                   <th className="px-2 py-1.5">{locale === "it" ? "Importo" : "金额"}</th>
                   <th className="px-2 py-1.5">{locale === "it" ? "Stato" : "状态"}</th>
@@ -200,7 +200,7 @@ export default async function AdminOrdersPage({
                         </p>
                       </td>
                       <td className="px-2 py-2">
-                        <OrderItemsSummary order={order} locale={locale} />
+                        <OrderShipmentSummary order={order} locale={locale} />
                       </td>
                       <td className="w-[150px] px-2 py-2 text-stone-700">
                         <p className="font-black">{paymentMethod.label}</p>
@@ -280,7 +280,7 @@ function MobileOrderCard({ order, locale }: Readonly<{ order: AdminOrder; locale
         <LocalizedStatusPill kind="order" locale={locale} value={order.status} />
       </div>
       <div className="mt-3">
-        <OrderItemsSummary order={order} locale={locale} />
+        <OrderShipmentSummary order={order} locale={locale} />
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-stone-500">
         <LocalizedStatusPill kind="payment" locale={locale} value={order.paymentStatus ?? "-"} />
@@ -299,66 +299,53 @@ function MobileOrderCard({ order, locale }: Readonly<{ order: AdminOrder; locale
   );
 }
 
-function OrderItemsSummary({
+function OrderShipmentSummary({
   order,
   locale,
 }: Readonly<{ order: AdminOrder; locale: Locale }>) {
-  const visibleItems = order.items.slice(0, 2);
-  const hiddenCount = Math.max(order.items.length - visibleItems.length, 0);
+  const trackingNumber = order.trackingNumber?.trim();
+  const carrier = order.shippingCarrier?.trim();
+  const trackingUrl = order.trackingUrl?.trim();
+  const shippedAt = order.shippedAt ? formatDateTime(order.shippedAt, locale) : null;
 
   return (
-    <div className="max-w-[420px] space-y-1">
-      {visibleItems.map((item) => {
-        const fulfillmentType = formatAdminStatus(
-          "fulfillmentType",
-          item.fulfillmentType ?? "-",
-          locale,
-        );
-        const displayName = getOrderItemName(item, locale);
-        return (
-          <div
-            key={`${order.id}-${item.sku}`}
-            className="min-w-0"
-            title={`${displayName} · ${item.sku} x ${item.quantity}`}
-          >
-            <p className="truncate text-[11px] font-black text-stone-800">
-              {displayName}
-              <span className="ml-1 font-semibold text-stone-500">x {item.quantity}</span>
-            </p>
-            <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1 text-[10px] font-bold text-stone-500">
-              <span className="max-w-[170px] truncate rounded bg-stone-100 px-1.5 py-0.5 font-mono text-stone-500">
-                {item.sku}
+    <div className="max-w-[360px] space-y-1">
+      {trackingNumber || carrier || trackingUrl ? (
+        <>
+          <p className="truncate font-mono text-[11px] font-black text-stone-900" title={trackingNumber || trackingUrl || carrier}>
+            {trackingNumber || (locale === "it" ? "Link tracking inserito" : "已填写跟踪链接")}
+          </p>
+          <p className="flex min-w-0 flex-wrap items-center gap-1 text-[10px] font-bold text-stone-500">
+            {carrier ? (
+              <span className="max-w-[120px] truncate rounded bg-stone-100 px-1.5 py-0.5">
+                {carrier}
               </span>
-              <span>{fulfillmentType.label}</span>
-              {item.preorderQty ? (
-                <span className="text-amber-700">
-                  {locale === "it" ? "preorder" : "预购"} {item.preorderQty}
-                </span>
-              ) : null}
-            </p>
-          </div>
-        );
-      })}
-      {hiddenCount > 0 ? (
-        <p className="text-[11px] font-black text-stone-400">
-          +{hiddenCount} {locale === "it" ? "articoli" : "件商品"}
-        </p>
-      ) : null}
+            ) : null}
+            {shippedAt ? <span>{shippedAt}</span> : null}
+            {trackingUrl ? (
+              <a
+                className="font-black text-blue-700 hover:text-blue-900"
+                href={trackingUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                {locale === "it" ? "Apri" : "跟踪"}
+              </a>
+            ) : null}
+          </p>
+        </>
+      ) : (
+        <div className="inline-flex flex-col gap-1 rounded-lg bg-amber-50 px-2 py-1 ring-1 ring-amber-100">
+          <span className="text-[11px] font-black text-amber-800">
+            {locale === "it" ? "Tracking da inserire" : "待填写快递单号"}
+          </span>
+          <span className="text-[10px] font-bold text-amber-700">
+            {locale === "it" ? "Compila nella scheda ordine" : "在订单详情里补录物流"}
+          </span>
+        </div>
+      )}
     </div>
   );
-}
-
-function getOrderItemName(
-  item: AdminOrder["items"][number],
-  locale: Locale,
-) {
-  const localizedName = locale === "zh" ? item.nameZh : item.nameIt;
-  const name = (localizedName || item.name || "").trim();
-  return name && name !== item.sku
-    ? name
-    : locale === "it"
-      ? "Nome prodotto da completare"
-      : "商品名待补全";
 }
 
 function LocalizedStatusPill({
@@ -476,6 +463,11 @@ function filterAdminOrders(
         order.paymentMethod,
         order.paymentStatus,
         order.fulfillmentStatus,
+        order.shippingCarrier,
+        order.trackingNumber,
+        order.trackingUrl,
+        order.shipmentNote,
+        order.customerNote,
         order.status,
         ...order.items.flatMap((item) => [item.sku, item.name, item.fulfillmentType]),
       ]

@@ -4,7 +4,6 @@ import { AdminCsrfField } from "@/components/admin/admin-csrf-field";
 import { OrderSubnav } from "@/components/admin/order-subnav";
 import { StatusSelectForm } from "@/components/admin/status-select-form";
 import {
-  AdminActionRail,
   AdminButtonLink,
   AdminDataTable,
   AdminMetricCard,
@@ -12,7 +11,6 @@ import {
   AdminNotice,
   AdminPageHeader,
   AdminPanel,
-  AdminWorkspaceGrid,
   StatusPill,
 } from "@/components/admin/admin-ui";
 import { formatAdminStatus, type AdminStatusKind } from "@/lib/admin-display";
@@ -67,7 +65,7 @@ export default async function AdminOrderDetailPage({
   const fulfillmentStatus = formatAdminStatus("fulfillment", order.fulfillmentStatus ?? "-", locale);
 
   return (
-    <div className="space-y-3">
+    <div className="mx-auto max-w-7xl space-y-3 rounded-2xl border border-black/10 bg-white p-3 shadow-2xl sm:p-4">
       <AdminPageHeader
         eyebrow={locale === "it" ? "Order detail" : "订单详情"}
         title={<span className="font-mono">{displayOrderNumber(order, locale)}</span>}
@@ -131,14 +129,22 @@ export default async function AdminOrderDetailPage({
         </div>
       </details>
 
-      <AdminWorkspaceGrid
-        className="xl:!grid-cols-[minmax(0,1fr)_280px] 2xl:!grid-cols-[minmax(0,1fr)_300px]"
-        rail={
-          <AdminActionRail
-            title={locale === "it" ? "Azioni ordine" : "订单操作"}
-            description={locale === "it" ? "Stato, pagamento e fulfilment" : "状态、收款与履约"}
-          >
-            <AdminPanel title={locale === "it" ? "Aggiorna stato" : "更新状态"} contentClassName="p-3">
+      <div className="space-y-3">
+        <AdminPanel
+          title={locale === "it" ? "Pannello operativo" : "订单操作面板"}
+          description={
+            locale === "it"
+              ? "Stato, incasso, fulfilment e tracking sono nello stesso pannello."
+              : "状态、收款、履约和物流集中在主内容区处理。"
+          }
+          contentClassName="space-y-3 p-3"
+        >
+          <div className="grid gap-3 xl:grid-cols-[minmax(260px,0.8fr)_minmax(340px,1.2fr)]">
+            <section className="rounded-lg border border-black/5 bg-stone-50 p-3">
+              <h3 className="text-sm font-black text-stone-950">
+                {locale === "it" ? "Aggiorna stato" : "更新状态"}
+              </h3>
+              <div className="mt-2">
               <StatusSelectForm
                 action="/api/admin/orders/status"
                 currentStatus={order.status}
@@ -149,6 +155,7 @@ export default async function AdminOrderDetailPage({
                 statuses={orderStatuses}
                 submitLabel={locale === "it" ? "Salva" : "保存"}
               />
+              </div>
               <div className="mt-2 rounded-lg bg-stone-50 p-2.5 text-xs font-semibold leading-5 text-stone-700">
                 <p>
                   {locale === "it" ? "Subtotal" : "小计"}:{" "}
@@ -168,14 +175,16 @@ export default async function AdminOrderDetailPage({
                   </p>
                 ) : null}
               </div>
-            </AdminPanel>
+            </section>
 
-            <AdminPanel
-              title={locale === "it" ? "Azioni rapide" : "快捷操作"}
-              description={locale === "it" ? "Incasso, fulfilment e lock." : "收款、履约与锁库。"}
-              contentClassName="p-3"
-            >
-              <div className="grid gap-1.5">
+            <section className="rounded-lg border border-black/5 bg-stone-50 p-3">
+              <h3 className="text-sm font-black text-stone-950">
+                {locale === "it" ? "Azioni rapide" : "快捷操作"}
+              </h3>
+              <p className="mt-1 text-xs font-semibold text-stone-500">
+                {locale === "it" ? "Incasso, fulfilment e lock." : "收款、履约与锁库。"}
+              </p>
+              <div className="mt-3 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
                 {order.paymentMethod === "cash" && order.paymentStatus === "pending_cash" ? (
                   <ActionForm action="/api/admin/orders/payment" id={order.id} locale={locale} returnTo={returnTo} value="confirm_cash">
                     {locale === "it" ? "Conferma contanti" : "确认现金收款"}
@@ -211,9 +220,11 @@ export default async function AdminOrderDetailPage({
                   {locale === "it" ? "Annulla e libera" : "取消并释放库存"}
                 </ActionForm>
               </div>
-            </AdminPanel>
+            </section>
+          </div>
 
-            <AdminPanel
+          <div className="grid gap-2 xl:grid-cols-3">
+            <OperationDetails
               title={locale === "it" ? "Prova pagamento" : "付款凭证"}
               description={
                 locale === "it"
@@ -222,9 +233,9 @@ export default async function AdminOrderDetailPage({
               }
             >
               <PaymentProofForm order={order} locale={locale} returnTo={returnTo} />
-            </AdminPanel>
+            </OperationDetails>
 
-            <AdminPanel
+            <OperationDetails
               title={locale === "it" ? "Rimborso" : "退款"}
               description={
                 locale === "it"
@@ -233,9 +244,9 @@ export default async function AdminOrderDetailPage({
               }
             >
               <RefundForm order={order} locale={locale} returnTo={returnTo} />
-            </AdminPanel>
+            </OperationDetails>
 
-            <AdminPanel
+            <OperationDetails
               title={locale === "it" ? "Spedizione" : "物流信息"}
               description={
                 locale === "it"
@@ -244,10 +255,10 @@ export default async function AdminOrderDetailPage({
               }
             >
               <ShipmentForm order={order} locale={locale} returnTo={returnTo} />
-            </AdminPanel>
-          </AdminActionRail>
-        }
-      >
+            </OperationDetails>
+          </div>
+        </AdminPanel>
+
         <AdminPanel title={locale === "it" ? "Cliente e fattura" : "客户与发票"}>
           <dl className="grid gap-2 text-sm">
             <InfoRow label={locale === "it" ? "Azienda" : "公司"} value={order.companyName || "-"} />
@@ -486,7 +497,7 @@ export default async function AdminOrderDetailPage({
             </table>
           </AdminDataTable>
         </AdminPanel>
-      </AdminWorkspaceGrid>
+      </div>
     </div>
   );
 }
@@ -601,6 +612,35 @@ function PaymentProofForm({
         {locale === "it" ? "Salva prova" : "保存付款凭证"}
       </button>
     </form>
+  );
+}
+
+function OperationDetails({
+  title,
+  description,
+  children,
+}: Readonly<{
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  children: React.ReactNode;
+}>) {
+  return (
+    <details className="group rounded-lg border border-black/5 bg-stone-50 p-3 open:bg-white open:shadow-sm">
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
+        <span className="min-w-0">
+          <span className="block text-sm font-black text-stone-950">{title}</span>
+          {description ? (
+            <span className="mt-0.5 block text-xs font-semibold leading-5 text-stone-500">
+              {description}
+            </span>
+          ) : null}
+        </span>
+        <span className="rounded-md bg-white px-2 py-1 text-[11px] font-black text-stone-500 ring-1 ring-black/5 group-open:bg-stone-950 group-open:text-white">
+          Open
+        </span>
+      </summary>
+      <div className="mt-3 border-t border-black/5 pt-3">{children}</div>
+    </details>
   );
 }
 
