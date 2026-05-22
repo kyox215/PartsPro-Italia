@@ -11,6 +11,10 @@ export type Product = {
   color: string
   frame: 'With Frame' | 'Without Frame' | 'N/A'
   stockStatus: StockStatus
+  imagePath?: string
+  imageUrl?: string
+  imageAlt?: string
+  galleryImagePaths?: string[]
   moq: number
   b2bPrice: number
   vatMode: 'IVA esclusa' | 'IVA inclusa'

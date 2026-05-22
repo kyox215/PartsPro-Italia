@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { FilterOutlined } from '@ant-design/icons-vue'
 import ProductCard from '@/components/ProductCard.vue'
@@ -16,6 +16,16 @@ const selectedStock = ref<string>()
 const isLoading = ref(false)
 
 const products = ref<Product[]>([])
+
+const categorySlugMap: Record<string, string> = {
+  screens: 'Screens',
+  batteries: 'Batteries',
+  'charging-ports': 'Charging Ports',
+  tools: 'Tools',
+  cameras: 'Cameras',
+  'back-cover': 'Back Covers',
+  'back-covers': 'Back Covers',
+}
 
 const brands = computed(() => [...new Set(products.value.map((product) => product.brand))])
 const categories = computed(() => [...new Set(products.value.map((product) => product.category))])
@@ -55,6 +65,11 @@ function clearFilters() {
   selectedStock.value = undefined
 }
 
+function syncRouteCategory() {
+  const category = String(route.query.category || '')
+  selectedCategory.value = category ? categorySlugMap[category] || category : undefined
+}
+
 async function loadProducts() {
   isLoading.value = true
   try {
@@ -65,6 +80,7 @@ async function loadProducts() {
 }
 
 onMounted(loadProducts)
+watch(() => route.query.category, syncRouteCategory, { immediate: true })
 </script>
 
 <template>

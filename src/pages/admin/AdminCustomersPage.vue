@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { fetchCustomerAccounts, fetchPriceGroups, getCustomerAccounts, getPriceGroups } from '@/services/admin.service'
 import type { CustomerAccount, CustomerStatus, CustomerTier } from '@/types/admin'
+import { labelCustomerStatus, labelCustomerTier } from '@/utils/adminLabels'
 
 const customers = ref(getCustomerAccounts())
 const priceGroups = ref(getPriceGroups())
@@ -11,14 +12,14 @@ const selectedCustomer = ref<CustomerAccount | null>(null)
 const isDrawerOpen = ref(false)
 
 const columns = [
-  { title: 'Cliente', dataIndex: 'companyName', key: 'customer', width: 280 },
+  { title: '客户', dataIndex: 'companyName', key: 'customer', width: 280 },
   { title: 'P.IVA / SDI / PEC', key: 'fiscal', width: 280 },
-  { title: 'Tier', dataIndex: 'tier', key: 'tier', width: 120 },
-  { title: 'Gruppo prezzo', dataIndex: 'priceGroupId', key: 'priceGroup', width: 180 },
-  { title: 'Acquisti', key: 'purchase', width: 180 },
-  { title: 'Credito / termini', key: 'terms', width: 220 },
-  { title: 'Stato', dataIndex: 'status', key: 'status', width: 120 },
-  { title: 'Azioni', key: 'actions', fixed: 'right' as const, width: 110 },
+  { title: '客户等级', dataIndex: 'tier', key: 'tier', width: 120 },
+  { title: '价格组', dataIndex: 'priceGroupId', key: 'priceGroup', width: 180 },
+  { title: '采购', key: 'purchase', width: 180 },
+  { title: '信用 / 条款', key: 'terms', width: 220 },
+  { title: '状态', dataIndex: 'status', key: 'status', width: 120 },
+  { title: '操作', key: 'actions', fixed: 'right' as const, width: 110 },
 ]
 
 const filteredCustomers = computed(() => {
@@ -56,7 +57,7 @@ function formatCurrency(value: number) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat('it-IT', {
+  return new Intl.DateTimeFormat('zh-CN', {
     dateStyle: 'medium',
   }).format(new Date(value))
 }
@@ -116,16 +117,16 @@ onMounted(loadCustomers)
 
     <a-row :gutter="[16, 16]" class="admin-metric-row">
       <a-col :xs="12" :md="6">
-        <a-card><a-statistic title="Clienti" :value="stats.total" /></a-card>
+        <a-card><a-statistic title="客户总数" :value="stats.total" /></a-card>
       </a-col>
       <a-col :xs="12" :md="6">
-        <a-card><a-statistic title="Attivi" :value="stats.active" /></a-card>
+        <a-card><a-statistic title="正常客户" :value="stats.active" /></a-card>
       </a-col>
       <a-col :xs="12" :md="6">
-        <a-card><a-statistic title="Gold" :value="stats.gold" /></a-card>
+        <a-card><a-statistic title="金牌客户" :value="stats.gold" /></a-card>
       </a-col>
       <a-col :xs="12" :md="6">
-        <a-card><a-statistic title="Revenue mock" :value="stats.revenue" prefix="EUR" /></a-card>
+        <a-card><a-statistic title="演示销售额" :value="stats.revenue" prefix="EUR" /></a-card>
       </a-col>
     </a-row>
 
@@ -134,7 +135,7 @@ onMounted(loadCustomers)
         <a-input-search
           v-model:value="query"
           class="admin-toolbar-search"
-          placeholder="Cerca azienda, email, P.IVA, SDI..."
+          placeholder="搜索公司、邮箱、P.IVA、SDI..."
           allow-clear
         />
         <a-alert
@@ -165,7 +166,7 @@ onMounted(loadCustomers)
           </template>
 
           <template v-else-if="column.key === 'tier'">
-            <a-tag :color="tierColor(record.tier)">{{ record.tier }}</a-tag>
+            <a-tag :color="tierColor(record.tier)">{{ labelCustomerTier(record.tier) }}</a-tag>
           </template>
 
           <template v-else-if="column.key === 'priceGroup'">
@@ -174,21 +175,21 @@ onMounted(loadCustomers)
 
           <template v-else-if="column.key === 'purchase'">
             <strong>{{ formatCurrency(record.revenue) }}</strong>
-            <span class="admin-muted-line">{{ record.ordersCount }} ordini</span>
-            <span class="admin-muted-line">Ultimo {{ formatDate(record.lastOrderAt) }}</span>
+            <span class="admin-muted-line">{{ record.ordersCount }} 个订单</span>
+            <span class="admin-muted-line">最近 {{ formatDate(record.lastOrderAt) }}</span>
           </template>
 
           <template v-else-if="column.key === 'terms'">
             <span>{{ record.paymentTerms }}</span>
-            <span class="admin-muted-line">Credito {{ formatCurrency(record.creditLimit) }}</span>
+            <span class="admin-muted-line">信用额度 {{ formatCurrency(record.creditLimit) }}</span>
           </template>
 
           <template v-else-if="column.key === 'status'">
-            <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
+            <a-tag :color="statusColor(record.status)">{{ labelCustomerStatus(record.status) }}</a-tag>
           </template>
 
           <template v-else-if="column.key === 'actions'">
-            <a-button size="small" @click="openCustomer(record)">Dettaglio</a-button>
+            <a-button size="small" @click="openCustomer(record)">详情</a-button>
           </template>
         </template>
       </a-table>
@@ -196,29 +197,30 @@ onMounted(loadCustomers)
 
     <a-drawer
       v-model:open="isDrawerOpen"
+      class="admin-data-drawer"
       width="640"
-      :title="selectedCustomer?.companyName || 'Cliente'"
+      :title="selectedCustomer?.companyName || '客户详情'"
     >
       <template v-if="selectedCustomer">
         <a-descriptions bordered size="small" :column="1">
-          <a-descriptions-item label="Contatto">
+          <a-descriptions-item label="联系人">
             {{ selectedCustomer.contactName }} / {{ selectedCustomer.email }}
           </a-descriptions-item>
-          <a-descriptions-item label="Fattura elettronica">
+          <a-descriptions-item label="电子发票">
             P.IVA {{ selectedCustomer.vatNumber }} - SDI {{ selectedCustomer.sdi }} - PEC
             {{ selectedCustomer.pec }}
           </a-descriptions-item>
-          <a-descriptions-item label="Tier">
-            {{ selectedCustomer.tier }} / {{ priceGroupName(selectedCustomer.priceGroupId) }}
+          <a-descriptions-item label="客户等级">
+            {{ labelCustomerTier(selectedCustomer.tier) }} / {{ priceGroupName(selectedCustomer.priceGroupId) }}
           </a-descriptions-item>
-          <a-descriptions-item label="Volume mensile">
+          <a-descriptions-item label="月采购量">
             {{ selectedCustomer.monthlyPurchase }}
           </a-descriptions-item>
-          <a-descriptions-item label="Credito">
+          <a-descriptions-item label="信用额度">
             {{ formatCurrency(selectedCustomer.creditLimit) }} / {{ selectedCustomer.paymentTerms }}
           </a-descriptions-item>
-          <a-descriptions-item label="Storico">
-            {{ selectedCustomer.ordersCount }} ordini, {{ formatCurrency(selectedCustomer.revenue) }}
+          <a-descriptions-item label="历史采购">
+            {{ selectedCustomer.ordersCount }} 个订单，{{ formatCurrency(selectedCustomer.revenue) }}
           </a-descriptions-item>
         </a-descriptions>
       </template>

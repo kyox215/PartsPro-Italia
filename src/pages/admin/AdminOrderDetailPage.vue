@@ -10,6 +10,14 @@ import {
   updateOrderStatus,
 } from '@/services/admin.service'
 import type { AdminOrder, AdminOrderStatus, PaymentStatus, StockRisk } from '@/types/admin'
+import {
+  labelCustomerTier,
+  labelOrderStatus,
+  labelPaymentStatus,
+  labelStockRisk,
+  labelStockStatus,
+  orderStatusLabels,
+} from '@/utils/adminLabels'
 
 const route = useRoute()
 const router = useRouter()
@@ -33,7 +41,7 @@ function formatCurrency(value: number) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat('it-IT', {
+  return new Intl.DateTimeFormat('zh-CN', {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value))
@@ -86,10 +94,10 @@ function nextActionLabel() {
   const nextStatus = getNextOrderStatus(order.value.status)
 
   if (!nextStatus) {
-    return 'Completato'
+    return '已完成'
   }
 
-  return nextStatus === 'shipped' ? 'Spedisci ordine' : `Avanza a ${nextStatus}`
+  return nextStatus === 'shipped' ? '发货订单' : `推进到${orderStatusLabels[nextStatus]}`
 }
 
 function confirmAdvance() {
@@ -105,11 +113,11 @@ function confirmAdvance() {
 
   if (nextStatus === 'shipped') {
     Modal.confirm({
-      title: `Spedire ${order.value.orderNo}?`,
+      title: `确认发货 ${order.value.orderNo}？`,
       content:
-        'Questa azione chiama staff_ship_order. Il backend reale dovra scaricare lo stock in modo atomico.',
-      okText: 'Chiama staff_ship_order',
-      cancelText: 'Annulla',
+        '此操作调用 staff_ship_order。真实后端需要在事务中扣减锁定库存并写入库存流水。',
+      okText: '确认发货',
+      cancelText: '取消',
       async onOk() {
         if (!order.value) {
           return
@@ -117,17 +125,17 @@ function confirmAdvance() {
 
         await staffShipOrder(order.value.id)
         refreshOrder()
-        message.success('Ordine spedito tramite staff_ship_order placeholder.')
+        message.success('订单已通过 staff_ship_order 发货。')
       },
     })
     return
   }
 
   Modal.confirm({
-    title: `Portare ${order.value.orderNo} a ${nextStatus}?`,
-    content: 'Aggiorna solo lo stato ordine; lo stock resta gestito dal service dedicato.',
-    okText: 'Conferma',
-    cancelText: 'Annulla',
+    title: `推进订单 ${order.value.orderNo}？`,
+    content: `订单状态将变更为“${orderStatusLabels[nextStatus]}”；库存仍由专用服务处理。`,
+    okText: '确认',
+    cancelText: '取消',
     async onOk() {
       if (!order.value) {
         return
@@ -135,7 +143,7 @@ function confirmAdvance() {
 
       await updateOrderStatus(order.value.id, nextStatus)
       refreshOrder()
-      message.success('Stato ordine aggiornato.')
+      message.success('订单状态已更新。')
     },
   })
 }
@@ -150,12 +158,12 @@ function confirmAdvance() {
         @back="router.push('/admin/orders')"
       >
         <template #tags>
-          <a-tag :color="statusColor(order.status)">{{ order.status }}</a-tag>
-          <a-tag :color="paymentColor(order.paymentStatus)">{{ order.paymentStatus }}</a-tag>
-          <a-tag :color="stockRiskColor(order.stockRisk)">stock {{ order.stockRisk }}</a-tag>
+          <a-tag :color="statusColor(order.status)">{{ labelOrderStatus(order.status) }}</a-tag>
+          <a-tag :color="paymentColor(order.paymentStatus)">{{ labelPaymentStatus(order.paymentStatus) }}</a-tag>
+          <a-tag :color="stockRiskColor(order.stockRisk)">库存 {{ labelStockRisk(order.stockRisk) }}</a-tag>
         </template>
         <template #extra>
-          <a-button @click="router.push('/admin/orders')">Lista ordini</a-button>
+          <a-button @click="router.push('/admin/orders')">订单列表</a-button>
           <a-button
             type="primary"
             :disabled="!getNextOrderStatus(order.status)"
@@ -168,81 +176,81 @@ function confirmAdvance() {
 
       <a-card class="admin-detail-card">
         <a-steps :current="currentStep" responsive>
-          <a-step v-for="status in orderStatusFlow" :key="status" :title="status" />
+          <a-step v-for="status in orderStatusFlow" :key="status" :title="orderStatusLabels[status]" />
         </a-steps>
       </a-card>
 
       <div class="admin-detail-grid">
-        <a-card title="Cliente e fattura">
+        <a-card title="客户与发票">
           <a-descriptions bordered size="small" :column="1">
-            <a-descriptions-item label="Cliente">
-              {{ order.customerName }} / tier {{ order.customerTier }}
+            <a-descriptions-item label="客户">
+              {{ order.customerName }} / 等级 {{ labelCustomerTier(order.customerTier) }}
             </a-descriptions-item>
             <a-descriptions-item label="P.IVA">
               {{ order.fiscal.vatNumber }}
             </a-descriptions-item>
-            <a-descriptions-item label="Codice Fiscale">
+            <a-descriptions-item label="税号">
               {{ order.fiscal.fiscalCode }}
             </a-descriptions-item>
             <a-descriptions-item label="SDI / PEC">
               {{ order.fiscal.sdi }} / {{ order.fiscal.pec }}
             </a-descriptions-item>
-            <a-descriptions-item label="Indirizzo">
+            <a-descriptions-item label="地址">
               {{ order.deliveryAddress }}
             </a-descriptions-item>
           </a-descriptions>
         </a-card>
 
-        <a-card title="Totali ordine">
-          <a-statistic title="Totale lordo" :value="totalGross" prefix="EUR" :precision="2" />
+        <a-card title="订单金额">
+          <a-statistic title="含税总额" :value="totalGross" prefix="EUR" :precision="2" />
           <a-divider />
           <a-descriptions size="small" :column="1">
-            <a-descriptions-item label="Netto">
+            <a-descriptions-item label="净额">
               {{ formatCurrency(order.totalNet) }}
             </a-descriptions-item>
             <a-descriptions-item label="VAT">
               {{ formatCurrency(order.vat) }}
             </a-descriptions-item>
-            <a-descriptions-item label="Spedizione">
+            <a-descriptions-item label="配送费">
               {{ formatCurrency(order.shipping) }}
             </a-descriptions-item>
-            <a-descriptions-item label="Metodo">
+            <a-descriptions-item label="配送方式">
               {{ order.shippingMethod }}
             </a-descriptions-item>
           </a-descriptions>
         </a-card>
       </div>
 
-      <a-card class="admin-table-card" title="Righe ordine">
+      <a-card class="admin-table-card" title="订单商品">
         <a-table :data-source="order.lines" row-key="skuCode" :pagination="false" :scroll="{ x: 920 }">
           <a-table-column title="SKU" data-index="skuCode" key="skuCode" width="160" />
-          <a-table-column title="Prodotto" data-index="productName" key="productName" />
-          <a-table-column title="Qualita" data-index="qualityGrade" key="qualityGrade" width="130" />
-          <a-table-column title="Qta" data-index="quantity" key="quantity" width="80" />
-          <a-table-column title="Prezzo" key="unitPrice" width="120">
+          <a-table-column title="商品" data-index="productName" key="productName" />
+          <a-table-column title="品质" data-index="qualityGrade" key="qualityGrade" width="130" />
+          <a-table-column title="数量" data-index="quantity" key="quantity" width="80" />
+          <a-table-column title="单价" key="unitPrice" width="120">
             <template #default="{ record }">
               {{ formatCurrency(record.unitPrice) }}
             </template>
           </a-table-column>
-          <a-table-column title="Stock" key="stockStatus" width="130">
+          <a-table-column title="库存" key="stockStatus" width="130">
             <template #default="{ record }">
               <a-tag :color="record.stockStatus === 'available' ? 'green' : 'orange'">
-                {{ record.stockStatus }}
+                {{ labelStockStatus(record.stockStatus) }}
               </a-tag>
             </template>
           </a-table-column>
-          <a-table-column title="Lotto" data-index="batchCode" key="batchCode" width="150" />
-          <a-table-column title="Ubicazione" data-index="location" key="location" width="130" />
+          <a-table-column title="批次" data-index="batchCode" key="batchCode" width="150" />
+          <a-table-column title="库位" data-index="location" key="location" width="130" />
         </a-table>
       </a-card>
 
-      <a-card title="Note operative">
+      <a-card title="操作备注">
         <a-row :gutter="[16, 16]">
           <a-col :xs="24" :md="12">
-            <a-alert type="info" show-icon message="Nota cliente" :description="order.customerNote" />
+            <a-alert type="info" show-icon message="客户备注" :description="order.customerNote" />
           </a-col>
           <a-col :xs="24" :md="12">
-            <a-alert type="warning" show-icon message="Nota staff" :description="order.staffNote" />
+            <a-alert type="warning" show-icon message="员工备注" :description="order.staffNote" />
           </a-col>
         </a-row>
       </a-card>
@@ -251,11 +259,11 @@ function confirmAdvance() {
     <a-result
       v-else
       status="404"
-      title="Ordine non trovato"
-      sub-title="Il mock service non contiene questo ordine."
+      title="未找到订单"
+      sub-title="演示服务中没有这个订单。"
     >
       <template #extra>
-        <a-button type="primary" @click="router.push('/admin/orders')">Torna agli ordini</a-button>
+        <a-button type="primary" @click="router.push('/admin/orders')">返回订单列表</a-button>
       </template>
     </a-result>
   </main>

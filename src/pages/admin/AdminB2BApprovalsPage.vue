@@ -9,6 +9,7 @@ import {
   getPriceGroups,
 } from '@/services/admin.service'
 import type { B2BApproval, B2BApprovalStatus } from '@/types/admin'
+import { labelApprovalStatus, labelCategory } from '@/utils/adminLabels'
 
 const approvals = ref(getB2BApprovals())
 const priceGroups = ref(getPriceGroups())
@@ -19,19 +20,19 @@ const selectedApproval = ref<B2BApproval | null>(null)
 const isDrawerOpen = ref(false)
 
 const columns = [
-  { title: 'Richiesta', dataIndex: 'companyName', key: 'request', width: 300 },
-  { title: 'Fiscale', key: 'fiscal', width: 260 },
-  { title: 'Volume / categorie', key: 'volume', width: 260 },
-  { title: 'Gruppo', dataIndex: 'requestedPriceGroupId', key: 'group', width: 180 },
-  { title: 'Stato', dataIndex: 'status', key: 'status', width: 120 },
-  { title: 'Azioni', key: 'actions', fixed: 'right' as const, width: 240 },
+  { title: '申请', dataIndex: 'companyName', key: 'request', width: 300 },
+  { title: '税务资料', key: 'fiscal', width: 260 },
+  { title: '采购量 / 分类', key: 'volume', width: 260 },
+  { title: '价格组', dataIndex: 'requestedPriceGroupId', key: 'group', width: 180 },
+  { title: '状态', dataIndex: 'status', key: 'status', width: 120 },
+  { title: '操作', key: 'actions', fixed: 'right' as const, width: 240 },
 ]
 
 const statusOptions = computed(() => [
-  { label: `Tutte (${approvals.value.length})`, value: 'all' },
-  { label: `Da valutare (${approvals.value.filter((item) => item.status === 'submitted').length})`, value: 'submitted' },
-  { label: `Approvate (${approvals.value.filter((item) => item.status === 'approved').length})`, value: 'approved' },
-  { label: `Respinte (${approvals.value.filter((item) => item.status === 'rejected').length})`, value: 'rejected' },
+  { label: `全部 (${approvals.value.length})`, value: 'all' },
+  { label: `待审核 (${approvals.value.filter((item) => item.status === 'submitted').length})`, value: 'submitted' },
+  { label: `已通过 (${approvals.value.filter((item) => item.status === 'approved').length})`, value: 'approved' },
+  { label: `已拒绝 (${approvals.value.filter((item) => item.status === 'rejected').length})`, value: 'rejected' },
 ])
 
 const filteredApprovals = computed(() => {
@@ -57,7 +58,7 @@ async function loadApprovals() {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat('it-IT', {
+  return new Intl.DateTimeFormat('zh-CN', {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value))
@@ -84,21 +85,21 @@ function openApproval(approval: B2BApproval) {
 }
 
 async function reviewApproval(approval: B2BApproval, status: 'approved' | 'rejected') {
-  const actionText = status === 'approved' ? 'approvare' : 'respingere'
+  const actionText = status === 'approved' ? '通过' : '拒绝'
 
   Modal.confirm({
-    title: `Vuoi ${actionText} ${approval.companyName}?`,
+    title: `确认${actionText} ${approval.companyName}？`,
     content:
       status === 'approved'
-        ? `Il cliente verra assegnato al gruppo ${priceGroupName(selectedPriceGroupId.value)}.`
-        : 'La richiesta restera tracciata come respinta.',
-    okText: status === 'approved' ? 'Approva' : 'Respingi',
-    cancelText: 'Annulla',
+        ? `客户将分配到价格组：${priceGroupName(selectedPriceGroupId.value)}。`
+        : '该申请会保留为已拒绝记录，便于后续追踪。',
+    okText: status === 'approved' ? '通过' : '拒绝',
+    cancelText: '取消',
     async onOk() {
       await approveB2BApplication(approval.id, status, selectedPriceGroupId.value)
       await loadApprovals()
       isDrawerOpen.value = false
-      message.success(status === 'approved' ? 'Richiesta B2B approvata.' : 'Richiesta B2B respinta.')
+      message.success(status === 'approved' ? 'B2B 申请已通过。' : 'B2B 申请已拒绝。')
     },
   })
 }
@@ -148,7 +149,7 @@ onMounted(loadApprovals)
             <span class="admin-muted-line">{{ record.monthlyPurchase }}</span>
             <a-space wrap>
               <a-tag v-for="category in record.interestedCategories" :key="category">
-                {{ category }}
+                {{ labelCategory(category) }}
               </a-tag>
             </a-space>
           </template>
@@ -158,19 +159,19 @@ onMounted(loadApprovals)
           </template>
 
           <template v-else-if="column.key === 'status'">
-            <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
+            <a-tag :color="statusColor(record.status)">{{ labelApprovalStatus(record.status) }}</a-tag>
           </template>
 
           <template v-else-if="column.key === 'actions'">
             <a-space>
-              <a-button size="small" @click="openApproval(record)">Dettaglio</a-button>
+              <a-button size="small" @click="openApproval(record)">详情</a-button>
               <a-button
                 size="small"
                 type="primary"
                 :disabled="record.status !== 'submitted'"
                 @click="reviewApproval(record, 'approved')"
               >
-                Approva
+                通过
               </a-button>
               <a-button
                 size="small"
@@ -178,7 +179,7 @@ onMounted(loadApprovals)
                 :disabled="record.status !== 'submitted'"
                 @click="reviewApproval(record, 'rejected')"
               >
-                Respingi
+                拒绝
               </a-button>
             </a-space>
           </template>
@@ -188,32 +189,33 @@ onMounted(loadApprovals)
 
     <a-drawer
       v-model:open="isDrawerOpen"
+      class="admin-data-drawer"
       width="640"
-      :title="selectedApproval?.companyName || 'Richiesta B2B'"
+      :title="selectedApproval?.companyName || 'B2B 申请'"
     >
       <template v-if="selectedApproval">
         <a-descriptions bordered size="small" :column="1">
-          <a-descriptions-item label="Contatto">
+          <a-descriptions-item label="联系人">
             {{ selectedApproval.contactName }} / {{ selectedApproval.email }} / {{ selectedApproval.phone }}
           </a-descriptions-item>
-          <a-descriptions-item label="Fiscale">
+          <a-descriptions-item label="税务资料">
             P.IVA {{ selectedApproval.vatNumber }} - CF {{ selectedApproval.fiscalCode }} - SDI
             {{ selectedApproval.sdi }} - PEC {{ selectedApproval.pec }}
           </a-descriptions-item>
-          <a-descriptions-item label="Azienda">
+          <a-descriptions-item label="公司">
             {{ selectedApproval.companyType }} / {{ selectedApproval.monthlyPurchase }}
           </a-descriptions-item>
-          <a-descriptions-item label="Categorie">
-            {{ selectedApproval.interestedCategories.join(', ') }}
+          <a-descriptions-item label="意向分类">
+            {{ selectedApproval.interestedCategories.map(labelCategory).join(', ') }}
           </a-descriptions-item>
-          <a-descriptions-item label="Nota review">
+          <a-descriptions-item label="审核备注">
             {{ selectedApproval.reviewNote }}
           </a-descriptions-item>
         </a-descriptions>
 
         <a-divider />
         <a-form layout="vertical">
-          <a-form-item label="Gruppo prezzo da assegnare">
+          <a-form-item label="分配价格组">
             <a-select v-model:value="selectedPriceGroupId">
               <a-select-option v-for="group in priceGroups" :key="group.id" :value="group.id">
                 {{ group.name }} - {{ group.paymentTerms }}
@@ -223,20 +225,20 @@ onMounted(loadApprovals)
         </a-form>
 
         <a-space class="admin-drawer-actions">
-          <a-button @click="isDrawerOpen = false">Chiudi</a-button>
+          <a-button @click="isDrawerOpen = false">关闭</a-button>
           <a-button
             danger
             :disabled="selectedApproval.status !== 'submitted'"
             @click="reviewApproval(selectedApproval, 'rejected')"
           >
-            Respingi
+            拒绝
           </a-button>
           <a-button
             type="primary"
             :disabled="selectedApproval.status !== 'submitted'"
             @click="reviewApproval(selectedApproval, 'approved')"
           >
-            Approva B2B
+            通过 B2B
           </a-button>
         </a-space>
       </template>

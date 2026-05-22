@@ -2,19 +2,20 @@
 import { computed, ref } from 'vue'
 import { getStockMovements } from '@/services/admin.service'
 import type { StockMovementType } from '@/types/admin'
+import { labelMovementType, movementTypeLabels } from '@/utils/adminLabels'
 
 const movements = ref(getStockMovements())
 const selectedType = ref<'all' | StockMovementType>('all')
 
 const columns = [
-  { title: 'Data', dataIndex: 'createdAt', key: 'createdAt', width: 150 },
-  { title: 'Tipo', dataIndex: 'type', key: 'type', width: 150 },
+  { title: '时间', dataIndex: 'createdAt', key: 'createdAt', width: 150 },
+  { title: '类型', dataIndex: 'type', key: 'type', width: 150 },
   { title: 'SKU', dataIndex: 'skuCode', key: 'skuCode', width: 180 },
-  { title: 'Lotto / ubicazione', key: 'batch', width: 220 },
-  { title: 'Qta', dataIndex: 'quantity', key: 'quantity', width: 100 },
-  { title: 'Riferimento', dataIndex: 'reference', key: 'reference', width: 180 },
-  { title: 'Operatore', dataIndex: 'operator', key: 'operator', width: 220 },
-  { title: 'Nota', dataIndex: 'note', key: 'note' },
+  { title: '批次 / 库位', key: 'batch', width: 220 },
+  { title: '数量', dataIndex: 'quantity', key: 'quantity', width: 100 },
+  { title: '关联单据', dataIndex: 'reference', key: 'reference', width: 180 },
+  { title: '操作人', dataIndex: 'operator', key: 'operator', width: 220 },
+  { title: '备注', dataIndex: 'note', key: 'note' },
 ]
 
 const movementTypes: StockMovementType[] = [
@@ -27,9 +28,9 @@ const movementTypes: StockMovementType[] = [
 ]
 
 const typeOptions = computed(() => [
-  { label: `Tutti (${movements.value.length})`, value: 'all' },
+  { label: `全部 (${movements.value.length})`, value: 'all' },
   ...movementTypes.map((type) => ({
-    label: `${type} (${movements.value.filter((movement) => movement.type === type).length})`,
+    label: `${movementTypeLabels[type]} (${movements.value.filter((movement) => movement.type === type).length})`,
     value: type,
   })),
 ])
@@ -56,7 +57,7 @@ function movementColor(type: StockMovementType) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat('it-IT', {
+  return new Intl.DateTimeFormat('zh-CN', {
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',
@@ -95,7 +96,7 @@ function formatDate(value: string) {
           </template>
 
           <template v-else-if="column.key === 'type'">
-            <a-tag :color="movementColor(record.type)">{{ record.type }}</a-tag>
+            <a-tag :color="movementColor(record.type)">{{ labelMovementType(record.type) }}</a-tag>
           </template>
 
           <template v-else-if="column.key === 'batch'">

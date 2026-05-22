@@ -66,7 +66,23 @@ async function handleDemoLogin(role: Exclude<UserRole, 'guest'>) {
         />
       </div>
 
-      <a-card title="Login">
+      <a-card title="Login" class="login-form-card">
+        <div class="login-oauth-panel">
+          <a-button
+            class="google-login-button"
+            block
+            size="large"
+            :loading="authStore.isLoading"
+            @click="handleGoogleLogin"
+          >
+            <GoogleOutlined />
+            Continua con Google
+          </a-button>
+          <span>OAuth Google tramite Supabase Auth</span>
+        </div>
+
+        <a-divider>Oppure email</a-divider>
+
         <a-form layout="vertical" :model="formState" @finish="handleEmailLogin">
           <a-form-item
             label="Email"
@@ -101,10 +117,6 @@ async function handleDemoLogin(role: Exclude<UserRole, 'guest'>) {
               :loading="authStore.isLoading"
             >
               Accedi con email
-            </a-button>
-            <a-button block :loading="authStore.isLoading" @click="handleGoogleLogin">
-              <GoogleOutlined />
-              Continua con Google
             </a-button>
           </a-space>
         </a-form>

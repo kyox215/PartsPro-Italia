@@ -1,32 +1,101 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  CheckCircleOutlined,
   FileProtectOutlined,
+  MinusOutlined,
+  PlusOutlined,
   RocketOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
+  ShoppingCartOutlined,
   ShopOutlined,
   ToolOutlined,
 } from '@ant-design/icons-vue'
+import { message } from 'ant-design-vue'
 import { t } from '@/i18n/messages'
+import { fetchProducts, getProducts } from '@/services/products.service'
+import { useAuthStore } from '@/stores/auth.store'
+import { useCartStore } from '@/stores/cart.store'
 import { useUiStore } from '@/stores/ui.store'
+import type { Product, StockStatus } from '@/types/product'
 
 const router = useRouter()
 const uiStore = useUiStore()
+const authStore = useAuthStore()
+const cartStore = useCartStore()
+const products = ref<Product[]>(getProducts())
+
+const currency = new Intl.NumberFormat('it-IT', {
+  style: 'currency',
+  currency: 'EUR',
+})
+
+const featuredSkuOrder = [
+  'IP11-SCR-SOFT-BLK',
+  'IP12-BAT-HQ-2815',
+  'SA52-CHG-EU-BLK',
+  'RN10-BKC-BLU',
+  'TOOL-WATERPROOF-SET',
+]
+
+const categoryConfig = computed(() => [
+  { title: t(uiStore.language, 'homeCategoryScreens'), category: 'Screens', to: '/products?category=screens' },
+  { title: t(uiStore.language, 'homeCategoryBatteries'), category: 'Batteries', to: '/products?category=batteries' },
+  { title: t(uiStore.language, 'homeCategoryCharging'), category: 'Charging Ports', to: '/products?category=charging-ports' },
+  { title: t(uiStore.language, 'homeCategoryBackCover'), category: 'Back Covers', to: '/products?category=back-covers' },
+  { title: t(uiStore.language, 'homeCategoryCameras'), category: 'Cameras', to: '/products?category=cameras' },
+  { title: t(uiStore.language, 'homeCategoryTools'), category: 'Tools', to: '/products?category=tools' },
+])
+
+const stockMeta = computed<Record<StockStatus, { label: string; color: string }>>(() => ({
+  in_stock: { label: uiStore.language === 'zh' ? '现货' : 'Disponibile', color: 'success' },
+  low_stock: { label: uiStore.language === 'zh' ? '低库存' : 'Scorte limitate', color: 'warning' },
+  out_of_stock: { label: uiStore.language === 'zh' ? '缺货' : 'Esaurito', color: 'error' },
+  incoming: { label: uiStore.language === 'zh' ? '在途' : 'In arrivo', color: 'purple' },
+}))
+
+const qualityColors: Record<string, string> = {
+  'Soft OLED': 'purple',
+  'High Quality Compatible': 'cyan',
+  'Compatible High Quality': 'cyan',
+  'Refurbished Original': 'blue',
+  Consumable: 'default',
+}
+
+const qualityLabels = computed<Record<string, string>>(() => {
+  if (uiStore.language === 'zh') {
+    return {
+      'Soft OLED': 'Soft OLED',
+      'High Quality Compatible': '高品质兼容',
+      'Compatible High Quality': '高品质兼容',
+      'Refurbished Original': '原装翻新',
+      Consumable: '耗材',
+    }
+  }
+
+  return {
+    'Soft OLED': 'Soft OLED',
+    'High Quality Compatible': 'Compatibile HQ',
+    'Compatible High Quality': 'Compatibile HQ',
+    'Refurbished Original': 'Originale ricond.',
+    Consumable: 'Consumabile',
+  }
+})
+
+const canBuy = computed(() => authStore.canViewCustomerPrices)
 
 const copy = computed(() => {
   if (uiStore.language === 'zh') {
     return {
       kicker: '意大利手机维修配件 B2B 供应',
-      title: '为维修店、实验室和经销商准备的配件采购平台',
+      title: authStore.isAuthenticated ? '继续你的 B2B 采购' : '为维修店、实验室和经销商准备的配件采购平台',
       description:
-        '屏幕、电池、尾插、摄像头和维修耗材集中采购。访客可浏览目录，登录后查看 B2B 批发价、阶梯价、实时库存、发票资料和售后入口。',
-      primary: '查看商品目录',
-      secondary: '申请 B2B 账户',
+        authStore.isAuthenticated
+          ? '查看常购 SKU、已加购数量、库存状态和结账入口。适合快速补货和重复采购。'
+          : '屏幕、电池、尾插、摄像头和维修耗材集中采购。访客可浏览目录，登录后查看 B2B 批发价、阶梯价、实时库存、发票资料和售后入口。',
+      primary: authStore.isAuthenticated ? '继续采购' : '查看商品目录',
       search: '搜索 iPhone 11 屏幕、A2221、SM-G991B、电池...',
-      trusted: ['意大利库存', 'VAT / SDI / PEC', 'RMA 可追踪', 'Stripe / PayPal / 转账'],
       showcaseTitle: '高周转配件',
       showcaseSubtitle: '按品牌、型号、品质和库存状态采购',
       serviceTitle: '客户采购需要的信息，首屏就能看到',
@@ -39,13 +108,13 @@ const copy = computed(() => {
 
   return {
     kicker: 'B2B ricambi smartphone in Italia',
-    title: 'Ricambi pronti per laboratori, negozi e rivenditori',
+    title: authStore.isAuthenticated ? 'Continua il tuo acquisto B2B' : 'Ricambi pronti per laboratori, negozi e rivenditori',
     description:
-      'Schermi, batterie, connettori, fotocamere e consumabili in un catalogo pensato per chi ripara ogni giorno. Sfoglia liberamente, accedi per prezzi B2B, fasce quantita, stock reale, fattura e RMA.',
-    primary: 'Vedi catalogo',
-    secondary: 'Richiedi account B2B',
+      authStore.isAuthenticated
+        ? 'Riprendi dal carrello, acquista SKU ricorrenti e controlla stock, MOQ, prezzo B2B e checkout in pochi passaggi.'
+        : 'Schermi, batterie, connettori, fotocamere e consumabili in un catalogo pensato per chi ripara ogni giorno. Sfoglia liberamente, accedi per prezzi B2B, fasce quantita, stock reale, fattura e RMA.',
+    primary: authStore.isAuthenticated ? 'Continua acquisti' : 'Vedi catalogo',
     search: 'Cerca iPhone 11 schermo, A2221, SM-G991B, batteria...',
-    trusted: ['Stock in Italia', 'VAT / SDI / PEC', 'RMA tracciabile', 'Stripe / PayPal / Bonifico'],
     showcaseTitle: 'Ricambi ad alta rotazione',
     showcaseSubtitle: 'Acquisto per brand, modello, qualita e stock',
     serviceTitle: 'Informazioni chiare prima dell’ordine',
@@ -91,16 +160,22 @@ const serviceCards = computed(() => [
   },
 ])
 
-const categories = computed(() => [
-  { title: t(uiStore.language, 'homeCategoryScreens'), meta: '320+', to: '/products?category=screens' },
-  { title: t(uiStore.language, 'homeCategoryBatteries'), meta: '180+', to: '/products?category=batteries' },
-  { title: t(uiStore.language, 'homeCategoryCharging'), meta: '140+', to: '/products?category=charging-ports' },
-  { title: t(uiStore.language, 'homeCategoryBackCover'), meta: '95+', to: '/products?category=back-cover' },
-  { title: t(uiStore.language, 'homeCategoryCameras'), meta: '70+', to: '/products?category=cameras' },
-  { title: t(uiStore.language, 'homeCategoryTools'), meta: '60+', to: '/products?category=tools' },
-])
-
 const brands = ['Apple', 'Samsung', 'Xiaomi', 'Huawei', 'Oppo', 'Honor', 'Realme', 'OnePlus']
+
+const featuredProducts = computed(() =>
+  featuredSkuOrder
+    .map((skuCode) => products.value.find((product) => product.skuCode === skuCode))
+    .filter((product): product is Product => Boolean(product)),
+)
+
+const categories = computed(() =>
+  categoryConfig.value
+    .map((category) => ({
+      ...category,
+      count: products.value.filter((product) => product.category === category.category).length,
+    }))
+    .filter((category) => category.count > 0),
+)
 
 const flowSteps = computed(() => [
   uiStore.language === 'zh' ? '浏览公开目录' : 'Catalogo pubblico',
@@ -115,6 +190,47 @@ function handleHeroSearch(value: string) {
     query: value ? { q: value } : undefined,
   })
 }
+
+function getCartQuantity(skuCode: string) {
+  return cartStore.items.find((item) => item.skuCode === skuCode)?.quantity || 0
+}
+
+function handleHomeAdd(product: Product) {
+  if (!canBuy.value) {
+    router.push({ name: 'login', query: { returnUrl: '/' } })
+    return
+  }
+
+  cartStore.addItem(product.skuCode, product.moq)
+  message.success(`${product.skuCode} ${uiStore.language === 'zh' ? '已加入购物车' : 'aggiunto al carrello'}`)
+}
+
+function increaseHomeQuantity(product: Product) {
+  cartStore.addItem(product.skuCode, 1)
+}
+
+function decreaseHomeQuantity(product: Product) {
+  const quantity = getCartQuantity(product.skuCode)
+
+  if (quantity <= 1) {
+    cartStore.removeItem(product.skuCode)
+    return
+  }
+
+  cartStore.updateQuantity(product.skuCode, quantity - 1)
+}
+
+function searchBrand(brand: string) {
+  return `/products?q=${encodeURIComponent(brand)}`
+}
+
+function getQualityLabel(qualityGrade: string) {
+  return qualityLabels.value[qualityGrade] || qualityGrade
+}
+
+onMounted(async () => {
+  products.value = await fetchProducts()
+})
 </script>
 
 <template>
@@ -138,22 +254,6 @@ function handleHeroSearch(value: string) {
             </a-button>
           </template>
         </a-input-search>
-
-        <div class="customer-hero-actions">
-          <RouterLink to="/products">
-            <a-button type="primary" size="large">{{ copy.primary }}</a-button>
-          </RouterLink>
-          <RouterLink to="/b2b/register">
-            <a-button size="large">{{ copy.secondary }}</a-button>
-          </RouterLink>
-        </div>
-
-        <div class="customer-trust-row">
-          <span v-for="item in copy.trusted" :key="item">
-            <CheckCircleOutlined />
-            {{ item }}
-          </span>
-        </div>
       </div>
 
       <div class="parts-showcase" aria-hidden="true">
@@ -176,10 +276,67 @@ function handleHeroSearch(value: string) {
       </div>
     </section>
 
+    <section class="home-featured-panel">
+      <div class="home-panel-title">
+        <h2>{{ uiStore.language === 'zh' ? '高频采购 SKU' : 'SKU ad alta rotazione' }}</h2>
+        <RouterLink to="/products">{{ copy.primary }}</RouterLink>
+      </div>
+      <div class="home-product-grid">
+        <article
+          v-for="product in featuredProducts"
+          :key="product.skuCode"
+          class="home-product-card"
+        >
+          <div class="home-product-tags">
+            <a-tag :color="qualityColors[product.qualityGrade] || 'blue'">
+              {{ getQualityLabel(product.qualityGrade) }}
+            </a-tag>
+            <a-tag :color="stockMeta[product.stockStatus].color">
+              {{ stockMeta[product.stockStatus].label }}
+            </a-tag>
+          </div>
+          <RouterLink :to="`/products/${product.skuCode}`" class="home-product-title">
+            {{ product.name }}
+          </RouterLink>
+          <div class="home-product-purchase">
+            <div class="home-product-price">
+              <template v-if="canBuy">
+                <strong>{{ currency.format(product.b2bPrice) }}</strong>
+                <span>{{ product.vatMode }}</span>
+              </template>
+              <template v-else>
+                <strong>{{ uiStore.language === 'zh' ? '登录看价' : 'Login prezzo' }}</strong>
+                <span>B2B</span>
+              </template>
+            </div>
+            <div v-if="canBuy && getCartQuantity(product.skuCode)" class="home-qty-control">
+              <a-button size="small" @click="decreaseHomeQuantity(product)">
+                <MinusOutlined />
+              </a-button>
+              <strong>{{ getCartQuantity(product.skuCode) }}</strong>
+              <a-button size="small" @click="increaseHomeQuantity(product)">
+                <PlusOutlined />
+              </a-button>
+            </div>
+            <a-button
+              v-else
+              size="small"
+              type="primary"
+              :disabled="product.stockStatus === 'out_of_stock'"
+              @click="handleHomeAdd(product)"
+            >
+              <ShoppingCartOutlined />
+              {{ canBuy ? (uiStore.language === 'zh' ? '添加' : 'Aggiungi') : (uiStore.language === 'zh' ? '登录' : 'Accedi') }}
+            </a-button>
+          </div>
+        </article>
+      </div>
+    </section>
+
     <section class="home-service-panel">
       <div class="home-panel-title">
         <h2>{{ copy.serviceTitle }}</h2>
-        <RouterLink to="/quality-guide">{{ uiStore.language === 'zh' ? '质量说明' : 'Guida qualita' }}</RouterLink>
+        <RouterLink to="/products">{{ uiStore.language === 'zh' ? '查看商品' : 'Vedi prodotti' }}</RouterLink>
       </div>
       <div class="home-service-grid">
         <a-card v-for="card in serviceCards" :key="card.title">
@@ -204,7 +361,7 @@ function handleHeroSearch(value: string) {
             :to="category.to"
           >
             <span>{{ category.title }}</span>
-            <strong>{{ category.meta }} {{ t(uiStore.language, 'homeCategoryPartsCount') }}</strong>
+            <strong>{{ category.count }} SKU</strong>
           </RouterLink>
         </div>
       </div>
@@ -214,7 +371,7 @@ function handleHeroSearch(value: string) {
           <h2>{{ copy.brandTitle }}</h2>
         </div>
         <div class="home-brand-grid compact">
-          <RouterLink v-for="brand in brands" :key="brand" :to="`/brands/${brand.toLowerCase()}`">
+          <RouterLink v-for="brand in brands" :key="brand" :to="searchBrand(brand)">
             {{ brand }}
           </RouterLink>
         </div>

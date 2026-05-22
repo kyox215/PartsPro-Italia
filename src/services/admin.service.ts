@@ -141,8 +141,8 @@ const orders: AdminOrder[] = [
       pec: 'amministrazione@riparaveloce.example',
     },
     deliveryAddress: 'Via Torino 22, 20123 Milano MI',
-    customerNote: 'Se possibile spedire oggi. Priorita schermi iPhone 11.',
-    staffNote: 'Cliente gold, ok priorita picking.',
+    customerNote: '如果可以请今天发货，优先处理 iPhone 11 屏幕。',
+    staffNote: '金牌客户，可优先拣货。',
     lines: [
       {
         skuCode: 'IP11-SCR-SOFT-BLK',
@@ -186,8 +186,8 @@ const orders: AdminOrder[] = [
       pec: 'fatture@centrorepair.example',
     },
     deliveryAddress: 'Via Appia 104, 00179 Roma RM',
-    customerNote: 'Bonifico inviato, allegato da verificare.',
-    staffNote: 'Verificare split stock per Xiaomi.',
+    customerNote: '已提交银行转账凭证，请核对附件。',
+    staffNote: '需要核对 Xiaomi 商品的拆单库存。',
     lines: [
       {
         skuCode: 'SMG991-CHP-USB',
@@ -231,8 +231,8 @@ const orders: AdminOrder[] = [
       pec: 'fixlab@pec.example',
     },
     deliveryAddress: 'Via della Scala 18, 50123 Firenze FI',
-    customerNote: 'Aggiungere packing list nel pacco.',
-    staffNote: 'Pronto per spedizione, attenzione batteria.',
+    customerNote: '请在包裹内加入装箱单。',
+    staffNote: '已准备发货，注意电池安全要求。',
     lines: [
       {
         skuCode: 'IPSE2-BAT-STD',
@@ -276,8 +276,8 @@ const orders: AdminOrder[] = [
       pec: 'admin@phonedoctor.example',
     },
     deliveryAddress: 'Corso Francia 88, 10143 Torino TO',
-    customerNote: 'Consegna mattina se possibile.',
-    staffNote: 'Tracking DHL generato.',
+    customerNote: '如果可以，请安排上午派送。',
+    staffNote: 'DHL 跟踪号已生成。',
     lines: [
       {
         skuCode: 'IP13-SCR-REF-BLK',
@@ -393,7 +393,7 @@ const movements: StockMovement[] = [
     quantity: -8,
     reference: 'SO-20260522-027',
     operator: 'warehouse@partspro.local',
-    note: 'Stock bloccato per ordine pagato.',
+    note: '已付款订单锁定库存。',
   },
   {
     id: 'mov-500',
@@ -405,7 +405,7 @@ const movements: StockMovement[] = [
     quantity: -4,
     reference: 'QC-20260522-004',
     operator: 'quality@partspro.local',
-    note: 'Controllo batterie prima della vendita.',
+    note: '销售前进行电池检查。',
   },
   {
     id: 'mov-499',
@@ -417,7 +417,7 @@ const movements: StockMovement[] = [
     quantity: -4,
     reference: 'SO-20260521-024',
     operator: 'warehouse@partspro.local',
-    note: 'Spedizione DHL confermata.',
+    note: 'DHL 发货已确认。',
   },
   {
     id: 'mov-498',
@@ -429,7 +429,7 @@ const movements: StockMovement[] = [
     quantity: 60,
     reference: 'PO-20260519-011',
     operator: 'purchasing@partspro.local',
-    note: 'Ingresso merce dopo QC superato.',
+    note: '质检通过后采购入库。',
   },
   {
     id: 'mov-497',
@@ -441,7 +441,7 @@ const movements: StockMovement[] = [
     quantity: 2,
     reference: 'RMA-20260521-006',
     operator: 'support@partspro.local',
-    note: 'Reso in valutazione tecnica.',
+    note: '退货进入技术评估。',
   },
 ]
 
@@ -601,7 +601,7 @@ const customers: CustomerAccount[] = [
     revenue: 18420,
     lastOrderAt: '2026-05-22T09:14:00+02:00',
     creditLimit: 2500,
-    paymentTerms: 'Carta / PayPal / Bonifico 7gg',
+    paymentTerms: '银行卡 / PayPal / 银行转账 7 天',
   },
   {
     id: 'cus-centro-roma',
@@ -619,7 +619,7 @@ const customers: CustomerAccount[] = [
     revenue: 7210,
     lastOrderAt: '2026-05-22T08:32:00+02:00',
     creditLimit: 900,
-    paymentTerms: 'Bonifico anticipato',
+    paymentTerms: '预付银行转账',
   },
   {
     id: 'cus-fixlab-firenze',
@@ -652,13 +652,13 @@ const b2bApprovals: B2BApproval[] = [
     fiscalCode: '13579246801',
     sdi: 'M5UXCR1',
     pec: 'repairhubnapoli@pec.example',
-    companyType: 'Laboratorio riparazioni',
+    companyType: '维修实验室',
     monthlyPurchase: '€1.000 - €3.000',
     interestedCategories: ['Screens', 'Batteries', 'Charging Ports'],
     status: 'submitted',
     submittedAt: '2026-05-22T10:18:00+02:00',
     requestedPriceGroupId: 'pg-silver-shop',
-    reviewNote: 'Verificare P.IVA e volume iniziale.',
+    reviewNote: '需要核对 P.IVA 和初始采购量。',
   },
   {
     id: 'b2b-20260521-011',
@@ -670,13 +670,13 @@ const b2bApprovals: B2BApproval[] = [
     fiscalCode: '24681357902',
     sdi: 'A4707H7',
     pec: 'smartpartsveneto@pec.example',
-    companyType: 'Rivenditore',
+    companyType: '经销商',
     monthlyPurchase: '€3.000 - €5.000',
     interestedCategories: ['Screens', 'Cameras', 'Back Covers'],
     status: 'submitted',
     submittedAt: '2026-05-21T15:04:00+02:00',
     requestedPriceGroupId: 'pg-gold-lab',
-    reviewNote: 'Richiede listino rivenditore e bonifico 7gg.',
+    reviewNote: '申请经销商价格表和 7 天银行转账账期。',
   },
   {
     id: 'b2b-20260520-008',
@@ -688,24 +688,24 @@ const b2bApprovals: B2BApproval[] = [
     fiscalCode: '99887766554',
     sdi: '0000000',
     pec: 'mobilecarebari@pec.example',
-    companyType: 'Negozio riparazioni',
+    companyType: '维修门店',
     monthlyPurchase: '< €1.000',
     interestedCategories: ['Batteries', 'Tools'],
     status: 'approved',
     submittedAt: '2026-05-20T12:40:00+02:00',
     requestedPriceGroupId: 'pg-standard-b2b',
-    reviewNote: 'Approvato come standard B2B.',
+    reviewNote: '已按标准 B2B 客户通过。',
   },
 ]
 
 const priceGroups: PriceGroup[] = [
   {
     id: 'pg-standard-b2b',
-    name: 'Standard B2B',
-    description: 'Listino base per clienti approvati e piccoli laboratori.',
+    name: '标准 B2B',
+    description: '适用于已审核客户和小型维修实验室的基础价格表。',
     customerCount: 34,
     defaultMarginPercent: 32,
-    paymentTerms: 'Stripe / PayPal / Bonifico anticipato',
+    paymentTerms: 'Stripe / PayPal / 预付银行转账',
     minMonthlyPurchase: '< €1.000',
     visibleCategories: ['Screens', 'Batteries', 'Charging Ports', 'Tools'],
     tierRules: [
@@ -716,11 +716,11 @@ const priceGroups: PriceGroup[] = [
   },
   {
     id: 'pg-silver-shop',
-    name: 'Silver Repair Shop',
-    description: 'Prezzi dedicati a negozi con acquisto ricorrente.',
+    name: '银牌维修店',
+    description: '适用于有稳定复购的维修门店的专属价格。',
     customerCount: 18,
     defaultMarginPercent: 26,
-    paymentTerms: 'Bonifico anticipato / 7gg previa approvazione',
+    paymentTerms: '预付银行转账 / 审核后 7 天账期',
     minMonthlyPurchase: '€1.000 - €3.000',
     visibleCategories: ['Screens', 'Batteries', 'Charging Ports', 'Back Covers'],
     tierRules: [
@@ -731,11 +731,11 @@ const priceGroups: PriceGroup[] = [
   },
   {
     id: 'pg-gold-lab',
-    name: 'Gold Lab / Reseller',
-    description: 'Listino piu aggressivo per laboratori e rivenditori alto volume.',
+    name: '金牌实验室 / 经销商',
+    description: '适用于高采购量维修实验室和经销商的更低价格表。',
     customerCount: 9,
     defaultMarginPercent: 20,
-    paymentTerms: 'Bonifico 7gg / 15gg con limite credito',
+    paymentTerms: '银行转账 7 天 / 有信用额度时 15 天',
     minMonthlyPurchase: '€3.000+',
     visibleCategories: ['Screens', 'Batteries', 'Charging Ports', 'Back Covers', 'Cameras'],
     tierRules: [
@@ -760,7 +760,7 @@ const batches: AdminBatch[] = [
     isBatteryBatch: false,
     msdsUrl: '',
     un38Url: '',
-    notes: 'Display test superato, 1 pezzo difettoso separato.',
+    notes: '屏幕测试已通过，1 件瑕疵品已隔离。',
   },
   {
     id: 'batch-bat-0418',
@@ -775,7 +775,7 @@ const batches: AdminBatch[] = [
     isBatteryBatch: true,
     msdsUrl: 'MSDS-BATCH-BAT-0418.pdf',
     un38Url: 'UN38.3-BATCH-BAT-0418.pdf',
-    notes: 'Controllo campione batterie prima rilascio completo.',
+    notes: '完全放行前进行电池抽样检查。',
   },
   {
     id: 'batch-xia-in',
@@ -790,7 +790,7 @@ const batches: AdminBatch[] = [
     isBatteryBatch: false,
     msdsUrl: '',
     un38Url: '',
-    notes: 'Merce prevista, non vendibile finche QC non e completato.',
+    notes: '预计到货，QC 完成前不可销售。',
   },
 ]
 
@@ -820,7 +820,7 @@ export async function updateOrderStatus(orderId: string, status: AdminOrderStatu
   const order = orders.find((item) => item.id === orderId)
 
   if (!order) {
-    throw new Error('Ordine non trovato.')
+    throw new Error('未找到订单。')
   }
 
   order.status = status
@@ -831,13 +831,13 @@ export async function staffShipOrder(orderId: string) {
   const order = orders.find((item) => item.id === orderId)
 
   if (!order) {
-    throw new Error('Ordine non trovato.')
+    throw new Error('未找到订单。')
   }
 
   // Placeholder for Supabase RPC: staff_ship_order.
   // Shipping must atomically validate locked stock and write stock movements server-side.
   order.status = 'shipped'
-  order.staffNote = `${order.staffNote} staff_ship_order placeholder chiamato.`
+  order.staffNote = `${order.staffNote} 已调用 staff_ship_order 占位服务。`
 
   return getAdminOrderById(orderId)
 }
@@ -876,7 +876,7 @@ export async function updateAdminProduct(productId: string, patch: Partial<Admin
   const product = adminProducts.find((item) => item.id === productId)
 
   if (!product) {
-    throw new Error('Prodotto non trovato.')
+    throw new Error('未找到商品。')
   }
 
   Object.assign(product, patch, {
@@ -905,15 +905,15 @@ export async function reviewB2BApproval(
   const approval = b2bApprovals.find((item) => item.id === approvalId)
 
   if (!approval) {
-    throw new Error('Richiesta B2B non trovata.')
+    throw new Error('未找到 B2B 申请。')
   }
 
   approval.status = status
   approval.requestedPriceGroupId = priceGroupId
   approval.reviewNote =
     status === 'approved'
-      ? `Approvato con gruppo prezzo ${priceGroupId}.`
-      : 'Respinto: dati aziendali o volume non sufficienti.'
+      ? `已通过，分配价格组 ${priceGroupId}。`
+      : '已拒绝：公司资料或采购量不符合要求。'
 
   return getB2BApprovals().find((item) => item.id === approvalId) || null
 }

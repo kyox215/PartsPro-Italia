@@ -7,28 +7,29 @@ import {
   getPriceGroups,
 } from '@/services/admin.service'
 import type { AdminProduct, PriceGroup } from '@/types/admin'
+import { labelCategory } from '@/utils/adminLabels'
 
 const priceGroups = ref<PriceGroup[]>(getPriceGroups())
 const products = ref<AdminProduct[]>(getAdminProducts())
 const isLoading = ref(false)
 
 const columns = [
-  { title: 'Gruppo', dataIndex: 'name', key: 'group', width: 240 },
-  { title: 'Clienti', dataIndex: 'customerCount', key: 'customerCount', width: 110 },
-  { title: 'Margine', dataIndex: 'defaultMarginPercent', key: 'margin', width: 120 },
-  { title: 'Volume minimo', dataIndex: 'minMonthlyPurchase', key: 'volume', width: 180 },
-  { title: 'Termini pagamento', dataIndex: 'paymentTerms', key: 'terms', width: 260 },
-  { title: 'Categorie visibili', dataIndex: 'visibleCategories', key: 'categories' },
-  { title: 'Regole qty', dataIndex: 'tierRules', key: 'tierRules', width: 180 },
+  { title: '价格组', dataIndex: 'name', key: 'group', width: 240 },
+  { title: '客户数', dataIndex: 'customerCount', key: 'customerCount', width: 110 },
+  { title: '毛利', dataIndex: 'defaultMarginPercent', key: 'margin', width: 120 },
+  { title: '最低月采购', dataIndex: 'minMonthlyPurchase', key: 'volume', width: 180 },
+  { title: '付款条款', dataIndex: 'paymentTerms', key: 'terms', width: 260 },
+  { title: '可见分类', dataIndex: 'visibleCategories', key: 'categories' },
+  { title: '数量规则', dataIndex: 'tierRules', key: 'tierRules', width: 180 },
 ]
 
 const productPriceColumns = [
   { title: 'SKU', dataIndex: 'skuCode', key: 'sku', width: 180 },
-  { title: 'Prodotto', dataIndex: 'name', key: 'name' },
-  { title: 'Costo', dataIndex: 'costPrice', key: 'cost', width: 110 },
+  { title: '商品', dataIndex: 'name', key: 'name' },
+  { title: '成本', dataIndex: 'costPrice', key: 'cost', width: 110 },
   { title: 'B2B', dataIndex: 'b2bPrice', key: 'b2b', width: 110 },
-  { title: 'Retail', dataIndex: 'retailPrice', key: 'retail', width: 110 },
-  { title: 'Fasce quantita', dataIndex: 'tierPrices', key: 'tiers', width: 220 },
+  { title: '零售', dataIndex: 'retailPrice', key: 'retail', width: 110 },
+  { title: '数量阶梯', dataIndex: 'tierPrices', key: 'tiers', width: 220 },
 ]
 
 const stats = computed(() => ({
@@ -67,13 +68,13 @@ onMounted(loadPrices)
 
     <a-row :gutter="[16, 16]" class="admin-metric-row">
       <a-col :xs="24" :md="8">
-        <a-card><a-statistic title="Gruppi prezzo" :value="stats.groups" /></a-card>
+        <a-card><a-statistic title="价格组数" :value="stats.groups" /></a-card>
       </a-col>
       <a-col :xs="24" :md="8">
-        <a-card><a-statistic title="Clienti assegnati" :value="stats.customers" /></a-card>
+        <a-card><a-statistic title="已分配客户" :value="stats.customers" /></a-card>
       </a-col>
       <a-col :xs="24" :md="8">
-        <a-card><a-statistic title="SKU con B2B price" :value="stats.pricedSku" /></a-card>
+        <a-card><a-statistic title="已定价 SKU" :value="stats.pricedSku" /></a-card>
       </a-col>
     </a-row>
 
@@ -89,7 +90,7 @@ onMounted(loadPrices)
           <template v-if="column.key === 'group'">
             <strong>{{ record.name }}</strong>
             <span class="admin-muted-line">{{ record.description }}</span>
-            <span class="admin-muted-line">Aggiornato {{ record.updatedAt.slice(0, 10) }}</span>
+            <span class="admin-muted-line">更新于 {{ record.updatedAt.slice(0, 10) }}</span>
           </template>
 
           <template v-else-if="column.key === 'margin'">
@@ -99,7 +100,7 @@ onMounted(loadPrices)
           <template v-else-if="column.key === 'categories'">
             <a-space wrap>
               <a-tag v-for="category in record.visibleCategories" :key="category">
-                {{ category }}
+                {{ labelCategory(category) }}
               </a-tag>
             </a-space>
           </template>

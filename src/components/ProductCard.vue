@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue'
 import {
+  MinusOutlined,
+  PlusOutlined,
   LockOutlined,
   ShoppingCartOutlined,
   StarOutlined,
@@ -17,6 +20,22 @@ const props = defineProps<{
 const route = useRoute()
 const router = useRouter()
 const cartStore = useCartStore()
+const hasImageError = ref(false)
+const cartQuantity = computed(
+  () => cartStore.items.find((item) => item.skuCode === props.product.skuCode)?.quantity || 0,
+)
+const productImageAlt = computed(
+  () => props.product.imageAlt || `${props.product.brand} ${props.product.model} ${props.product.category}`,
+)
+const shouldShowImage = computed(() => Boolean(props.product.imageUrl) && !hasImageError.value)
+const fallbackInitials = computed(() =>
+  props.product.category
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 3)
+    .toUpperCase(),
+)
 
 const stockMeta: Record<StockStatus, { label: string; color: string }> = {
   in_stock: { label: 'Disponibile', color: 'success' },
@@ -51,66 +70,99 @@ function handleAddToCart() {
   cartStore.addItem(props.product.skuCode, props.product.moq)
   message.success(`${props.product.skuCode} aggiunto al carrello`)
 }
+
+function handleIncreaseQuantity() {
+  cartStore.addItem(props.product.skuCode, 1)
+}
+
+function handleDecreaseQuantity() {
+  if (cartQuantity.value <= 1) {
+    cartStore.removeItem(props.product.skuCode)
+    return
+  }
+
+  cartStore.updateQuantity(props.product.skuCode, cartQuantity.value - 1)
+}
+
+watch(
+  () => props.product.imageUrl,
+  () => {
+    hasImageError.value = false
+  },
+)
 </script>
 
 <template>
   <a-card class="product-card" hoverable>
     <RouterLink :to="`/products/${product.skuCode}`" class="product-card-link">
-      <div class="product-thumb">
-        <span>{{ product.brand }}</span>
-        <strong>{{ product.category }}</strong>
+      <div class="product-media">
+        <img
+          v-if="shouldShowImage"
+          :src="product.imageUrl"
+          :alt="productImageAlt"
+          loading="lazy"
+          decoding="async"
+          @error="hasImageError = true"
+        />
+        <div v-else class="product-media-fallback" aria-hidden="true">
+          <span>{{ product.brand }}</span>
+          <strong>{{ fallbackInitials }}</strong>
+        </div>
+        <a-tag :color="stockMeta[product.stockStatus].color" class="product-stock-pill">
+          <span class="product-stock-dot" />
+          {{ stockMeta[product.stockStatus].label }}
+        </a-tag>
       </div>
       <div class="product-tags">
         <a-tag :color="qualityColors[product.qualityGrade] || 'blue'">
           {{ product.qualityGrade }}
         </a-tag>
-        <a-tag :color="stockMeta[product.stockStatus].color">
-          {{ stockMeta[product.stockStatus].label }}
-        </a-tag>
       </div>
       <h3>{{ product.name }}</h3>
       <dl class="product-meta">
         <div>
-          <dt>SKU</dt>
-          <dd>{{ product.skuCode }}</dd>
-        </div>
-        <div>
           <dt>Modello</dt>
           <dd>{{ product.model }}</dd>
-        </div>
-        <div>
-          <dt>Colore</dt>
-          <dd>{{ product.color }}</dd>
         </div>
       </dl>
     </RouterLink>
 
-    <div class="product-price">
-      <template v-if="canViewPrice">
-        <strong>€{{ product.b2bPrice.toFixed(2) }}</strong>
-        <span>{{ product.vatMode }}</span>
-      </template>
-      <a-alert v-else type="info" show-icon>
-        <template #icon>
-          <LockOutlined />
+    <div class="product-buy-row">
+      <div class="product-price">
+        <template v-if="canViewPrice">
+          <strong>€{{ product.b2bPrice.toFixed(2) }}</strong>
+          <span>{{ product.vatMode }}</span>
         </template>
-        <template #message>Accedi per vedere il prezzo B2B</template>
-      </a-alert>
-    </div>
+        <div v-else class="product-price-lock">
+          <LockOutlined />
+          <span>Login prezzo B2B</span>
+        </div>
+      </div>
 
-    <div class="product-actions">
-      <a-input-number :min="product.moq" :value="product.moq" />
-      <a-button
-        type="primary"
-        :disabled="product.stockStatus === 'out_of_stock'"
-        @click="handleAddToCart"
-      >
-        <ShoppingCartOutlined />
-        {{ canViewPrice ? 'Add' : 'Login' }}
-      </a-button>
-      <a-button>
-        <StarOutlined />
-      </a-button>
+      <div class="product-actions">
+        <div v-if="canViewPrice && cartQuantity > 0" class="product-qty-control">
+          <a-button size="small" @click="handleDecreaseQuantity">
+            <MinusOutlined />
+          </a-button>
+          <strong>{{ cartQuantity }}</strong>
+          <a-button size="small" @click="handleIncreaseQuantity">
+            <PlusOutlined />
+          </a-button>
+        </div>
+        <a-button
+          v-else
+          size="small"
+          type="primary"
+          :disabled="product.stockStatus === 'out_of_stock'"
+          @click="handleAddToCart"
+        >
+          <ShoppingCartOutlined />
+          {{ canViewPrice ? 'Add' : 'Login' }}
+        </a-button>
+        <a-button size="small" class="product-favorite-button">
+          <StarOutlined />
+        </a-button>
+      </div>
     </div>
   </a-card>
 </template>

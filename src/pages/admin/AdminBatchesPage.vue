@@ -2,28 +2,29 @@
 import { computed, onMounted, ref } from 'vue'
 import { fetchAdminBatches, getAdminBatches } from '@/services/admin.service'
 import type { AdminBatch, BatchStatus } from '@/types/admin'
+import { labelBatchStatus, labelQcStatus } from '@/utils/adminLabels'
 
 const batches = ref<AdminBatch[]>(getAdminBatches())
 const selectedStatus = ref<'all' | BatchStatus>('all')
 const isLoading = ref(false)
 
 const columns = [
-  { title: 'Lotto', dataIndex: 'batchCode', key: 'batch', width: 240 },
-  { title: 'Fornitore / PO', key: 'supplier', width: 260 },
-  { title: 'Stato', dataIndex: 'status', key: 'status', width: 130 },
+  { title: '批次', dataIndex: 'batchCode', key: 'batch', width: 240 },
+  { title: '供应商 / 采购单', key: 'supplier', width: 260 },
+  { title: '状态', dataIndex: 'status', key: 'status', width: 130 },
   { title: 'QC', dataIndex: 'qcStatus', key: 'qc', width: 120 },
   { title: 'SKU', dataIndex: 'skuCount', key: 'skuCount', width: 100 },
-  { title: 'Ubicazione', dataIndex: 'warehouseLocation', key: 'warehouseLocation', width: 180 },
-  { title: 'Compliance batterie', key: 'battery', width: 220 },
-  { title: 'Note', dataIndex: 'notes', key: 'notes' },
+  { title: '库位', dataIndex: 'warehouseLocation', key: 'warehouseLocation', width: 180 },
+  { title: '电池合规', key: 'battery', width: 220 },
+  { title: '备注', dataIndex: 'notes', key: 'notes' },
 ]
 
 const statusOptions = computed(() => [
-  { label: `Tutti (${batches.value.length})`, value: 'all' },
-  { label: `Incoming (${batches.value.filter((batch) => batch.status === 'incoming').length})`, value: 'incoming' },
-  { label: `QC hold (${batches.value.filter((batch) => batch.status === 'qc_hold').length})`, value: 'qc_hold' },
-  { label: `Released (${batches.value.filter((batch) => batch.status === 'released').length})`, value: 'released' },
-  { label: `Blocked (${batches.value.filter((batch) => batch.status === 'blocked').length})`, value: 'blocked' },
+  { label: `全部 (${batches.value.length})`, value: 'all' },
+  { label: `在途 (${batches.value.filter((batch) => batch.status === 'incoming').length})`, value: 'incoming' },
+  { label: `质检暂挂 (${batches.value.filter((batch) => batch.status === 'qc_hold').length})`, value: 'qc_hold' },
+  { label: `已放行 (${batches.value.filter((batch) => batch.status === 'released').length})`, value: 'released' },
+  { label: `已阻塞 (${batches.value.filter((batch) => batch.status === 'blocked').length})`, value: 'blocked' },
 ])
 
 const filteredBatches = computed(() => {
@@ -42,7 +43,7 @@ const stats = computed(() => ({
 }))
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat('it-IT', {
+  return new Intl.DateTimeFormat('zh-CN', {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value))
@@ -90,16 +91,16 @@ onMounted(loadBatches)
 
     <a-row :gutter="[16, 16]" class="admin-metric-row">
       <a-col :xs="12" :md="6">
-        <a-card><a-statistic title="Lotti" :value="stats.total" /></a-card>
+        <a-card><a-statistic title="批次数" :value="stats.total" /></a-card>
       </a-col>
       <a-col :xs="12" :md="6">
-        <a-card><a-statistic title="Batterie" :value="stats.battery" /></a-card>
+        <a-card><a-statistic title="电池批次" :value="stats.battery" /></a-card>
       </a-col>
       <a-col :xs="12" :md="6">
-        <a-card><a-statistic title="QC hold" :value="stats.qcHold" /></a-card>
+        <a-card><a-statistic title="质检暂挂" :value="stats.qcHold" /></a-card>
       </a-col>
       <a-col :xs="12" :md="6">
-        <a-card><a-statistic title="Released" :value="stats.released" /></a-card>
+        <a-card><a-statistic title="已放行" :value="stats.released" /></a-card>
       </a-col>
     </a-row>
 
@@ -124,7 +125,7 @@ onMounted(loadBatches)
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'batch'">
             <strong>{{ record.batchCode }}</strong>
-            <span class="admin-muted-line">Ricezione {{ formatDate(record.receivedAt) }}</span>
+            <span class="admin-muted-line">收货 {{ formatDate(record.receivedAt) }}</span>
           </template>
 
           <template v-else-if="column.key === 'supplier'">
@@ -133,17 +134,17 @@ onMounted(loadBatches)
           </template>
 
           <template v-else-if="column.key === 'status'">
-            <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
+            <a-tag :color="statusColor(record.status)">{{ labelBatchStatus(record.status) }}</a-tag>
           </template>
 
           <template v-else-if="column.key === 'qc'">
-            <a-tag :color="qcColor(record.qcStatus)">{{ record.qcStatus }}</a-tag>
+            <a-tag :color="qcColor(record.qcStatus)">{{ labelQcStatus(record.qcStatus) }}</a-tag>
           </template>
 
           <template v-else-if="column.key === 'battery'">
             <a-space wrap>
               <a-tag :color="record.isBatteryBatch ? 'red' : 'default'">
-                {{ record.isBatteryBatch ? 'Battery batch' : 'No battery' }}
+                {{ record.isBatteryBatch ? '电池批次' : '非电池' }}
               </a-tag>
               <a-tag v-if="record.msdsUrl">MSDS</a-tag>
               <a-tag v-if="record.un38Url">UN38.3</a-tag>

@@ -7,16 +7,16 @@ const inventory = ref(getInventoryItems())
 const query = ref('')
 
 const columns = [
-  { title: 'SKU / prodotto', dataIndex: 'skuCode', key: 'product', width: 280 },
-  { title: 'Brand / modello', dataIndex: 'brand', key: 'brand', width: 180 },
-  { title: 'Lotto', dataIndex: 'batchCode', key: 'batch', width: 160 },
-  { title: 'Ubicazione', dataIndex: 'location', key: 'location', width: 130 },
-  { title: 'Actual', dataIndex: 'actualQty', key: 'actualQty', width: 100 },
-  { title: 'Locked', dataIndex: 'lockedQty', key: 'lockedQty', width: 100 },
-  { title: 'Available', dataIndex: 'availableQty', key: 'availableQty', width: 110 },
-  { title: 'Incoming', dataIndex: 'incomingQty', key: 'incomingQty', width: 110 },
-  { title: 'QC / RMA / Difettosi', key: 'exceptions', width: 190 },
-  { title: 'Fornitore', dataIndex: 'supplier', key: 'supplier', width: 180 },
+  { title: 'SKU / 商品', dataIndex: 'skuCode', key: 'product', width: 280 },
+  { title: '品牌 / 机型', dataIndex: 'brand', key: 'brand', width: 180 },
+  { title: '批次', dataIndex: 'batchCode', key: 'batch', width: 160 },
+  { title: '库位', dataIndex: 'location', key: 'location', width: 130 },
+  { title: '实际', dataIndex: 'actualQty', key: 'actualQty', width: 100 },
+  { title: '锁定', dataIndex: 'lockedQty', key: 'lockedQty', width: 100 },
+  { title: '可用', dataIndex: 'availableQty', key: 'availableQty', width: 110 },
+  { title: '在途', dataIndex: 'incomingQty', key: 'incomingQty', width: 110 },
+  { title: 'QC / RMA / 瑕疵', key: 'exceptions', width: 190 },
+  { title: '供应商', dataIndex: 'supplier', key: 'supplier', width: 180 },
 ]
 
 const filteredInventory = computed(() => {
@@ -57,7 +57,7 @@ function stockColor(item: InventoryItem) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat('it-IT', {
+  return new Intl.DateTimeFormat('zh-CN', {
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',
@@ -70,7 +70,7 @@ function formatDate(value: string) {
   <main class="admin-page">
     <a-page-header
       title="库存管理"
-      sub-title="actual、locked、available、incoming、QC、RMA、defective、batch 和 location"
+      sub-title="实际、锁定、可用、在途、质检、RMA、瑕疵、批次和库位"
     >
       <template #extra>
         <a-button @click="refreshInventory">刷新</a-button>
@@ -80,22 +80,22 @@ function formatDate(value: string) {
     <a-row :gutter="[16, 16]" class="admin-metric-row">
       <a-col :xs="12" :md="6">
         <a-card>
-          <a-statistic title="Actual qty" :value="stats.actual" />
+          <a-statistic title="实际库存" :value="stats.actual" />
         </a-card>
       </a-col>
       <a-col :xs="12" :md="6">
         <a-card>
-          <a-statistic title="Available" :value="stats.available" />
+          <a-statistic title="可用库存" :value="stats.available" />
         </a-card>
       </a-col>
       <a-col :xs="12" :md="6">
         <a-card>
-          <a-statistic title="Locked" :value="stats.locked" />
+          <a-statistic title="锁定库存" :value="stats.locked" />
         </a-card>
       </a-col>
       <a-col :xs="12" :md="6">
         <a-card>
-          <a-statistic title="Incoming" :value="stats.incoming" />
+          <a-statistic title="在途库存" :value="stats.incoming" />
         </a-card>
       </a-col>
     </a-row>
@@ -105,7 +105,7 @@ function formatDate(value: string) {
         <a-input-search
           v-model:value="query"
           class="admin-toolbar-search"
-          placeholder="Cerca SKU, prodotto, brand, lotto o ubicazione..."
+          placeholder="搜索 SKU、商品、品牌、批次或库位..."
           allow-clear
         />
         <a-alert
@@ -136,7 +136,7 @@ function formatDate(value: string) {
 
           <template v-else-if="column.key === 'batch'">
             <a-tag>{{ record.batchCode }}</a-tag>
-            <span class="admin-muted-line">Ultimo mov. {{ formatDate(record.lastMovementAt) }}</span>
+            <span class="admin-muted-line">最后流水 {{ formatDate(record.lastMovementAt) }}</span>
           </template>
 
           <template v-else-if="column.key === 'availableQty'">
@@ -154,7 +154,7 @@ function formatDate(value: string) {
               <a-tag :color="record.qcQty > 0 ? 'gold' : 'default'">QC {{ record.qcQty }}</a-tag>
               <a-tag :color="record.rmaQty > 0 ? 'blue' : 'default'">RMA {{ record.rmaQty }}</a-tag>
               <a-tag :color="record.defectiveQty > 0 ? 'red' : 'default'">
-                DEF {{ record.defectiveQty }}
+                瑕疵 {{ record.defectiveQty }}
               </a-tag>
             </a-space>
           </template>

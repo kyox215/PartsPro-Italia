@@ -4,9 +4,9 @@ import { useRoute } from 'vue-router'
 
 const route = useRoute()
 
-const title = computed(() => String(route.meta.title || 'Admin'))
+const title = computed(() => String(route.meta.title || '后台'))
 const description = computed(() =>
-  String(route.meta.description || 'Modulo operativo pianificato per PartsPro.'),
+  String(route.meta.description || 'PartsPro 后台功能模块已规划。'),
 )
 </script>
 
@@ -14,7 +14,7 @@ const description = computed(() =>
   <main>
     <a-page-header :title="title" :sub-title="description" />
     <a-card>
-      <a-empty description="Modulo pronto per la prossima fase">
+      <a-empty description="模块已准备，等待下一阶段实现">
         <template #image>
           <span />
         </template>

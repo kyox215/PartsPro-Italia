@@ -1,5 +1,5 @@
 import type { Product } from '@/types/product'
-import { shouldUseSupabaseData, supabase } from '@/lib/supabase'
+import { hasSupabaseConfig, shouldUseSupabaseData, supabase } from '@/lib/supabase'
 
 type ProductRow = {
   sku_code: string
@@ -12,6 +12,9 @@ type ProductRow = {
   color: string
   frame: Product['frame']
   stock_status: Product['stockStatus']
+  image_path?: string | null
+  image_alt?: string | null
+  gallery_image_paths?: string[] | null
   moq: number
   b2b_price?: number | null
   vat_mode: Product['vatMode']
@@ -21,9 +24,29 @@ type ProductRow = {
 }
 
 const publicProductColumns =
-  'sku_code,name,brand,model,model_codes,category,quality_grade,color,frame,stock_status,moq,vat_mode,warranty_days,compatibility,highlights'
+  'sku_code,name,brand,model,model_codes,category,quality_grade,color,frame,stock_status,image_path,image_alt,gallery_image_paths,moq,vat_mode,warranty_days,compatibility,highlights'
 
 const authenticatedProductColumns = `${publicProductColumns},b2b_price`
+const productImageBucket = 'product-images'
+
+function getProductImageUrl(imagePath?: string | null) {
+  const normalizedPath = imagePath?.trim()
+
+  if (!normalizedPath) {
+    return ''
+  }
+
+  if (/^https?:\/\//i.test(normalizedPath)) {
+    return normalizedPath
+  }
+
+  if (!hasSupabaseConfig) {
+    return ''
+  }
+
+  const { data } = supabase.storage.from(productImageBucket).getPublicUrl(normalizedPath)
+  return data.publicUrl
+}
 
 const products: Product[] = [
   {
@@ -37,6 +60,8 @@ const products: Product[] = [
     color: 'Black',
     frame: 'Without Frame',
     stockStatus: 'in_stock',
+    imagePath: 'screens/IP11-SCR-SOFT-BLK.webp',
+    imageAlt: 'iPhone 11 display Soft OLED black without frame',
     moq: 1,
     b2bPrice: 32,
     vatMode: 'IVA esclusa',
@@ -58,6 +83,8 @@ const products: Product[] = [
     color: 'Black',
     frame: 'N/A',
     stockStatus: 'low_stock',
+    imagePath: 'batteries/IP12-BAT-HQ-2815.webp',
+    imageAlt: 'iPhone 12 compatible high quality battery',
     moq: 1,
     b2bPrice: 14.5,
     vatMode: 'IVA esclusa',
@@ -78,6 +105,8 @@ const products: Product[] = [
     color: 'Black',
     frame: 'N/A',
     stockStatus: 'in_stock',
+    imagePath: 'charging-ports/SA52-CHG-EU-BLK.webp',
+    imageAlt: 'Samsung Galaxy A52 charging port flex EU version',
     moq: 2,
     b2bPrice: 5.9,
     vatMode: 'IVA esclusa',
@@ -99,6 +128,8 @@ const products: Product[] = [
     color: 'Blue',
     frame: 'N/A',
     stockStatus: 'incoming',
+    imagePath: 'back-covers/RN10-BKC-BLU.webp',
+    imageAlt: 'Xiaomi Redmi Note 10 blue back cover',
     moq: 1,
     b2bPrice: 7.8,
     vatMode: 'IVA esclusa',
@@ -119,6 +150,8 @@ const products: Product[] = [
     color: 'Black',
     frame: 'N/A',
     stockStatus: 'out_of_stock',
+    imagePath: 'cameras/IP13-CAM-REAR.webp',
+    imageAlt: 'iPhone 13 rear camera compatible module',
     moq: 1,
     b2bPrice: 38,
     vatMode: 'IVA esclusa',
@@ -139,6 +172,8 @@ const products: Product[] = [
     color: 'Mixed',
     frame: 'N/A',
     stockStatus: 'in_stock',
+    imagePath: 'tools/TOOL-WATERPROOF-SET.webp',
+    imageAlt: 'Waterproof adhesive set for iPhone 11 and 12 series',
     moq: 5,
     b2bPrice: 1.2,
     vatMode: 'IVA esclusa',
@@ -195,6 +230,10 @@ function mapProductRow(row: ProductRow): Product {
     color: row.color,
     frame: row.frame,
     stockStatus: row.stock_status,
+    imagePath: row.image_path || '',
+    imageUrl: getProductImageUrl(row.image_path),
+    imageAlt: row.image_alt || row.name,
+    galleryImagePaths: row.gallery_image_paths || [],
     moq: row.moq,
     b2bPrice: Number(row.b2b_price || 0),
     vatMode: row.vat_mode,
