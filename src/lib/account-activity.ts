@@ -1,4 +1,3 @@
-import { toAttachmentHref } from "@/lib/admin-attachment-storage";
 import type { AuthContext } from "@/lib/auth";
 import { products } from "@/lib/catalog";
 import {
@@ -322,7 +321,7 @@ function mapAccountOrder(order: {
         currency: record.currency ?? "EUR",
         provider: record.provider ?? null,
         providerReference: record.provider_reference ?? null,
-        proofUrl: toAttachmentHref(record.proof_url),
+        proofUrl: toPaymentProofHref(record.proof_url),
         proofLabel: record.proof_label ?? null,
         note: record.note ?? null,
         createdAt: record.created_at,
@@ -353,6 +352,11 @@ function mapAccountOrder(order: {
       }))
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
   };
+}
+
+function toPaymentProofHref(value: string | null | undefined) {
+  if (!value) return null;
+  return value.startsWith("storage://") ? null : value;
 }
 
 function mapAccountNotification(notification: {

@@ -1,4 +1,4 @@
-import type { CheckoutCartInput } from "@/admin/schemas/order-checkout";
+import type { CheckoutCartInput } from "@/lib/checkout-cart-schema";
 import {
   getAccountCompany,
   getCheckoutCompanyMissingFields,
@@ -11,18 +11,19 @@ import {
 import { getSiteUrl } from "@/lib/env";
 import { isLocale, localizePath, type Locale } from "@/lib/i18n";
 import {
-  createOrderReservation,
-  getCheckoutInitialOrderStatus,
-  getCheckoutPaymentStatus,
-  getCheckoutReservationExpiry,
-  getOrderTransactionClient,
-  loadCheckoutOrderLines,
-  releaseOrderReservation,
-  updateOrderStripeCheckoutSession,
+  createSupabaseOrderWithReservations,
+  getInitialOrderStatus,
+  getPaymentStatus,
+  getReservationExpiry,
+  loadSupabaseOrderLines,
+  releaseOrderReservations,
   type PaymentMethod,
-} from "@/admin/repositories/order-transactions";
+} from "@/lib/order-workflow";
 import { getStripe, hasStripeConfig } from "@/lib/stripe";
-import { hasSupabaseAdminConfig } from "@/lib/supabase/admin";
+import {
+  getSupabaseAdminClient,
+  hasSupabaseAdminConfig,
+} from "@/lib/supabase/admin";
 import { hasSupabasePublicConfig } from "@/lib/supabase/config";
 import type { orderSchema } from "@/lib/validations";
 import type { z } from "zod";
@@ -139,11 +140,11 @@ export async function createCheckoutOrder(
 
   const orderId = crypto.randomUUID();
   const now = new Date();
-  const reservationExpiresAt = getCheckoutReservationExpiry(now);
+  const reservationExpiresAt = getReservationExpiry(now);
 
   let lines;
   try {
-    lines = await loadCheckoutOrderLines(items, useB2BPrice);
+    lines = await loadSupabaseOrderLines(items, useB2BPrice);
   } catch (error) {
     return checkoutOrderError(
       "ORDER_LINES_INVALID",
@@ -158,12 +159,12 @@ export async function createCheckoutOrder(
 
   let orderNumber = orderId;
   try {
-    const createdOrder = await createOrderReservation({
-      supabase: getOrderTransactionClient(),
+    const createdOrder = await createSupabaseOrderWithReservations({
+      supabase: getSupabaseAdminClient(),
       orderId,
       profileId: auth.user.id,
-      status: getCheckoutInitialOrderStatus(paymentMethod),
-      paymentStatus: getCheckoutPaymentStatus(paymentMethod),
+      status: getInitialOrderStatus(paymentMethod),
+      paymentStatus: getPaymentStatus(paymentMethod),
       reservationExpiresAt: reservationExpiresAt.toISOString(),
       reservedAt: now.toISOString(),
       paymentMethod,
@@ -227,14 +228,14 @@ export async function createCheckoutOrder(
           checkoutUrl: session.url,
           orderId,
           orderNumber,
-          paymentStatus: getCheckoutPaymentStatus(paymentMethod),
+          paymentStatus: getPaymentStatus(paymentMethod),
           status: "checkout_created",
           total,
         },
         ok: true,
       };
     } catch (error) {
-      await releaseOrderReservation({
+      await releaseOrderReservations({
         orderId,
         paymentStatus: "failed",
         status: "cancelled",
@@ -256,7 +257,7 @@ export async function createCheckoutOrder(
           : "Bank transfer order created.",
       orderId,
       orderNumber,
-      paymentStatus: getCheckoutPaymentStatus(paymentMethod),
+      paymentStatus: getPaymentStatus(paymentMethod),
       status: "pending_payment",
       total,
     },
@@ -290,6 +291,28 @@ export function parseCheckoutOrderItems(
   } catch {
     return [];
   }
+}
+
+async function updateOrderStripeCheckoutSession({
+  orderId,
+  stripeCheckoutSessionId,
+  stripePaymentIntentId,
+}: {
+  orderId: string;
+  stripeCheckoutSessionId: string;
+  stripePaymentIntentId?: string | null;
+}) {
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase
+    .from("orders")
+    .update({
+      stripe_checkout_session_id: stripeCheckoutSessionId,
+      stripe_payment_intent_id: stripePaymentIntentId ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", orderId);
+
+  if (error) throw new Error(error.message);
 }
 
 function checkoutOrderError(

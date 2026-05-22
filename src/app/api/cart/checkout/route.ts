@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { checkoutCartSchema } from "@/admin/schemas/order-checkout";
-import { prepareCheckoutCart } from "@/admin/services/order-checkout";
+import { checkoutCartSchema } from "@/lib/checkout-cart-schema";
+import { prepareCheckoutCart } from "@/lib/checkout-order-service";
 import { checkoutCartCookieName, encodeCheckoutCart } from "@/lib/checkout-cart-cookie";
 import { parseRequestBody } from "@/lib/request";
 

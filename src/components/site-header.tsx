@@ -10,13 +10,9 @@ export function SiteHeader({
   dictionary,
   auth,
 }: Readonly<{ locale: Locale; dictionary: Dictionary; auth: AuthContext }>) {
-  const rawNavItems: Array<[string, string] | null> = [
+  const navItems: Array<[string, string]> = [
     ["products", dictionary.nav.products as string],
-    auth.isAdmin ? ["admin", dictionary.nav.admin as string] : null,
   ];
-  const navItems = rawNavItems.filter((item): item is [string, string] =>
-    Boolean(item),
-  );
   const accountHref = auth.user
     ? localizePath(locale, "/account")
     : localizePath(locale, "/login");

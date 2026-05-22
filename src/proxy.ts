@@ -1,13 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import {
-  adminCsrfCookieName,
-  adminCsrfCookieOptions,
-  generateAdminCsrfToken,
-  isAdminCsrfTokenWellFormed,
-  shouldIssueAdminCsrfCookie,
-} from "@/lib/admin-csrf";
-import {
   getSupabasePublicKey,
   getSupabaseUrl,
 } from "@/lib/supabase/config";
@@ -19,14 +12,9 @@ import {
 export async function proxy(request: NextRequest) {
   const url = getSupabaseUrl();
   const publicKey = getSupabasePublicKey();
-  const adminCsrfToken = ensureAdminCsrfRequestCookie(request);
 
   if (!url || !publicKey) {
-    return applyAdminCsrfResponseCookie(
-      request,
-      NextResponse.next({ request }),
-      adminCsrfToken,
-    );
+    return NextResponse.next({ request });
   }
 
   let response = NextResponse.next({ request });
@@ -60,34 +48,6 @@ export async function proxy(request: NextRequest) {
 
   await supabase.auth.getUser();
 
-  return applyAdminCsrfResponseCookie(request, response, adminCsrfToken);
-}
-
-function ensureAdminCsrfRequestCookie(request: NextRequest) {
-  if (!shouldIssueAdminCsrfCookie(request.nextUrl.pathname)) {
-    return null;
-  }
-
-  const existing = request.cookies.get(adminCsrfCookieName)?.value;
-  if (isAdminCsrfTokenWellFormed(existing)) {
-    return existing;
-  }
-
-  const token = generateAdminCsrfToken();
-  request.cookies.set(adminCsrfCookieName, token);
-  return token;
-}
-
-function applyAdminCsrfResponseCookie(
-  request: NextRequest,
-  response: NextResponse,
-  token: string | null | undefined,
-) {
-  if (!token || !shouldIssueAdminCsrfCookie(request.nextUrl.pathname)) {
-    return response;
-  }
-
-  response.cookies.set(adminCsrfCookieName, token, adminCsrfCookieOptions);
   return response;
 }
 

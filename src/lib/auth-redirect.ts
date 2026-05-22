@@ -26,25 +26,18 @@ export function getSafeAuthRedirect(
 export function getRoleAwareAuthRedirect({
   value,
   locale,
-  isAdmin,
 }: {
   value: FormDataEntryValue | string | null | undefined;
   locale: Locale;
   isAdmin: boolean;
 }) {
   const rawNext = String(value ?? "");
-  const defaultPath = isAdmin ? `/${locale}/admin` : `/${locale}/account`;
+  const defaultPath = `/${locale}/account`;
 
   if (!rawNext) {
     return defaultPath;
   }
 
   const safeNext = getSafeAuthRedirect(rawNext, locale);
-  const adminPrefix = `/${locale}/admin`;
-
-  if (safeNext === adminPrefix || safeNext.startsWith(`${adminPrefix}/`)) {
-    return isAdmin ? safeNext : `/${locale}/account?error=admin-required`;
-  }
-
   return safeNext;
 }

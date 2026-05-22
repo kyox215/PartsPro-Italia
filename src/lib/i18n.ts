@@ -15,7 +15,6 @@ export const dictionaries = {
     nav: {
       products: "Catalogo",
       account: "Account",
-      admin: "Admin",
       cart: "Carrello",
     },
     common: {
@@ -78,13 +77,6 @@ export const dictionaries = {
       subtitle:
         "Ordini, fatture, riordino e indirizzi. L'accesso reale e gestito da Supabase Auth.",
     },
-    admin: {
-      title: "Pannello operativo",
-      subtitle:
-        "Console interna per prodotti, stock, ordini e clienti wholesale. L'accesso e limitato agli admin.",
-      warning:
-        "Collegare Supabase e impostare ADMIN_EMAIL prima di usare dati reali.",
-    },
     legal: {
       title: "Pagine legali e operative",
       privacy: "Privacy policy",
@@ -101,7 +93,6 @@ export const dictionaries = {
     nav: {
       products: "商品目录",
       account: "账户中心",
-      admin: "后台",
       cart: "购物车",
     },
     common: {
@@ -163,12 +154,6 @@ export const dictionaries = {
       title: "客户账户中心",
       subtitle:
         "订单、发票、重复购买和地址。真实登录由 Supabase Auth 管理。",
-    },
-    admin: {
-      title: "运营后台",
-      subtitle:
-        "内部管理商品、库存、订单和批发客户。只有管理员角色可以访问。",
-      warning: "使用真实数据前，请先配置 Supabase 和 ADMIN_EMAIL。",
     },
     legal: {
       title: "法律与运营页面",

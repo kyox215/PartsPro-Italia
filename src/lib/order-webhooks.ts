@@ -1,8 +1,8 @@
 import {
-  markOrderStripePaymentPaid,
-  releaseOrderReservation,
-  syncOrderStripeRefundStatus,
-} from "@/admin/repositories/order-transactions";
+  markOrderPaid,
+  releaseOrderReservations,
+  syncStripeRefundStatus,
+} from "@/lib/order-workflow";
 import { hasSupabaseAdminConfig } from "@/lib/supabase/admin";
 
 type StripePaymentIntentRef = string | { id?: string | null } | null | undefined;
@@ -29,7 +29,7 @@ export async function handleStripeCheckoutCompleted(
   const orderId = getStripeOrderId(session);
   if (!orderId || !hasSupabaseAdminConfig()) return { handled: false };
 
-  await markOrderStripePaymentPaid({
+  await markOrderPaid({
     orderId,
     stripeCheckoutSessionId: session.id,
     stripePaymentIntentId: getStripePaymentIntentId(session.payment_intent),
@@ -46,7 +46,7 @@ export async function handleStripeCheckoutFailed(
   const orderId = getStripeOrderId(session);
   if (!orderId || !hasSupabaseAdminConfig()) return { handled: false };
 
-  await releaseOrderReservation({
+  await releaseOrderReservations({
     orderId,
     paymentStatus: "failed",
     status: "cancelled",
@@ -62,7 +62,7 @@ export async function handleStripeCheckoutFailed(
 export async function handleStripeRefundChanged(refund: StripeRefundLike) {
   if (!refund.id || !hasSupabaseAdminConfig()) return { handled: false };
 
-  const result = await syncOrderStripeRefundStatus({
+  const result = await syncStripeRefundStatus({
     stripeRefundId: refund.id,
     stripePaymentIntentId: getStripePaymentIntentId(refund.payment_intent),
     stripeStatus: refund.status,

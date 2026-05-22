@@ -12,15 +12,9 @@ The app is built for:
 - Supabase CLI config in `supabase/config.toml`
 - Stripe checkout and bank transfer orders
 - Vercel Git deployments from GitHub
-- Internal admin shell at `/admin` or `/{locale}/admin`
 - Supabase SSR auth with cookie sessions
-- Role-aware navigation and post-login redirects
-- Admin product/SKU creation shell at `/{locale}/admin/products`
-- Admin catalog Chinese translation generation and manual correction
-- Admin order, B2B approval, and RMA status workflows
-- Admin order/RMA detail pages with fulfillment and return-to-detail status updates
-- Admin system health dashboard for environment and Supabase table checks
-- Customer account workspace with own orders, totals, RMA activity, and detail pages
+- Account navigation and post-login redirects
+- Customer account workspace with own orders, totals, and detail pages
 - Customer company profile editor for invoice and B2B data
 
 ## Getting Started
@@ -61,57 +55,23 @@ npm run build
 - `/it/products/[slug]`
 - `/it/cart`
 - `/it/checkout`
-- `/it/b2b`
-- `/it/rma`
 - `/it/account`
 - `/it/account/orders`
 - `/it/account/orders/[orderId]`
-- `/it/account/rma`
-- `/it/account/rma/[rmaId]`
 - `/it/account/company`
-- `/it/admin`
-- `/it/admin/inventory`
-- `/it/admin/products`
-- `/it/admin/orders`
-- `/it/admin/orders/[orderId]`
-- `/it/admin/b2b`
-- `/it/admin/rma`
-- `/it/admin/rma/[rmaId]`
-- `/it/admin/system`
 - `/it/login`
 - `/api/orders`
 - `/api/account/company`
-- `/api/admin/products`
-- `/api/admin/catalog/translations`
-- `/api/admin/inventory/import-cart`
-- `/api/admin/inventory/receive`
-- `/api/admin/inventory/settings`
-- `/api/admin/orders/status`
-- `/api/admin/b2b/status`
-- `/api/admin/rma/status`
-- `/api/admin/health`
 - `/api/auth/callback`
 - `/api/auth/oauth/google`
 - `/api/auth/sign-in`
 - `/api/auth/sign-up`
 - `/api/auth/sign-out`
-- `/api/b2b-applications`
-- `/api/rma`
 - `/api/stripe/webhook`
 
 ## Database
 
-Initial Supabase schema:
-
-```text
-supabase/migrations/0001_initial_schema.sql
-```
-
-Optional seed data:
-
-```text
-supabase/seed.sql
-```
+The previous Supabase schema and seed migrations were intentionally removed during the rebuild reset. New database migrations should be created from the next backend design.
 
 ## Deploy on Vercel
 

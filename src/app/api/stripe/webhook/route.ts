@@ -3,7 +3,7 @@ import {
   handleStripeCheckoutCompleted,
   handleStripeCheckoutFailed,
   handleStripeRefundChanged,
-} from "@/admin/services/order-webhooks";
+} from "@/lib/order-webhooks";
 import { getStripe, hasStripeConfig } from "@/lib/stripe";
 
 export const runtime = "nodejs";

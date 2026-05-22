@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createCheckoutOrder } from "@/admin/services/order-checkout";
+import { createCheckoutOrder } from "@/lib/checkout-order-service";
 import { checkoutCartCookieName } from "@/lib/checkout-cart-cookie";
 import { parseRequestBody } from "@/lib/request";
 import { orderSchema } from "@/lib/validations";
