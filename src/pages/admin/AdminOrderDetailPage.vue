@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import {
-  getAdminOrderById,
+  fetchAdminOrderById,
   getNextOrderStatus,
   orderStatusFlow,
   staffShipOrder,
   updateOrderStatus,
-} from '@/services/admin.service'
+} from '@/services/order.service'
 import type { AdminOrder, AdminOrderStatus, PaymentStatus, StockRisk } from '@/types/admin'
 import {
   labelCustomerTier,
@@ -21,7 +21,8 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const order = ref<AdminOrder | null>(getAdminOrderById(String(route.params.id)))
+const order = ref<AdminOrder | null>(null)
+const isLoading = ref(false)
 
 const currentStep = computed(() => (order.value ? orderStatusFlow.indexOf(order.value.status) : 0))
 
@@ -82,8 +83,16 @@ function stockRiskColor(risk: StockRisk) {
   return colors[risk]
 }
 
-function refreshOrder() {
-  order.value = getAdminOrderById(String(route.params.id))
+async function refreshOrder() {
+  isLoading.value = true
+
+  try {
+    order.value = await fetchAdminOrderById(String(route.params.id))
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '订单加载失败。')
+  } finally {
+    isLoading.value = false
+  }
 }
 
 function nextActionLabel() {
@@ -124,7 +133,7 @@ function confirmAdvance() {
         }
 
         await staffShipOrder(order.value.id)
-        refreshOrder()
+        await refreshOrder()
         message.success('订单已通过 staff_ship_order 发货。')
       },
     })
@@ -142,16 +151,20 @@ function confirmAdvance() {
       }
 
       await updateOrderStatus(order.value.id, nextStatus)
-      refreshOrder()
+      await refreshOrder()
       message.success('订单状态已更新。')
     },
   })
 }
+
+onMounted(refreshOrder)
 </script>
 
 <template>
   <main class="admin-page">
-    <template v-if="order">
+    <a-spin v-if="isLoading" />
+
+    <template v-else-if="order">
       <a-page-header
         :title="order.orderNo"
         :sub-title="`${order.customerName} - ${formatDate(order.createdAt)}`"

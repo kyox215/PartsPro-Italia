@@ -60,7 +60,7 @@ export async function signInWithEmail(email: string, password: string) {
   return profileFromUser(data.user)
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(redirectTo?: string) {
   if (!hasSupabaseConfig) {
     throw new Error('Supabase non configurato. Usa un accesso demo per provare il flusso.')
   }
@@ -68,7 +68,7 @@ export async function signInWithGoogle() {
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: window.location.origin,
+      redirectTo: redirectTo || window.location.origin,
     },
   })
 

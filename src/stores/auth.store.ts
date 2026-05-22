@@ -98,12 +98,12 @@ export const useAuthStore = defineStore('auth', {
         this.isLoading = false
       }
     },
-    async loginWithGoogle() {
+    async loginWithGoogle(redirectTo?: string) {
       this.isLoading = true
       this.authError = ''
 
       try {
-        await signInWithGoogle()
+        await signInWithGoogle(redirectTo)
       } catch (error) {
         this.authError = error instanceof Error ? error.message : 'Login Google non riuscito.'
         throw error

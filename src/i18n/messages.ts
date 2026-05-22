@@ -3,7 +3,7 @@ import type { Language } from '@/stores/ui.store'
 const messages = {
   it: {
     storefrontSearch:
-      'Cerca per modello, SKU o ricambio... es. iPhone 11 schermo, A2221',
+      'Cerca per modello o ricambio... es. iPhone 11 schermo, batteria',
     shippingStrip: "Ordini pagati entro le 15:00, spedizione oggi dall'Italia",
     requestB2B: 'Richiedi account B2B',
     account: 'Account',
@@ -33,7 +33,7 @@ const messages = {
     homeHeroTag: 'B2B Ricambi Smartphone',
     homeHeroTitle: 'Ricambi per smartphone per professionisti della riparazione',
     homeHeroDescription:
-      "Schermi, batterie, connettori di ricarica e componenti selezionati per laboratori, negozi e rivenditori. Cerca per modello, SKU o compatibilita, poi accedi per vedere prezzi B2B e disponibilita reale.",
+      "Schermi, batterie, connettori di ricarica e componenti selezionati per laboratori, negozi e rivenditori. Cerca per modello o compatibilita, poi accedi per vedere prezzi B2B e disponibilita reale.",
     homeHeroSearchPlaceholder: 'Cerca iPhone 11 schermo, A2221, SM-G991B, batteria...',
     homeHeroSearchButton: 'Cerca',
     homeHeroBrowseProducts: 'Catalogo prodotti',
@@ -47,7 +47,7 @@ const messages = {
     homePanelQualityText: 'Original Pull, Refurbished, Soft OLED, Hard OLED, TFT e compatibili.',
     homePanelRmaTitle: 'RMA tracciabile',
     homePanelRmaText: 'Richieste con foto/video, regole visibili e stato pratica sempre consultabile.',
-    homeStatsSku: 'SKU ordinati per brand, modello e qualita',
+    homeStatsSku: 'Ricambi ordinati per brand, modello e qualita',
     homeStatsDispatch: 'Cut-off spedizione Italia',
     homeStatsVat: 'Fattura, P.IVA, SDI e PEC',
     homeCategoriesTitle: 'Categorie principali',
@@ -56,7 +56,7 @@ const messages = {
     homeBrandsDescription: 'Parti dai marchi piu richiesti e arriva alla scheda modello senza perdere il contesto.',
     homeQualityTitle: 'Progettato per acquisti B2B ripetuti',
     homeQualityDescription:
-      'La UI mette in primo piano SKU, compatibilita, qualita, stock, MOQ, VAT e regole RMA, cosi chi compra spesso puo decidere rapidamente.',
+      'La UI mette in primo piano compatibilita, qualita, stock, MOQ, VAT e regole RMA, cosi chi compra spesso puo decidere rapidamente.',
     homeValueStockTitle: 'Stock in Italia',
     homeValueStockText: 'Disponibilita chiara per ricambi ad alta rotazione e arrivi in ingresso.',
     homeValueShippingTitle: 'Spedizione rapida',
@@ -69,10 +69,10 @@ const messages = {
     homeCategoryBackCover: 'Cover posteriori',
     homeCategoryCameras: 'Fotocamere',
     homeCategoryTools: 'Strumenti',
-    homeCategoryPartsCount: 'SKU disponibili',
+    homeCategoryPartsCount: 'Articoli disponibili',
   },
   zh: {
-    storefrontSearch: '按型号、SKU或配件搜索，例如 iPhone 11 屏幕、A2221',
+    storefrontSearch: '按型号或配件搜索，例如 iPhone 11 屏幕、电池',
     shippingStrip: '15:00 前付款订单，意大利本土当天发货',
     requestB2B: '申请 B2B 批发账户',
     account: '账户',
@@ -101,7 +101,7 @@ const messages = {
     homeHeroTag: 'B2B 手机维修配件',
     homeHeroTitle: '面向专业维修商的手机配件采购平台',
     homeHeroDescription:
-      '屏幕、电池、尾插和精选维修组件，服务维修店、实验室和经销商。按型号、SKU 或兼容性搜索，登录后查看 B2B 批发价和真实库存。',
+      '屏幕、电池、尾插和精选维修组件，服务维修店、实验室和经销商。按型号或兼容性搜索，登录后查看 B2B 批发价和真实库存。',
     homeHeroSearchPlaceholder: '搜索 iPhone 11 屏幕、A2221、SM-G991B、电池...',
     homeHeroSearchButton: '搜索',
     homeHeroBrowseProducts: '进入商品目录',
@@ -115,7 +115,7 @@ const messages = {
     homePanelQualityText: 'Original Pull、Refurbished、Soft OLED、Hard OLED、TFT 和兼容品质。',
     homePanelRmaTitle: '售后可追踪',
     homePanelRmaText: '支持照片/视频提交、规则可见、售后状态随时查看。',
-    homeStatsSku: 'SKU 按品牌、型号和品质组织',
+    homeStatsSku: '配件按品牌、型号和品质组织',
     homeStatsDispatch: '意大利发货截单时间',
     homeStatsVat: '发票、P.IVA、SDI 与 PEC',
     homeCategoriesTitle: '主要品类',
@@ -124,7 +124,7 @@ const messages = {
     homeBrandsDescription: '从高频品牌进入，再保持上下文筛选到具体机型。',
     homeQualityTitle: '为 B2B 高频采购设计',
     homeQualityDescription:
-      '界面优先展示 SKU、兼容性、质量等级、库存、MOQ、VAT 和 RMA 规则，让经常采购的人可以更快决策。',
+      '界面优先展示兼容性、质量等级、库存、MOQ、VAT 和 RMA 规则，让经常采购的人可以更快决策。',
     homeValueStockTitle: '意大利库存',
     homeValueStockText: '高周转配件库存和在途到货状态清楚展示。',
     homeValueShippingTitle: '快速发货',
@@ -137,7 +137,7 @@ const messages = {
     homeCategoryBackCover: '后盖',
     homeCategoryCameras: '摄像头',
     homeCategoryTools: '维修工具',
-    homeCategoryPartsCount: '可售 SKU',
+    homeCategoryPartsCount: '可售商品',
   },
 } satisfies Record<string, Record<string, string>>
 

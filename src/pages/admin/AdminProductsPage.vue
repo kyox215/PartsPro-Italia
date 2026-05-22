@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import { fetchAdminProducts, saveAdminProduct } from '@/services/admin.service'
+import { useTaxonomyStore } from '@/stores/taxonomy.store'
 import type { AdminProduct, AdminProductStatus } from '@/types/admin'
 import { labelCategory, labelFrame, labelProductStatus } from '@/utils/adminLabels'
 
@@ -31,13 +33,18 @@ type ProductFormState = {
   alternativeSkuText: string
   addOnSkuText: string
   status: AdminProductStatus
+  taxonomyPath: string[]
 }
 
+const route = useRoute()
+const taxonomyStore = useTaxonomyStore()
 const products = ref<AdminProduct[]>([])
 const isLoading = ref(false)
 const query = ref('')
 const isDrawerOpen = ref(false)
 const selectedProductId = ref('')
+const selectedTaxonomyBrandId = ref('')
+const selectedTaxonomyModelId = ref('')
 
 const formState = reactive<ProductFormState>({
   name: '',
@@ -65,6 +72,7 @@ const formState = reactive<ProductFormState>({
   alternativeSkuText: '',
   addOnSkuText: '',
   status: 'draft',
+  taxonomyPath: [],
 })
 
 const columns = [
@@ -106,6 +114,28 @@ const stats = computed(() => ({
   batteries: products.value.filter((product) => product.isBattery).length,
   lowStock: products.value.filter((product) => product.stockQty <= 10).length,
 }))
+const taxonomyCascaderOptions = computed(() => taxonomyStore.cascaderOptions)
+const selectedTaxonomyBrand = computed(
+  () => taxonomyStore.groups.find((brand) => brand.id === selectedTaxonomyBrandId.value) || taxonomyStore.groups[0],
+)
+const selectedTaxonomyModel = computed(
+  () =>
+    selectedTaxonomyBrand.value?.children.find((model) => model.id === selectedTaxonomyModelId.value) ||
+    selectedTaxonomyBrand.value?.children[0],
+)
+const selectedTaxonomyProductCount = computed(() =>
+  products.value.filter(
+    (product) =>
+      product.brand === selectedTaxonomyBrand.value?.value &&
+      (!selectedTaxonomyModel.value || product.model === selectedTaxonomyModel.value.value),
+  ).length,
+)
+const selectedTaxonomyPathLabel = computed(() => {
+  const brand = selectedTaxonomyBrand.value?.labelZh
+  const model = selectedTaxonomyModel.value?.labelZh
+
+  return [brand, model].filter(Boolean).join(' / ')
+})
 
 async function refreshProducts() {
   isLoading.value = true
@@ -141,6 +171,54 @@ function splitList(value: string) {
     .filter(Boolean)
 }
 
+function readRouteQuery(value: unknown) {
+  return Array.isArray(value) ? value[0] || '' : typeof value === 'string' ? value : ''
+}
+
+function ensureTaxonomySelection() {
+  if (!taxonomyStore.groups.length) {
+    selectedTaxonomyBrandId.value = ''
+    selectedTaxonomyModelId.value = ''
+    return
+  }
+
+  const hasSelectedBrand = taxonomyStore.groups.some((brand) => brand.id === selectedTaxonomyBrandId.value)
+
+  if (!hasSelectedBrand) {
+    selectedTaxonomyBrandId.value = taxonomyStore.groups[0].id
+  }
+
+  const brand = taxonomyStore.groups.find((item) => item.id === selectedTaxonomyBrandId.value)
+  const hasSelectedModel = brand?.children.some((model) => model.id === selectedTaxonomyModelId.value)
+
+  if (!hasSelectedModel) {
+    selectedTaxonomyModelId.value = brand?.children[0]?.id || ''
+  }
+}
+
+function selectTaxonomyBrand(brandId: string) {
+  selectedTaxonomyBrandId.value = brandId
+  selectedTaxonomyModelId.value =
+    taxonomyStore.groups.find((brand) => brand.id === brandId)?.children[0]?.id || ''
+}
+
+function selectTaxonomyModel(modelId: string) {
+  selectedTaxonomyModelId.value = modelId
+}
+
+function handleTaxonomyPathChange(value: unknown) {
+  const path = Array.isArray(value) ? value.map(String) : []
+  const values = taxonomyStore.getValuesForPath(path)
+
+  if (!values) {
+    return
+  }
+
+  formState.brand = values.brand
+  formState.model = values.model
+  formState.category = values.category
+}
+
 function openEditor(product: AdminProduct) {
   selectedProductId.value = product.id
   Object.assign(formState, {
@@ -169,6 +247,7 @@ function openEditor(product: AdminProduct) {
     alternativeSkuText: product.alternativeSkus.join('\n'),
     addOnSkuText: product.addOnSkus.join('\n'),
     status: product.status,
+    taxonomyPath: taxonomyStore.findPathForProduct(product.brand, product.model, product.category),
   })
   isDrawerOpen.value = true
 }
@@ -190,6 +269,29 @@ async function saveProduct() {
 }
 
 onMounted(refreshProducts)
+
+watch(
+  () => taxonomyStore.groups.length,
+  () => ensureTaxonomySelection(),
+  { immediate: true },
+)
+
+watch(
+  () => taxonomyStore.groups,
+  () => {
+    taxonomyStore.persist()
+    ensureTaxonomySelection()
+  },
+  { deep: true },
+)
+
+watch(
+  () => route.query.q,
+  (value) => {
+    query.value = readRouteQuery(value)
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -217,6 +319,101 @@ onMounted(refreshProducts)
         <a-card><a-statistic title="低库存" :value="stats.lowStock" /></a-card>
       </a-col>
     </a-row>
+
+    <a-card class="admin-taxonomy-card" title="三级目录管理">
+      <template #extra>
+        <a-space>
+          <a-button size="small" type="primary" @click="taxonomyStore.addBrand">添加品牌</a-button>
+          <a-button size="small" @click="taxonomyStore.resetDefaults">恢复默认</a-button>
+        </a-space>
+      </template>
+
+      <div class="admin-taxonomy-workbench">
+        <aside class="admin-taxonomy-column admin-taxonomy-brand-list">
+          <header>
+            <strong>品牌</strong>
+            <span>{{ taxonomyStore.groups.length }} 个</span>
+          </header>
+          <button
+            v-for="brand in taxonomyStore.groups"
+            :key="brand.id"
+            type="button"
+            :class="{ 'is-active': brand.id === selectedTaxonomyBrand?.id }"
+            @click="selectTaxonomyBrand(brand.id)"
+          >
+            <strong>{{ brand.labelZh }}</strong>
+            <span>{{ brand.labelIt }} / {{ brand.value }}</span>
+          </button>
+        </aside>
+
+        <section v-if="selectedTaxonomyBrand" class="admin-taxonomy-column admin-taxonomy-editor">
+          <header>
+            <strong>品牌信息</strong>
+            <a-button size="small" @click="taxonomyStore.addModel(selectedTaxonomyBrand.id)">
+              添加机型
+            </a-button>
+          </header>
+          <div class="admin-taxonomy-form-grid">
+            <a-input v-model:value="selectedTaxonomyBrand.labelZh" addon-before="中文" />
+            <a-input v-model:value="selectedTaxonomyBrand.labelIt" addon-before="IT" />
+            <a-input v-model:value="selectedTaxonomyBrand.value" addon-before="筛选值" />
+          </div>
+
+          <div class="admin-taxonomy-model-list">
+            <button
+              v-for="model in selectedTaxonomyBrand.children"
+              :key="model.id"
+              type="button"
+              :class="{ 'is-active': model.id === selectedTaxonomyModel?.id }"
+              @click="selectTaxonomyModel(model.id)"
+            >
+              <strong>{{ model.labelZh }}</strong>
+              <span>{{ model.labelIt }} / {{ model.value }}</span>
+            </button>
+          </div>
+        </section>
+
+        <section v-if="selectedTaxonomyModel && selectedTaxonomyBrand" class="admin-taxonomy-column admin-taxonomy-editor">
+          <header>
+            <strong>机型与分类</strong>
+            <a-tag color="blue">{{ selectedTaxonomyProductCount }} 个商品</a-tag>
+          </header>
+          <div class="admin-taxonomy-path-preview">
+            <span>当前路径</span>
+            <strong>{{ selectedTaxonomyPathLabel }}</strong>
+          </div>
+          <div class="admin-taxonomy-form-grid">
+            <a-input v-model:value="selectedTaxonomyModel.labelZh" addon-before="中文" />
+            <a-input v-model:value="selectedTaxonomyModel.labelIt" addon-before="IT" />
+            <a-input v-model:value="selectedTaxonomyModel.value" addon-before="筛选值" />
+          </div>
+
+          <div class="admin-taxonomy-category-panel">
+            <div class="admin-taxonomy-category-head">
+              <strong>三级分类</strong>
+              <a-button
+                size="small"
+                type="primary"
+                @click="taxonomyStore.addCategory(selectedTaxonomyBrand.id, selectedTaxonomyModel.id)"
+              >
+                添加分类
+              </a-button>
+            </div>
+            <div class="admin-taxonomy-category-list">
+              <div
+                v-for="category in selectedTaxonomyModel.children"
+                :key="category.id"
+                class="admin-taxonomy-category-edit-row"
+              >
+                <a-input v-model:value="category.labelZh" addon-before="中文" />
+                <a-input v-model:value="category.labelIt" addon-before="IT" />
+                <a-input v-model:value="category.value" addon-before="值" />
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </a-card>
 
     <a-card class="admin-table-card">
       <div class="admin-toolbar">
@@ -319,6 +516,18 @@ onMounted(refreshProducts)
                   <a-select-option value="hidden">已隐藏</a-select-option>
                   <a-select-option value="blocked">已冻结</a-select-option>
                 </a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :xs="24" :md="8">
+              <a-form-item label="三级目录">
+                <a-cascader
+                  v-model:value="formState.taxonomyPath"
+                  :options="taxonomyCascaderOptions"
+                  placeholder="品牌 / 机型 / 分类"
+                  change-on-select
+                  class="full-width"
+                  @change="handleTaxonomyPathChange"
+                />
               </a-form-item>
             </a-col>
             <a-col :xs="12" :md="8">

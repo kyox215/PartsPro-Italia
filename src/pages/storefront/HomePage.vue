@@ -2,162 +2,217 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
   FileProtectOutlined,
-  MinusOutlined,
-  PlusOutlined,
   RocketOutlined,
   SafetyCertificateOutlined,
-  SearchOutlined,
-  ShoppingCartOutlined,
   ShopOutlined,
   ToolOutlined,
 } from '@ant-design/icons-vue'
-import { message } from 'ant-design-vue'
-import { t } from '@/i18n/messages'
-import { fetchProducts, getProducts } from '@/services/products.service'
-import { useAuthStore } from '@/stores/auth.store'
-import { useCartStore } from '@/stores/cart.store'
+import {
+  fetchProducts,
+  getProducts,
+  getProductRoutePath,
+  resolveProductImageUrl,
+} from '@/services/products.service'
 import { useUiStore } from '@/stores/ui.store'
-import type { Product, StockStatus } from '@/types/product'
+import type { Product } from '@/types/product'
 
 const router = useRouter()
 const uiStore = useUiStore()
-const authStore = useAuthStore()
-const cartStore = useCartStore()
 const products = ref<Product[]>(getProducts())
+const failedImages = ref(new Set<string>())
 
-const currency = new Intl.NumberFormat('it-IT', {
-  style: 'currency',
-  currency: 'EUR',
-})
+const heroFallbackImage = '/assets/partspro-repair-parts.svg'
 
 const featuredSkuOrder = [
   'IP11-SCR-SOFT-BLK',
   'IP12-BAT-HQ-2815',
   'SA52-CHG-EU-BLK',
   'RN10-BKC-BLU',
+  'IP13-CAM-REAR',
   'TOOL-WATERPROOF-SET',
 ]
 
 const categoryConfig = computed(() => [
-  { title: t(uiStore.language, 'homeCategoryScreens'), category: 'Screens', to: '/products?category=screens' },
-  { title: t(uiStore.language, 'homeCategoryBatteries'), category: 'Batteries', to: '/products?category=batteries' },
-  { title: t(uiStore.language, 'homeCategoryCharging'), category: 'Charging Ports', to: '/products?category=charging-ports' },
-  { title: t(uiStore.language, 'homeCategoryBackCover'), category: 'Back Covers', to: '/products?category=back-covers' },
-  { title: t(uiStore.language, 'homeCategoryCameras'), category: 'Cameras', to: '/products?category=cameras' },
-  { title: t(uiStore.language, 'homeCategoryTools'), category: 'Tools', to: '/products?category=tools' },
+  { title: uiStore.language === 'zh' ? '屏幕总成' : 'Schermi', category: 'Screens', to: '/products?category=screens' },
+  { title: uiStore.language === 'zh' ? '电池' : 'Batterie', category: 'Batteries', to: '/products?category=batteries' },
+  { title: uiStore.language === 'zh' ? '尾插小板' : 'Connettori', category: 'Charging Ports', to: '/products?category=charging-ports' },
+  { title: uiStore.language === 'zh' ? '后盖' : 'Back cover', category: 'Back Covers', to: '/products?category=back-covers' },
+  { title: uiStore.language === 'zh' ? '摄像头' : 'Fotocamere', category: 'Cameras', to: '/products?category=cameras' },
+  { title: uiStore.language === 'zh' ? '工具耗材' : 'Tool e consumabili', category: 'Tools', to: '/products?category=tools' },
 ])
-
-const stockMeta = computed<Record<StockStatus, { label: string; color: string }>>(() => ({
-  in_stock: { label: uiStore.language === 'zh' ? '现货' : 'Disponibile', color: 'success' },
-  low_stock: { label: uiStore.language === 'zh' ? '低库存' : 'Scorte limitate', color: 'warning' },
-  out_of_stock: { label: uiStore.language === 'zh' ? '缺货' : 'Esaurito', color: 'error' },
-  incoming: { label: uiStore.language === 'zh' ? '在途' : 'In arrivo', color: 'purple' },
-}))
-
-const qualityColors: Record<string, string> = {
-  'Soft OLED': 'purple',
-  'High Quality Compatible': 'cyan',
-  'Compatible High Quality': 'cyan',
-  'Refurbished Original': 'blue',
-  Consumable: 'default',
-}
 
 const qualityLabels = computed<Record<string, string>>(() => {
   if (uiStore.language === 'zh') {
     return {
-      'Soft OLED': 'Soft OLED',
+      'Soft OLED': 'Soft OLED 精选屏',
       'High Quality Compatible': '高品质兼容',
       'Compatible High Quality': '高品质兼容',
       'Refurbished Original': '原装翻新',
-      Consumable: '耗材',
+      Consumable: '维修耗材',
     }
   }
 
   return {
-    'Soft OLED': 'Soft OLED',
+    'Soft OLED': 'Soft OLED selezionato',
     'High Quality Compatible': 'Compatibile HQ',
     'Compatible High Quality': 'Compatibile HQ',
     'Refurbished Original': 'Originale ricond.',
-    Consumable: 'Consumabile',
+    Consumable: 'Consumabile tecnico',
   }
 })
-
-const canBuy = computed(() => authStore.canViewCustomerPrices)
 
 const copy = computed(() => {
   if (uiStore.language === 'zh') {
     return {
-      kicker: '意大利手机维修配件 B2B 供应',
-      title: authStore.isAuthenticated ? '继续你的 B2B 采购' : '为维修店、实验室和经销商准备的配件采购平台',
-      description:
-        authStore.isAuthenticated
-          ? '查看常购 SKU、已加购数量、库存状态和结账入口。适合快速补货和重复采购。'
-          : '屏幕、电池、尾插、摄像头和维修耗材集中采购。访客可浏览目录，登录后查看 B2B 批发价、阶梯价、实时库存、发票资料和售后入口。',
-      primary: authStore.isAuthenticated ? '继续采购' : '查看商品目录',
-      search: '搜索 iPhone 11 屏幕、A2221、SM-G991B、电池...',
-      showcaseTitle: '高周转配件',
-      showcaseSubtitle: '按品牌、型号、品质和库存状态采购',
-      serviceTitle: '客户采购需要的信息，首屏就能看到',
-      categoryTitle: '按维修场景快速进入',
-      brandTitle: '高频品牌入口',
-      flowTitle: '从浏览到复购的 B2B 流程',
-      flowText: '公开目录负责展示，登录权限负责价格、购物车、结账、发票和 RMA。',
+      primary: '进入商品目录',
+      secondary: '申请 B2B 账户',
+      visualTitle: '高周转维修配件',
+      visualText: '按型号、批次、质量等级和意大利库存组织',
+      serviceTitle: '为高频采购设计的服务体系',
+      serviceText: '从选品、库存到售后，每个环节都围绕维修业务的节奏构建。',
+      deliveryTitle: '意大利本土发货与到达时效',
+      deliveryText: '工作日按付款与库存状态处理订单。实际到达时间以承运商、地区和电池运输限制为准。',
+      qualityTitle: '屏幕与核心配件质量策略',
+      qualityText: '不同维修报价需要不同质量等级。PartsPro 将品质、兼容型号和安装提醒明确展示，减少错配和售后争议。',
+      catalogTitle: '按维修场景进入采购',
+      brandTitle: '主流品牌覆盖',
+      ctaTitle: '准备开始更高效率的 B2B 采购',
+      ctaText: '浏览公开目录，登录后查看批发价、阶梯价、发票资料、RMA 和重复采购入口。',
     }
   }
 
   return {
-    kicker: 'B2B ricambi smartphone in Italia',
-    title: authStore.isAuthenticated ? 'Continua il tuo acquisto B2B' : 'Ricambi pronti per laboratori, negozi e rivenditori',
-    description:
-      authStore.isAuthenticated
-        ? 'Riprendi dal carrello, acquista SKU ricorrenti e controlla stock, MOQ, prezzo B2B e checkout in pochi passaggi.'
-        : 'Schermi, batterie, connettori, fotocamere e consumabili in un catalogo pensato per chi ripara ogni giorno. Sfoglia liberamente, accedi per prezzi B2B, fasce quantita, stock reale, fattura e RMA.',
-    primary: authStore.isAuthenticated ? 'Continua acquisti' : 'Vedi catalogo',
-    search: 'Cerca iPhone 11 schermo, A2221, SM-G991B, batteria...',
-    showcaseTitle: 'Ricambi ad alta rotazione',
-    showcaseSubtitle: 'Acquisto per brand, modello, qualita e stock',
-    serviceTitle: 'Informazioni chiare prima dell’ordine',
-    categoryTitle: 'Ingressi rapidi per tipo riparazione',
-    brandTitle: 'Brand piu richiesti',
-    flowTitle: 'Dal catalogo al riordino B2B',
-    flowText: 'Catalogo pubblico per esplorare, login cliente per prezzi, carrello, checkout, fattura e RMA.',
+    primary: 'Vedi catalogo',
+    secondary: 'Richiedi account B2B',
+    visualTitle: 'Ricambi ad alta rotazione',
+    visualText: 'Organizzati per modello, lotto, qualita e stock in Italia',
+    serviceTitle: 'Servizi pensati per chi acquista spesso',
+    serviceText: 'Dal catalogo al post-vendita, ogni passaggio e costruito sul ritmo dei laboratori.',
+    deliveryTitle: 'Spedizione dall’Italia e tempi di arrivo',
+    deliveryText:
+      'Gli ordini vengono processati nei giorni lavorativi in base a pagamento e disponibilita. I tempi dipendono da corriere, area e restrizioni per batterie.',
+    qualityTitle: 'Qualita schermi e ricambi critici',
+    qualityText:
+      'Ogni riparazione ha un prezzo e una promessa diversa. PartsPro distingue qualita, compatibilita e note di installazione per ridurre errori e contestazioni.',
+    catalogTitle: 'Acquista per scenario di riparazione',
+    brandTitle: 'Brand coperti',
+    ctaTitle: 'Porta il tuo acquisto B2B a un flusso piu preciso',
+    ctaText: 'Sfoglia il catalogo pubblico. Accedi per prezzi B2B, fasce quantita, fattura, RMA e riordino rapido.',
   }
 })
 
+const heroStats = computed(() => [
+  {
+    value: '24/48h',
+    label: uiStore.language === 'zh' ? '意大利主要城市常规配送' : 'Consegna standard Italia',
+  },
+  {
+    value: '15:00',
+    label: uiStore.language === 'zh' ? '工作日付款截单参考' : 'Cut-off operativo',
+  },
+  {
+    value: 'QC',
+    label: uiStore.language === 'zh' ? '质量等级与安装提醒' : 'Qualita e note installazione',
+  },
+])
+
 const serviceCards = computed(() => [
   {
-    title: uiStore.language === 'zh' ? '真实库存' : 'Stock reale',
+    title: uiStore.language === 'zh' ? '意大利库存优先' : 'Stock Italia prioritario',
     text:
       uiStore.language === 'zh'
-        ? '显示可售、低库存、在途和 MOQ，减少来回确认。'
-        : 'Disponibile, low stock, incoming e MOQ sempre visibili.',
+        ? '按可售、低库存、在途和 MOQ 呈现，适合门店快速补货。'
+        : 'Disponibile, low stock, incoming e MOQ sono leggibili prima dell’ordine.',
     icon: ShopOutlined,
   },
   {
-    title: uiStore.language === 'zh' ? '质量等级' : 'Qualita dichiarata',
+    title: uiStore.language === 'zh' ? '屏幕质量分层' : 'Qualita schermi dichiarata',
     text:
       uiStore.language === 'zh'
-        ? 'Soft OLED、TFT、兼容品质、电池安全信息分区展示。'
-        : 'Soft OLED, TFT, compatibili e sicurezza batterie separati.',
+        ? 'Soft OLED、兼容 HQ、原装翻新等等级分清楚，方便不同维修报价。'
+        : 'Soft OLED, compatibili HQ e originali ricondizionati sono separati con chiarezza.',
     icon: SafetyCertificateOutlined,
   },
   {
-    title: uiStore.language === 'zh' ? '快速发货' : 'Spedizione rapida',
+    title: uiStore.language === 'zh' ? '快速履约' : 'Evasione rapida',
     text:
       uiStore.language === 'zh'
-        ? '15:00 前付款订单，按意大利本土流程处理。'
-        : "Ordini pagati entro le 15:00, gestione dall'Italia.",
+        ? '付款、库存和配送信息清楚后，订单可进入拣货、打包、发货流程。'
+        : 'Pagamento, stock e consegna guidano picking, packing e spedizione.',
     icon: RocketOutlined,
   },
   {
-    title: uiStore.language === 'zh' ? '售后规则' : 'RMA e regole',
+    title: uiStore.language === 'zh' ? 'RMA 可追踪' : 'RMA tracciabile',
     text:
       uiStore.language === 'zh'
-        ? '安装提醒、照片/视频证据和 RMA 状态入口清楚。'
-        : 'Test prima installazione, prove e stato pratica in evidenza.',
+        ? '安装前测试、照片/视频证据、售后状态，让争议处理更有依据。'
+        : 'Test prima installazione, prove foto/video e stato pratica sempre ordinati.',
     icon: FileProtectOutlined,
   },
+])
+
+const deliveryCards = computed(() => [
+  {
+    area: uiStore.language === 'zh' ? '米兰 / 都灵 / 博洛尼亚' : 'Milano / Torino / Bologna',
+    time: '24/48h',
+    note: uiStore.language === 'zh' ? '常规快递到达参考' : 'Standard su corriere espresso',
+  },
+  {
+    area: uiStore.language === 'zh' ? '罗马 / 佛罗伦萨 / 那不勒斯' : 'Roma / Firenze / Napoli',
+    time: '24/48h',
+    note: uiStore.language === 'zh' ? '工作日发货后参考时效' : 'Dopo evasione in giorno lavorativo',
+  },
+  {
+    area: uiStore.language === 'zh' ? '岛屿 / 偏远地区' : 'Isole / aree remote',
+    time: '48/72h',
+    note: uiStore.language === 'zh' ? '以承运商实际线路为准' : 'In base alla tratta del corriere',
+  },
+  {
+    area: uiStore.language === 'zh' ? '电池类商品' : 'Batterie',
+    time: 'QC + MSDS',
+    note: uiStore.language === 'zh' ? '按安全资料和物流限制处理' : 'Gestione con documenti e limiti trasporto',
+  },
+])
+
+const qualityCards = computed(() => [
+  {
+    title: 'Soft OLED',
+    text:
+      uiStore.language === 'zh'
+        ? '适合重视显示效果、触控反馈和客户体验的高价值维修。'
+        : 'Per riparazioni dove resa, touch e percezione finale contano di piu.',
+  },
+  {
+    title: uiStore.language === 'zh' ? '兼容 HQ' : 'Compatibile HQ',
+    text:
+      uiStore.language === 'zh'
+        ? '用于日常维修报价，强调稳定供应、清楚兼容和可控成本。'
+        : 'Per preventivi quotidiani con costo controllato e compatibilita chiara.',
+  },
+  {
+    title: uiStore.language === 'zh' ? '原装翻新' : 'Originale ricond.',
+    text:
+      uiStore.language === 'zh'
+        ? '适合需要原装特性、功能匹配和更高信任感的客户。'
+        : 'Quando servono caratteristiche originali e maggiore fiducia sul risultato.',
+  },
+  {
+    title: uiStore.language === 'zh' ? '电池安全' : 'Sicurezza batterie',
+    text:
+      uiStore.language === 'zh'
+        ? '电池类商品明确安全提醒、运输限制和安装前检查。'
+        : 'Note sicurezza, limiti trasporto e controllo prima installazione in evidenza.',
+  },
+])
+
+const flowSteps = computed(() => [
+  uiStore.language === 'zh' ? '浏览公开目录' : 'Catalogo pubblico',
+  uiStore.language === 'zh' ? '登录查看 B2B 价格' : 'Prezzi dopo login',
+  uiStore.language === 'zh' ? '确认发票与配送' : 'Fattura e consegna',
+  uiStore.language === 'zh' ? '复购与 RMA' : 'Riordino e RMA',
 ])
 
 const brands = ['Apple', 'Samsung', 'Xiaomi', 'Huawei', 'Oppo', 'Honor', 'Realme', 'OnePlus']
@@ -168,6 +223,8 @@ const featuredProducts = computed(() =>
     .filter((product): product is Product => Boolean(product)),
 )
 
+const heroProducts = computed(() => featuredProducts.value.slice(0, 3))
+
 const categories = computed(() =>
   categoryConfig.value
     .map((category) => ({
@@ -177,55 +234,32 @@ const categories = computed(() =>
     .filter((category) => category.count > 0),
 )
 
-const flowSteps = computed(() => [
-  uiStore.language === 'zh' ? '浏览公开目录' : 'Catalogo pubblico',
-  uiStore.language === 'zh' ? '登录查看批发价' : 'Prezzi dopo login',
-  uiStore.language === 'zh' ? '购物车与发票' : 'Carrello e fattura',
-  uiStore.language === 'zh' ? '复购与 RMA' : 'Riordino e RMA',
-])
-
-function handleHeroSearch(value: string) {
-  router.push({
-    path: '/products',
-    query: value ? { q: value } : undefined,
-  })
+function getProductImageSrc(product: Product) {
+  return resolveProductImageUrl(product)
 }
 
-function getCartQuantity(skuCode: string) {
-  return cartStore.items.find((item) => item.skuCode === skuCode)?.quantity || 0
+function shouldShowImage(product: Product) {
+  return Boolean(getProductImageSrc(product)) && !failedImages.value.has(product.skuCode)
 }
 
-function handleHomeAdd(product: Product) {
-  if (!canBuy.value) {
-    router.push({ name: 'login', query: { returnUrl: '/' } })
-    return
-  }
-
-  cartStore.addItem(product.skuCode, product.moq)
-  message.success(`${product.skuCode} ${uiStore.language === 'zh' ? '已加入购物车' : 'aggiunto al carrello'}`)
-}
-
-function increaseHomeQuantity(product: Product) {
-  cartStore.addItem(product.skuCode, 1)
-}
-
-function decreaseHomeQuantity(product: Product) {
-  const quantity = getCartQuantity(product.skuCode)
-
-  if (quantity <= 1) {
-    cartStore.removeItem(product.skuCode)
-    return
-  }
-
-  cartStore.updateQuantity(product.skuCode, quantity - 1)
-}
-
-function searchBrand(brand: string) {
-  return `/products?q=${encodeURIComponent(brand)}`
+function markImageFailed(skuCode: string) {
+  failedImages.value = new Set([...failedImages.value, skuCode])
 }
 
 function getQualityLabel(qualityGrade: string) {
   return qualityLabels.value[qualityGrade] || qualityGrade
+}
+
+function goToProducts() {
+  router.push('/products')
+}
+
+function goToRegister() {
+  router.push('/b2b/register')
+}
+
+function searchBrand(brand: string) {
+  return `/products?q=${encodeURIComponent(brand)}`
 }
 
 onMounted(async () => {
@@ -234,112 +268,78 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="home-page customer-home">
-    <section class="customer-hero">
-      <div class="customer-hero-copy">
-        <a-tag color="blue">{{ copy.kicker }}</a-tag>
-        <h1>{{ copy.title }}</h1>
-        <p>{{ copy.description }}</p>
+  <main class="home-page customer-home home-marketing-page">
+    <section class="customer-hero home-intro-hero">
+      <div class="customer-hero-copy home-intro-copy home-intro-actions-only">
+        <div class="home-hero-actions">
+          <a-button type="primary" size="large" @click="goToProducts">
+            {{ copy.primary }}
+          </a-button>
+          <a-button size="large" @click="goToRegister">
+            {{ copy.secondary }}
+          </a-button>
+        </div>
 
-        <a-input-search
-          size="large"
-          class="home-hero-search"
-          :placeholder="copy.search"
-          @search="handleHeroSearch"
-        >
-          <template #enterButton>
-            <a-button type="primary" size="large">
-              <SearchOutlined />
-              {{ t(uiStore.language, 'homeHeroSearchButton') }}
-            </a-button>
-          </template>
-        </a-input-search>
+        <div class="home-proof-row">
+          <span v-for="stat in heroStats" :key="stat.value">
+            <strong>{{ stat.value }}</strong>
+            <small>{{ stat.label }}</small>
+          </span>
+        </div>
       </div>
 
-      <div class="parts-showcase" aria-hidden="true">
-        <div class="parts-showcase-header">
-          <strong>{{ copy.showcaseTitle }}</strong>
-          <span>{{ copy.showcaseSubtitle }}</span>
+      <div class="home-visual-panel">
+        <div class="home-visual-header">
+          <span>{{ copy.visualTitle }}</span>
+          <strong>{{ copy.visualText }}</strong>
         </div>
-        <div class="parts-phone-visual">
-          <div class="phone-screen-part">OLED</div>
-          <div class="phone-battery-part">BAT</div>
-          <div class="phone-flex-part">USB-C</div>
-          <div class="phone-camera-part">CAM</div>
+
+        <div class="home-visual-main">
+          <template v-if="heroProducts[0]">
+            <img
+              :src="shouldShowImage(heroProducts[0]) ? getProductImageSrc(heroProducts[0]) : heroFallbackImage"
+              :alt="heroProducts[0].imageAlt || heroProducts[0].name"
+              loading="eager"
+              @error="markImageFailed(heroProducts[0].skuCode)"
+            />
+          </template>
+          <div class="home-visual-badge">
+            <CheckCircleOutlined />
+            <span>{{ uiStore.language === 'zh' ? '批次 / 库位 / RMA 可追踪' : 'Lotto / stock / RMA tracciabili' }}</span>
+          </div>
         </div>
-        <div class="parts-showcase-grid">
-          <span>IP11-SCR</span>
-          <span>SM-A52</span>
-          <span>RN10-BKC</span>
-          <span>UN38.3</span>
+
+        <div class="home-visual-stack">
+          <article v-for="product in heroProducts.slice(1)" :key="product.skuCode">
+            <img
+              v-if="shouldShowImage(product)"
+              :src="getProductImageSrc(product)"
+              :alt="product.imageAlt || product.name"
+              loading="lazy"
+              @error="markImageFailed(product.skuCode)"
+            />
+            <div v-else class="home-mini-fallback">
+              {{ product.category }}
+            </div>
+            <div>
+              <strong>{{ getQualityLabel(product.qualityGrade) }}</strong>
+              <span>{{ product.brand }} · {{ product.model }}</span>
+            </div>
+          </article>
         </div>
       </div>
     </section>
 
-    <section class="home-featured-panel">
-      <div class="home-panel-title">
-        <h2>{{ uiStore.language === 'zh' ? '高频采购 SKU' : 'SKU ad alta rotazione' }}</h2>
+    <section class="home-service-panel home-service-overview">
+      <div class="home-panel-title home-wide-title">
+        <div>
+          <h2>{{ copy.serviceTitle }}</h2>
+          <p>{{ copy.serviceText }}</p>
+        </div>
         <RouterLink to="/products">{{ copy.primary }}</RouterLink>
       </div>
-      <div class="home-product-grid">
-        <article
-          v-for="product in featuredProducts"
-          :key="product.skuCode"
-          class="home-product-card"
-        >
-          <div class="home-product-tags">
-            <a-tag :color="qualityColors[product.qualityGrade] || 'blue'">
-              {{ getQualityLabel(product.qualityGrade) }}
-            </a-tag>
-            <a-tag :color="stockMeta[product.stockStatus].color">
-              {{ stockMeta[product.stockStatus].label }}
-            </a-tag>
-          </div>
-          <RouterLink :to="`/products/${product.skuCode}`" class="home-product-title">
-            {{ product.name }}
-          </RouterLink>
-          <div class="home-product-purchase">
-            <div class="home-product-price">
-              <template v-if="canBuy">
-                <strong>{{ currency.format(product.b2bPrice) }}</strong>
-                <span>{{ product.vatMode }}</span>
-              </template>
-              <template v-else>
-                <strong>{{ uiStore.language === 'zh' ? '登录看价' : 'Login prezzo' }}</strong>
-                <span>B2B</span>
-              </template>
-            </div>
-            <div v-if="canBuy && getCartQuantity(product.skuCode)" class="home-qty-control">
-              <a-button size="small" @click="decreaseHomeQuantity(product)">
-                <MinusOutlined />
-              </a-button>
-              <strong>{{ getCartQuantity(product.skuCode) }}</strong>
-              <a-button size="small" @click="increaseHomeQuantity(product)">
-                <PlusOutlined />
-              </a-button>
-            </div>
-            <a-button
-              v-else
-              size="small"
-              type="primary"
-              :disabled="product.stockStatus === 'out_of_stock'"
-              @click="handleHomeAdd(product)"
-            >
-              <ShoppingCartOutlined />
-              {{ canBuy ? (uiStore.language === 'zh' ? '添加' : 'Aggiungi') : (uiStore.language === 'zh' ? '登录' : 'Accedi') }}
-            </a-button>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <section class="home-service-panel">
-      <div class="home-panel-title">
-        <h2>{{ copy.serviceTitle }}</h2>
-        <RouterLink to="/products">{{ uiStore.language === 'zh' ? '查看商品' : 'Vedi prodotti' }}</RouterLink>
-      </div>
-      <div class="home-service-grid">
-        <a-card v-for="card in serviceCards" :key="card.title">
+      <div class="home-service-grid home-service-card-grid">
+        <a-card v-for="card in serviceCards" :key="card.title" class="home-service-card">
           <component :is="card.icon" class="value-icon" />
           <h3>{{ card.title }}</h3>
           <p>{{ card.text }}</p>
@@ -347,10 +347,76 @@ onMounted(async () => {
       </div>
     </section>
 
+    <section class="home-delivery-quality-grid">
+      <div class="home-delivery-panel">
+        <div class="home-panel-title home-wide-title">
+          <div>
+            <ClockCircleOutlined class="home-title-icon" />
+            <h2>{{ copy.deliveryTitle }}</h2>
+            <p>{{ copy.deliveryText }}</p>
+          </div>
+        </div>
+        <div class="home-delivery-grid">
+          <article v-for="delivery in deliveryCards" :key="delivery.area" class="home-delivery-card">
+            <strong>{{ delivery.time }}</strong>
+            <span>{{ delivery.area }}</span>
+            <small>{{ delivery.note }}</small>
+          </article>
+        </div>
+      </div>
+
+      <div class="home-quality-panel">
+        <div class="home-panel-title home-wide-title">
+          <div>
+            <SafetyCertificateOutlined class="home-title-icon" />
+            <h2>{{ copy.qualityTitle }}</h2>
+            <p>{{ copy.qualityText }}</p>
+          </div>
+        </div>
+        <div class="home-quality-card-grid">
+          <article v-for="quality in qualityCards" :key="quality.title" class="home-quality-card">
+            <strong>{{ quality.title }}</strong>
+            <span>{{ quality.text }}</span>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="home-image-strip">
+      <div class="home-panel-title">
+        <h2>{{ uiStore.language === 'zh' ? '核心配件品类' : 'Categorie principali' }}</h2>
+        <RouterLink to="/products">{{ copy.primary }}</RouterLink>
+      </div>
+      <div class="home-image-strip-grid">
+        <RouterLink
+          v-for="product in featuredProducts"
+          :key="product.skuCode"
+          :to="getProductRoutePath(product)"
+          class="home-image-tile"
+        >
+          <div>
+            <img
+              v-if="shouldShowImage(product)"
+              :src="getProductImageSrc(product)"
+              :alt="product.imageAlt || product.name"
+              loading="lazy"
+              @error="markImageFailed(product.skuCode)"
+            />
+            <div v-else class="home-image-fallback compact">
+              <span>{{ product.brand }}</span>
+              <strong>{{ product.category }}</strong>
+            </div>
+          </div>
+          <span>{{ getQualityLabel(product.qualityGrade) }}</span>
+          <strong>{{ product.brand }} {{ product.model }}</strong>
+        </RouterLink>
+      </div>
+    </section>
+
     <section class="home-commerce-grid">
       <div class="home-category-panel">
         <div class="home-panel-title">
-          <h2>{{ copy.categoryTitle }}</h2>
+          <h2>{{ copy.catalogTitle }}</h2>
           <RouterLink to="/products">{{ copy.primary }}</RouterLink>
         </div>
         <div class="home-category-grid">
@@ -361,7 +427,10 @@ onMounted(async () => {
             :to="category.to"
           >
             <span>{{ category.title }}</span>
-            <strong>{{ category.count }} SKU</strong>
+            <strong>
+              {{ category.count }}
+              {{ uiStore.language === 'zh' ? '款商品' : 'articoli' }}
+            </strong>
           </RouterLink>
         </div>
       </div>
@@ -378,11 +447,11 @@ onMounted(async () => {
       </div>
     </section>
 
-    <section class="home-flow-band">
+    <section class="home-flow-band home-b2b-cta">
       <div>
         <ToolOutlined />
-        <h2>{{ copy.flowTitle }}</h2>
-        <p>{{ copy.flowText }}</p>
+        <h2>{{ copy.ctaTitle }}</h2>
+        <p>{{ copy.ctaText }}</p>
       </div>
       <div class="home-flow-steps">
         <span v-for="(step, index) in flowSteps" :key="step">

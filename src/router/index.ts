@@ -10,6 +10,8 @@ const ProductDetailPage = () => import('@/pages/storefront/ProductDetailPage.vue
 const LoginPage = () => import('@/pages/storefront/LoginPage.vue')
 const B2BRegisterPage = () => import('@/pages/storefront/B2BRegisterPage.vue')
 const AccountPage = () => import('@/pages/storefront/AccountPage.vue')
+const AccountOrdersPage = () => import('@/pages/storefront/AccountOrdersPage.vue')
+const FrequentProductsPage = () => import('@/pages/storefront/FrequentProductsPage.vue')
 const CartPage = () => import('@/pages/storefront/CartPage.vue')
 const CheckoutPage = () => import('@/pages/storefront/CheckoutPage.vue')
 const RmaPage = () => import('@/pages/storefront/RmaPage.vue')
@@ -26,6 +28,16 @@ const AdminPlaceholderPage = () => import('@/pages/admin/AdminPlaceholderPage.vu
 const AdminPricesPage = () => import('@/pages/admin/AdminPricesPage.vue')
 const AdminProductsPage = () => import('@/pages/admin/AdminProductsPage.vue')
 const AdminStockMovementsPage = () => import('@/pages/admin/AdminStockMovementsPage.vue')
+
+function getSafeReturnUrl(value: unknown) {
+  const returnUrl = Array.isArray(value) ? value[0] : value
+
+  if (typeof returnUrl !== 'string' || !returnUrl.startsWith('/') || returnUrl.startsWith('//')) {
+    return ''
+  }
+
+  return returnUrl
+}
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -54,12 +66,12 @@ export const router = createRouter({
           },
         },
         {
-          path: 'products/:skuCode',
+          path: 'products/:productRef',
           name: 'product-detail',
           component: ProductDetailPage,
           meta: {
             title: 'Dettaglio prodotto',
-            description: 'Immagini, SKU, compatibilita, qualita, stock, prezzo e RMA.',
+            description: 'Immagini, compatibilita, qualita, stock, prezzo e RMA.',
             access: 'public',
           },
         },
@@ -156,10 +168,70 @@ export const router = createRouter({
         {
           path: 'account/orders',
           name: 'account-orders',
-          component: PlaceholderPage,
+          component: AccountOrdersPage,
           meta: {
             title: 'I miei ordini',
             description: 'Storico ordini e stati di spedizione.',
+            access: 'customer',
+          },
+        },
+        {
+          path: 'account/orders/:id',
+          name: 'account-order-detail',
+          component: AccountOrdersPage,
+          meta: {
+            title: 'Dettaglio ordine',
+            description: 'Dettaglio ordine, pagamento, spedizione e RMA.',
+            access: 'customer',
+          },
+        },
+        {
+          path: 'account/invoices',
+          name: 'account-invoices',
+          component: PlaceholderPage,
+          meta: {
+            title: 'Fatture',
+            description: 'Download fatture, note credito e dati fiscali cliente.',
+            access: 'customer',
+          },
+        },
+        {
+          path: 'account/frequent',
+          name: 'account-frequent',
+          component: FrequentProductsPage,
+          meta: {
+            title: 'Lista frequenti',
+            description: 'Ricambi acquistati spesso e riordino rapido.',
+            access: 'customer',
+          },
+        },
+        {
+          path: 'account/addresses',
+          name: 'account-addresses',
+          component: PlaceholderPage,
+          meta: {
+            title: 'Indirizzi',
+            description: 'Sedi operative, indirizzi di fatturazione e consegna.',
+            access: 'customer',
+          },
+        },
+        {
+          path: 'account/company',
+          name: 'account-company',
+          component: PlaceholderPage,
+          meta: {
+            title: 'Dati aziendali',
+            description: 'P.IVA, SDI, PEC, referente e profilo B2B.',
+            access: 'customer',
+          },
+        },
+        {
+          path: 'account/prices',
+          name: 'account-prices',
+          component: PlaceholderPage,
+          meta: {
+            title: 'Prezzi dedicati',
+            description: 'Gruppo prezzo, condizioni B2B e fasce quantita.',
             access: 'customer',
           },
         },
@@ -310,6 +382,12 @@ export const router = createRouter({
         },
       ],
     },
+    {
+      path: '/:pathMatch(.*)*',
+      redirect: {
+        name: 'home',
+      },
+    },
   ],
   scrollBehavior() {
     return { top: 0 }
@@ -323,7 +401,18 @@ router.beforeEach(async (to) => {
   const access = (to.meta.access as RouteAccess | undefined) || 'public'
 
   if (to.name === 'login' && authStore.isAuthenticated) {
-    return { name: 'products' }
+    const returnUrl = getSafeReturnUrl(to.query.returnUrl)
+
+    if (returnUrl && returnUrl !== '/login') {
+      const resolvedReturnRoute = router.resolve(returnUrl)
+      const returnAccess = (resolvedReturnRoute.meta.access as RouteAccess | undefined) || 'public'
+
+      if (authStore.canAccess(returnAccess)) {
+        return returnUrl
+      }
+    }
+
+    return authStore.isStaff ? { name: 'admin-dashboard' } : { name: 'products' }
   }
 
   if (authStore.canAccess(access)) {

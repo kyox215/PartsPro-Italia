@@ -44,6 +44,7 @@ export type CheckoutPayload = {
 
 export type CreatedOrder = {
   orderId: string
+  orderNo: string
   status: 'submitted'
   summary: CartSummary
 }

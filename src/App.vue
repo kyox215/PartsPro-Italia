@@ -9,6 +9,7 @@ import { partsProTheme } from './theme/partsproTheme'
 
 const uiStore = useUiStore()
 const route = useRoute()
+uiStore.initializeLanguageState()
 
 const activeLanguage = computed(() =>
   route.path.startsWith('/admin') ? uiStore.adminLanguage : uiStore.language,

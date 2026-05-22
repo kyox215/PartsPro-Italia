@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import {
   getB2BApprovals,
-  getAdminDashboardStats,
-  getAdminOrders,
   getInventoryItems,
   getStockMovements,
-  orderStatusFlow,
 } from '@/services/admin.service'
-import type { AdminOrderStatus, PaymentStatus, StockRisk } from '@/types/admin'
+import {
+  fetchAdminOrders,
+  orderStatusFlow,
+} from '@/services/order.service'
+import type { AdminOrder, AdminOrderStatus, PaymentStatus, StockRisk } from '@/types/admin'
 import {
   labelApprovalStatus,
   labelMovementType,
@@ -17,14 +18,13 @@ import {
   labelStockRisk,
 } from '@/utils/adminLabels'
 
-const stats = getAdminDashboardStats()
-const orders = getAdminOrders()
+const orders = ref<AdminOrder[]>([])
 const inventory = getInventoryItems()
 const approvals = getB2BApprovals()
 const movements = getStockMovements()
 
 const priorityOrders = computed(() =>
-  orders.filter((order) => order.status === 'submitted' || order.stockRisk !== 'clear').slice(0, 4),
+  orders.value.filter((order) => order.status === 'submitted' || order.stockRisk !== 'clear').slice(0, 4),
 )
 
 const stockAlerts = computed(() =>
@@ -32,7 +32,7 @@ const stockAlerts = computed(() =>
 )
 
 const paymentQueue = computed(() =>
-  orders.filter((order) => order.paymentStatus !== 'paid').slice(0, 4),
+  orders.value.filter((order) => order.paymentStatus !== 'paid').slice(0, 4),
 )
 
 const approvalQueue = computed(() =>
@@ -40,14 +40,14 @@ const approvalQueue = computed(() =>
 )
 
 const shipmentQueue = computed(() =>
-  orders.filter((order) => ['picking', 'packed'].includes(order.status)).slice(0, 4),
+  orders.value.filter((order) => ['picking', 'packed'].includes(order.status)).slice(0, 4),
 )
 
 const recentMovements = computed(() => movements.slice(0, 5))
 
 const orderLanes = computed(() =>
   orderStatusFlow.map((status) => {
-    const laneOrders = orders.filter((order) => order.status === status)
+    const laneOrders = orders.value.filter((order) => order.status === status)
 
     return {
       status,
@@ -62,19 +62,19 @@ const orderLanes = computed(() =>
 const kpis = computed(() => [
   {
     label: '待处理订单',
-    value: stats.openOrders,
+    value: orders.value.filter((order) => order.status !== 'completed').length,
     tone: 'blue',
-    note: `${orders.filter((order) => order.status === 'submitted').length} 个新提交`,
+    note: `${orders.value.filter((order) => order.status === 'submitted').length} 个新提交`,
   },
   {
     label: '待核对付款',
-    value: stats.pendingPayments,
+    value: orders.value.filter((order) => order.paymentStatus !== 'paid').length,
     tone: 'orange',
     note: `${paymentQueue.value.length} 个需跟进`,
   },
   {
     label: '库存预警',
-    value: stats.lowStock,
+    value: stockAlerts.value.length,
     tone: 'red',
     note: `${stockAlerts.value.length} 个 SKU`,
   },
@@ -140,6 +140,12 @@ function stockRiskTone(risk: StockRisk) {
 
   return tones[risk]
 }
+
+async function loadDashboardOrders() {
+  orders.value = await fetchAdminOrders()
+}
+
+onMounted(loadDashboardOrders)
 </script>
 
 <template>

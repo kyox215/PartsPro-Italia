@@ -1,5 +1,5 @@
 import { getProductBySku } from '@/services/products.service'
-import type { CartItem, CartLine, CartSummary, CheckoutPayload, CreatedOrder } from '@/types/cart'
+import type { CartItem, CartLine, CartSummary } from '@/types/cart'
 
 const vatRate = 0.22
 const standardShipping = 7.9
@@ -42,22 +42,5 @@ export function calculateCartSummary(lines: CartLine[]): CartSummary {
     shipping,
     total: subtotal + vat + shipping,
     totalQuantity,
-  }
-}
-
-export async function createOrderFromCart(payload: CheckoutPayload): Promise<CreatedOrder> {
-  const lines = buildCartLines(payload.items)
-  const hasInvalidLine = lines.some((line) => line.isBelowMoq || line.isOutOfStock)
-
-  if (hasInvalidLine) {
-    throw new Error('Carrello non valido: controlla MOQ e disponibilita stock.')
-  }
-
-  // Placeholder for Supabase RPC: create_order_from_cart.
-  // The order price is recalculated here from product data and must later be recalculated server-side.
-  return {
-    orderId: `SO-${Date.now()}`,
-    status: 'submitted',
-    summary: calculateCartSummary(lines),
   }
 }

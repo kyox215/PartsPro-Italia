@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, ref } from 'vue'
+import { computed, h, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   AuditOutlined,
@@ -27,6 +27,7 @@ const authStore = useAuthStore()
 const uiStore = useUiStore()
 const isAdminMenuOpen = ref(false)
 const openAdminSectionKey = ref('operations')
+const globalSearchQuery = ref('')
 
 const adminText = {
   zh: {
@@ -45,6 +46,7 @@ const adminText = {
     demo: '演示权限',
     role: '角色',
     home: '回到主页',
+    homeShort: '主页',
     language: '语言',
   },
   it: {
@@ -63,6 +65,7 @@ const adminText = {
     demo: '演示权限',
     role: '角色',
     home: '回到主页',
+    homeShort: '主页',
     language: '语言',
   },
 } satisfies Record<Language, Record<string, string>>
@@ -154,9 +157,77 @@ const selectedKeys = computed(() => {
   return [current || '/admin']
 })
 
+function readRouteQuery(value: unknown) {
+  return Array.isArray(value) ? value[0] || '' : typeof value === 'string' ? value : ''
+}
+
+function getAdminSearchPath(query: string) {
+  const normalizedQuery = query.toLowerCase()
+
+  if (/^so[-\s]/i.test(query)) {
+    return '/admin/orders'
+  }
+
+  if (
+    normalizedQuery.includes('@') ||
+    normalizedQuery.includes('p.iva') ||
+    normalizedQuery.includes('pec') ||
+    normalizedQuery.includes('cliente') ||
+    normalizedQuery.includes('customer') ||
+    normalizedQuery.includes('repair') ||
+    normalizedQuery.includes('ripara') ||
+    normalizedQuery.includes('centro') ||
+    normalizedQuery.includes('fixlab') ||
+    normalizedQuery.includes('phone doctor') ||
+    normalizedQuery.includes('repair hub') ||
+    normalizedQuery.includes('smart parts') ||
+    normalizedQuery.includes('milano') ||
+    normalizedQuery.includes('roma') ||
+    normalizedQuery.includes('firenze') ||
+    normalizedQuery.includes('napoli') ||
+    /^it\d{5,}/i.test(query)
+  ) {
+    return '/admin/customers'
+  }
+
+  if (
+    normalizedQuery.includes('stock') ||
+    normalizedQuery.includes('库存') ||
+    normalizedQuery.includes('batch') ||
+    normalizedQuery.includes('批次') ||
+    normalizedQuery.includes('库位')
+  ) {
+    return '/admin/inventory'
+  }
+
+  if (
+    query.includes('-') ||
+    /(sku|screen|display|battery|iphone|samsung|xiaomi|apple|ip\d|sa\d|bat|scr|chg|cam|tool|屏|电池|尾插|摄像头)/i.test(
+      query,
+    )
+  ) {
+    return '/admin/products'
+  }
+
+  return '/admin/orders'
+}
+
 function handleMenuClick({ key }: { key: string }) {
   router.push(key)
   isAdminMenuOpen.value = false
+}
+
+function handleAdminGlobalSearch(value: string) {
+  const query = value.trim()
+
+  if (!query) {
+    return
+  }
+
+  router.push({
+    path: getAdminSearchPath(query),
+    query: { q: query },
+  })
 }
 
 function handleAdminLanguageChange(value: string | number) {
@@ -166,6 +237,14 @@ function handleAdminLanguageChange(value: string | number) {
 function toggleAdminSection(sectionKey: string) {
   openAdminSectionKey.value = openAdminSectionKey.value === sectionKey ? '' : sectionKey
 }
+
+watch(
+  () => route.query.q,
+  (value) => {
+    globalSearchQuery.value = readRouteQuery(value)
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -192,12 +271,18 @@ function toggleAdminSection(sectionKey: string) {
           </a-button>
           <RouterLink class="admin-mobile-brand" to="/admin">{{ text.brand }}</RouterLink>
         </div>
-        <a-input-search class="admin-search" :placeholder="text.search" />
-        <a-space class="admin-header-actions" wrap>
+        <a-input-search
+          v-model:value="globalSearchQuery"
+          class="admin-search"
+          :placeholder="text.search"
+          allow-clear
+          @search="handleAdminGlobalSearch"
+        />
+        <a-space class="admin-header-actions">
           <RouterLink to="/">
-            <a-button :aria-label="text.home">
+            <a-button class="admin-home-button" :aria-label="text.home">
               <HomeOutlined />
-              {{ text.home }}
+              <span>{{ text.homeShort }}</span>
             </a-button>
           </RouterLink>
           <a-segmented
@@ -209,7 +294,10 @@ function toggleAdminSection(sectionKey: string) {
             @change="handleAdminLanguageChange"
           />
           <a-tag class="admin-demo-tag" color="blue">{{ text.demo }}</a-tag>
-          <span class="admin-role-text">{{ text.role }}: {{ authStore.role }}</span>
+          <span class="admin-role-text">
+            <small>{{ text.role }}</small>
+            <strong>{{ authStore.role }}</strong>
+          </span>
         </a-space>
       </a-layout-header>
       <a-layout-content class="admin-content">
@@ -235,21 +323,16 @@ function toggleAdminSection(sectionKey: string) {
         </header>
 
         <div class="mobile-drawer-quick-grid admin-drawer-quick-grid">
-          <RouterLink to="/" @click="isAdminMenuOpen = false">
-            <span>{{ text.home }}</span>
-            <strong>Storefront</strong>
+          <RouterLink class="admin-drawer-home-card" to="/" @click="isAdminMenuOpen = false">
+            <span class="admin-drawer-home-icon">
+              <HomeOutlined />
+            </span>
+            <span class="admin-drawer-home-copy">
+              <strong>{{ text.home }}</strong>
+              <small>Storefront</small>
+            </span>
+            <RightOutlined class="admin-drawer-home-arrow" />
           </RouterLink>
-          <div class="admin-drawer-language-card">
-            <span>{{ text.language }}</span>
-            <a-segmented
-              :value="uiStore.adminLanguage"
-              :options="[
-                { label: '中文', value: 'zh' },
-                { label: 'IT', value: 'it' },
-              ]"
-              @change="handleAdminLanguageChange"
-            />
-          </div>
         </div>
 
         <section class="mobile-drawer-section">
@@ -295,6 +378,17 @@ function toggleAdminSection(sectionKey: string) {
           <div class="mobile-account-copy">
             <strong>{{ text.demo }}</strong>
             <span>{{ text.role }}: {{ authStore.role }}</span>
+          </div>
+          <div class="admin-account-language-row">
+            <span>{{ text.language }}</span>
+            <a-segmented
+              :value="uiStore.adminLanguage"
+              :options="[
+                { label: '中文', value: 'zh' },
+                { label: 'IT', value: 'it' },
+              ]"
+              @change="handleAdminLanguageChange"
+            />
           </div>
         </div>
       </div>

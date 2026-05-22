@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { getInventoryItems } from '@/services/admin.service'
 import type { InventoryItem } from '@/types/admin'
 
+const route = useRoute()
 const inventory = ref(getInventoryItems())
 const query = ref('')
 
@@ -44,6 +46,10 @@ function refreshInventory() {
   inventory.value = getInventoryItems()
 }
 
+function readRouteQuery(value: unknown) {
+  return Array.isArray(value) ? value[0] || '' : typeof value === 'string' ? value : ''
+}
+
 function stockColor(item: InventoryItem) {
   if (item.defectiveQty > 0 || item.availableQty === 0) {
     return 'red'
@@ -64,6 +70,14 @@ function formatDate(value: string) {
     minute: '2-digit',
   }).format(new Date(value))
 }
+
+watch(
+  () => route.query.q,
+  (value) => {
+    query.value = readRouteQuery(value)
+  },
+  { immediate: true },
+)
 </script>
 
 <template>

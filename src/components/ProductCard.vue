@@ -5,12 +5,17 @@ import {
   PlusOutlined,
   LockOutlined,
   ShoppingCartOutlined,
+  StarFilled,
   StarOutlined,
 } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { Product, StockStatus } from '@/types/product'
+import { useAuthStore } from '@/stores/auth.store'
 import { useCartStore } from '@/stores/cart.store'
+import { useFavoritesStore } from '@/stores/favorites.store'
+import { useUiStore } from '@/stores/ui.store'
+import { getProductRoutePath } from '@/services/products.service'
 
 const props = defineProps<{
   product: Product
@@ -19,7 +24,10 @@ const props = defineProps<{
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 const cartStore = useCartStore()
+const favoritesStore = useFavoritesStore()
+const uiStore = useUiStore()
 const hasImageError = ref(false)
 const cartQuantity = computed(
   () => cartStore.items.find((item) => item.skuCode === props.product.skuCode)?.quantity || 0,
@@ -27,7 +35,9 @@ const cartQuantity = computed(
 const productImageAlt = computed(
   () => props.product.imageAlt || `${props.product.brand} ${props.product.model} ${props.product.category}`,
 )
+const vatLabel = computed(() => (uiStore.language === 'zh' ? '不含 VAT' : props.product.vatMode))
 const shouldShowImage = computed(() => Boolean(props.product.imageUrl) && !hasImageError.value)
+const isFavorite = computed(() => favoritesStore.isFavorite(props.product.skuCode))
 const fallbackInitials = computed(() =>
   props.product.category
     .split(/\s+/)
@@ -37,12 +47,12 @@ const fallbackInitials = computed(() =>
     .toUpperCase(),
 )
 
-const stockMeta: Record<StockStatus, { label: string; color: string }> = {
-  in_stock: { label: 'Disponibile', color: 'success' },
-  low_stock: { label: 'Scorte limitate', color: 'warning' },
-  out_of_stock: { label: 'Esaurito', color: 'error' },
-  incoming: { label: 'In arrivo', color: 'purple' },
-}
+const stockMeta = computed<Record<StockStatus, { label: string; color: string }>>(() => ({
+  in_stock: { label: uiStore.language === 'zh' ? '有库存' : 'Disponibile', color: 'success' },
+  low_stock: { label: uiStore.language === 'zh' ? '库存紧张' : 'Scorte limitate', color: 'warning' },
+  out_of_stock: { label: uiStore.language === 'zh' ? '缺货' : 'Esaurito', color: 'error' },
+  incoming: { label: uiStore.language === 'zh' ? '即将到货' : 'In arrivo', color: 'purple' },
+}))
 
 const qualityColors: Record<string, string> = {
   'Original Pull': 'green',
@@ -68,7 +78,30 @@ function handleAddToCart() {
   }
 
   cartStore.addItem(props.product.skuCode, props.product.moq)
-  message.success(`${props.product.skuCode} aggiunto al carrello`)
+  message.success(uiStore.language === 'zh' ? '已加入购物车' : 'Articolo aggiunto al carrello')
+}
+
+function handleToggleFavorite() {
+  if (!authStore.isAuthenticated) {
+    router.push({
+      name: 'login',
+      query: {
+        returnUrl: route.fullPath,
+      },
+    })
+    return
+  }
+
+  const added = favoritesStore.toggleFavorite(props.product.skuCode)
+  message.success(
+    uiStore.language === 'zh'
+      ? added
+        ? '已加入常购清单'
+        : '已从常购清单移除'
+      : added
+        ? 'Aggiunto alla lista frequenti'
+        : 'Rimosso dalla lista frequenti',
+  )
 }
 
 function handleIncreaseQuantity() {
@@ -94,7 +127,7 @@ watch(
 
 <template>
   <a-card class="product-card" hoverable>
-    <RouterLink :to="`/products/${product.skuCode}`" class="product-card-link">
+    <RouterLink :to="getProductRoutePath(product)" class="product-card-link">
       <div class="product-media">
         <img
           v-if="shouldShowImage"
@@ -121,7 +154,7 @@ watch(
       <h3>{{ product.name }}</h3>
       <dl class="product-meta">
         <div>
-          <dt>Modello</dt>
+          <dt>{{ uiStore.language === 'zh' ? '型号' : 'Modello' }}</dt>
           <dd>{{ product.model }}</dd>
         </div>
       </dl>
@@ -131,11 +164,11 @@ watch(
       <div class="product-price">
         <template v-if="canViewPrice">
           <strong>€{{ product.b2bPrice.toFixed(2) }}</strong>
-          <span>{{ product.vatMode }}</span>
+          <span>{{ vatLabel }}</span>
         </template>
         <div v-else class="product-price-lock">
           <LockOutlined />
-          <span>Login prezzo B2B</span>
+          <span>{{ uiStore.language === 'zh' ? '登录看价' : 'Login prezzo B2B' }}</span>
         </div>
       </div>
 
@@ -157,10 +190,17 @@ watch(
           @click="handleAddToCart"
         >
           <ShoppingCartOutlined />
-          {{ canViewPrice ? 'Add' : 'Login' }}
+          {{ canViewPrice ? (uiStore.language === 'zh' ? '加购' : 'Add') : 'Login' }}
         </a-button>
-        <a-button size="small" class="product-favorite-button">
-          <StarOutlined />
+        <a-button
+          size="small"
+          class="product-favorite-button"
+          :class="{ 'is-favorite': isFavorite }"
+          :aria-label="uiStore.language === 'zh' ? '切换常购' : 'Toggle preferito'"
+          @click="handleToggleFavorite"
+        >
+          <StarFilled v-if="isFavorite" />
+          <StarOutlined v-else />
         </a-button>
       </div>
     </div>

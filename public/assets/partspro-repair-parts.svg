@@ -1,0 +1,51 @@
+<svg width="960" height="640" viewBox="0 0 960 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="640" rx="36" fill="#F8FAFC"/>
+  <path d="M80 80h800v480H80z" fill="white" stroke="#E2E8F0" stroke-width="2"/>
+  <path d="M80 160h800M80 240h800M80 320h800M80 400h800M80 480h800M180 80v480M280 80v480M380 80v480M480 80v480M580 80v480M680 80v480M780 80v480" stroke="#E2E8F0" stroke-width="1"/>
+
+  <g filter="url(#shadow)">
+    <rect x="150" y="122" width="248" height="396" rx="46" fill="#020617"/>
+    <rect x="174" y="148" width="200" height="344" rx="32" fill="#05070D"/>
+    <circle cx="274" cy="168" r="7" fill="#F8FAFC"/>
+    <path d="M198 456h152" stroke="#1F2937" stroke-width="7" stroke-linecap="round"/>
+    <path d="M216 196c42-28 108-30 150-6" stroke="white" stroke-opacity=".12" stroke-width="10" stroke-linecap="round"/>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="424" y="118" width="276" height="398" rx="34" fill="#F8F2E8" stroke="#CBD5E1" stroke-width="2"/>
+    <rect x="458" y="160" width="208" height="300" rx="20" fill="#F5EFE4" stroke="#D6CDBF" stroke-width="2"/>
+    <path d="M488 444h148" stroke="#1F2937" stroke-width="10" stroke-linecap="round"/>
+    <rect x="466" y="136" width="62" height="44" rx="10" fill="#111827"/>
+    <circle cx="497" cy="158" r="13" fill="#F8FAFC"/>
+    <circle cx="497" cy="158" r="7" fill="#111827"/>
+    <path d="M636 172h44v76h-28v74h-42v-112h26v-38z" fill="#111827"/>
+    <path d="M486 472h146" stroke="#C084FC" stroke-width="5" stroke-linecap="round"/>
+    <path d="M506 488h96" stroke="#14B8A6" stroke-width="5" stroke-linecap="round"/>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="720" y="155" width="122" height="210" rx="18" fill="#0F172A"/>
+    <rect x="742" y="186" width="78" height="128" rx="9" fill="#111827" stroke="#334155" stroke-width="2"/>
+    <path d="M766 164h30" stroke="#CBD5E1" stroke-width="8" stroke-linecap="round"/>
+    <path d="M758 330h48" stroke="#22C55E" stroke-width="8" stroke-linecap="round"/>
+    <text x="781" y="267" text-anchor="middle" fill="#E2E8F0" font-family="Arial, sans-serif" font-size="24" font-weight="700">BAT</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="724" y="402" width="150" height="82" rx="18" fill="white" stroke="#CBD5E1" stroke-width="2"/>
+    <path d="M748 444h66c24 0 26-28 50-28" stroke="#2563EB" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="748" cy="444" r="12" fill="#111827"/>
+    <circle cx="864" cy="416" r="12" fill="#111827"/>
+    <text x="799" y="470" text-anchor="middle" fill="#0F172A" font-family="Arial, sans-serif" font-size="18" font-weight="700">USB-C</text>
+  </g>
+
+  <rect x="122" y="548" width="714" height="44" rx="22" fill="#DCFCE7" stroke="#BBF7D0"/>
+  <circle cx="154" cy="570" r="9" fill="#22C55E"/>
+  <text x="176" y="576" fill="#166534" font-family="Arial, sans-serif" font-size="22" font-weight="700">Italian stock · 24/48h delivery · QC and RMA traceability</text>
+
+  <defs>
+    <filter id="shadow" x="100" y="80" width="820" height="500" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#0F172A" flood-opacity=".16"/>
+    </filter>
+  </defs>
+</svg>

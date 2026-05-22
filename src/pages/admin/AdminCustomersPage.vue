@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { fetchCustomerAccounts, fetchPriceGroups, getCustomerAccounts, getPriceGroups } from '@/services/admin.service'
 import type { CustomerAccount, CustomerStatus, CustomerTier } from '@/types/admin'
 import { labelCustomerStatus, labelCustomerTier } from '@/utils/adminLabels'
 
+const route = useRoute()
 const customers = ref(getCustomerAccounts())
 const priceGroups = ref(getPriceGroups())
 const isLoading = ref(false)
@@ -86,6 +88,10 @@ function priceGroupName(priceGroupId: string) {
   return priceGroups.value.find((group) => group.id === priceGroupId)?.name || priceGroupId
 }
 
+function readRouteQuery(value: unknown) {
+  return Array.isArray(value) ? value[0] || '' : typeof value === 'string' ? value : ''
+}
+
 function openCustomer(customer: CustomerAccount) {
   selectedCustomer.value = customer
   isDrawerOpen.value = true
@@ -106,6 +112,14 @@ async function loadCustomers() {
 }
 
 onMounted(loadCustomers)
+
+watch(
+  () => route.query.q,
+  (value) => {
+    query.value = readRouteQuery(value)
+  },
+  { immediate: true },
+)
 </script>
 
 <template>

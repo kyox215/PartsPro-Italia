@@ -29,7 +29,22 @@ const publicProductColumns =
 const authenticatedProductColumns = `${publicProductColumns},b2b_price`
 const productImageBucket = 'product-images'
 
-function getProductImageUrl(imagePath?: string | null) {
+function slugifyProductText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+export function getProductSlug(product: Product) {
+  return slugifyProductText(`${product.brand} ${product.model} ${product.category} ${product.qualityGrade} ${product.color}`)
+}
+
+export function getProductRoutePath(product: Product) {
+  return `/products/${getProductSlug(product)}`
+}
+
+export function getProductImageUrl(imagePath?: string | null) {
   const normalizedPath = imagePath?.trim()
 
   if (!normalizedPath) {
@@ -46,6 +61,10 @@ function getProductImageUrl(imagePath?: string | null) {
 
   const { data } = supabase.storage.from(productImageBucket).getPublicUrl(normalizedPath)
   return data.publicUrl
+}
+
+export function resolveProductImageUrl(product: Product) {
+  return product.imageUrl || getProductImageUrl(product.imagePath)
 }
 
 const products: Product[] = [
@@ -193,6 +212,10 @@ export function getProductBySku(skuCode: string) {
   return products.find((product) => product.skuCode.toLowerCase() === skuCode.toLowerCase())
 }
 
+export function getProductBySlug(slug: string) {
+  return products.find((product) => getProductSlug(product) === slug.toLowerCase())
+}
+
 export function searchProducts(query: string) {
   const normalizedQuery = query.trim().toLowerCase()
 
@@ -302,4 +325,29 @@ export async function fetchProductBySku(skuCode: string) {
     warnSupabaseFallback('product detail', error)
     return getProductBySku(skuCode)
   }
+}
+
+export async function fetchProductByRef(productRef: string) {
+  const normalizedRef = productRef.trim()
+
+  if (!normalizedRef) {
+    return undefined
+  }
+
+  const localProduct = getProductBySku(normalizedRef) || getProductBySlug(normalizedRef)
+
+  if (localProduct) {
+    return localProduct
+  }
+
+  if (/^[A-Z0-9-]+$/i.test(normalizedRef)) {
+    const productBySku = await fetchProductBySku(normalizedRef)
+
+    if (productBySku) {
+      return productBySku
+    }
+  }
+
+  const allProducts = await fetchProducts()
+  return allProducts.find((product) => getProductSlug(product) === normalizedRef.toLowerCase())
 }
