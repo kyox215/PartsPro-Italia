@@ -1,22 +1,9 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
-import { loadCartQuote } from "@/lib/cart-quote";
-import { isLocale, type Locale } from "@/lib/i18n";
+import { cartQuoteSchema } from "@/admin/schemas/order-checkout";
+import { quoteCheckoutCart } from "@/admin/services/order-checkout";
 import { parseRequestBody } from "@/lib/request";
 
 export const runtime = "nodejs";
-
-const cartQuoteSchema = z.object({
-  locale: z.enum(["it", "zh"]).default("it"),
-  items: z
-    .array(
-      z.object({
-        sku: z.string().min(1),
-        quantity: z.coerce.number().int().positive(),
-      }),
-    )
-    .default([]),
-});
 
 export async function POST(request: Request) {
   const body = await parseRequestBody(request);
@@ -29,7 +16,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const locale: Locale = isLocale(parsed.data.locale) ? parsed.data.locale : "it";
-  const quote = await loadCartQuote({ locale, items: parsed.data.items });
+  const quote = await quoteCheckoutCart(parsed.data);
   return NextResponse.json(quote);
 }

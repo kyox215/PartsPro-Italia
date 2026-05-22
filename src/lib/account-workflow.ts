@@ -1,9 +1,9 @@
 import {
-  recordOrderEvent,
-  recordOrderPaymentRecord,
-  releaseOrderReservations,
+  appendOrderTimelineEvent,
+  recordOrderPayment,
+  releaseOrderReservation,
   type PaymentMethod,
-} from "@/lib/order-workflow";
+} from "@/admin/repositories/order-transactions";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type AccountAuthUser = {
@@ -47,7 +47,7 @@ export async function cancelAccountOrder({
     throw new Error("This order reservation has already been released.");
   }
 
-  await releaseOrderReservations({
+  await releaseOrderReservation({
     orderId,
     paymentStatus: "cancelled",
     status: "cancelled",
@@ -89,7 +89,7 @@ export async function submitAccountOrderPaymentProof({
 
   const amount = Number(order.total ?? 0);
   const currency = order.currency ?? "EUR";
-  await recordOrderPaymentRecord({
+  await recordOrderPayment({
     orderId,
     paymentMethod: method,
     paymentStatus: order.payment_status || (method === "cash" ? "pending_cash" : "pending_bank_transfer"),
@@ -107,7 +107,7 @@ export async function submitAccountOrderPaymentProof({
     },
   });
 
-  await recordOrderEvent({
+  await appendOrderTimelineEvent({
     orderId,
     eventType: "payment_proof_submitted",
     title: "Customer submitted payment proof",
@@ -136,7 +136,7 @@ export async function recordAccountOrderMessage({
   const order = await loadOwnedOrder(orderId, user.id);
   if (!order) throw new Error("Order not found.");
 
-  await recordOrderEvent({
+  await appendOrderTimelineEvent({
     orderId,
     eventType: "customer_message",
     title: "Customer message",

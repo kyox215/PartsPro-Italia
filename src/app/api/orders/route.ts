@@ -1,24 +1,7 @@
 import { NextResponse } from "next/server";
-import {
-  getAccountCompany,
-  getCheckoutCompanyMissingFields,
-} from "@/lib/account-company";
-import { canViewB2BPrice, getAuthContext } from "@/lib/auth";
+import { createCheckoutOrder } from "@/admin/services/order-checkout";
 import { checkoutCartCookieName } from "@/lib/checkout-cart-cookie";
-import { getSiteUrl } from "@/lib/env";
-import {
-  createSupabaseOrderWithReservations,
-  getInitialOrderStatus,
-  getPaymentStatus,
-  getReservationExpiry,
-  loadSupabaseOrderLines,
-  releaseOrderReservations,
-  type PaymentMethod,
-} from "@/lib/order-workflow";
 import { parseRequestBody } from "@/lib/request";
-import { getStripe, hasStripeConfig } from "@/lib/stripe";
-import { getSupabaseAdminClient, hasSupabaseAdminConfig } from "@/lib/supabase/admin";
-import { hasSupabasePublicConfig } from "@/lib/supabase/config";
 import { orderSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
@@ -34,228 +17,39 @@ export async function POST(request: Request) {
     );
   }
 
-  const auth = await getAuthContext();
-  const items = parseItems(parsed.data.items, parsed.data.itemsJson);
-  const paymentMethod = parsed.data.paymentMethod as PaymentMethod;
+  const result = await createCheckoutOrder(parsed.data);
 
-  if (items.length === 0) {
-    return orderError(request, parsed.data.locale, "Cart is empty.", 400);
-  }
-
-  if (!hasSupabasePublicConfig() || !hasSupabaseAdminConfig()) {
-    return orderError(
+  if (!result.ok) {
+    return orderError({
       request,
-      parsed.data.locale,
-      "Supabase service role is required to create real orders.",
-      503,
-    );
-  }
-
-  if (!auth.user) {
-    return orderError(
-      request,
-      parsed.data.locale,
-      "Login is required to create stock or preorder orders.",
-      401,
-    );
-  }
-
-  if (paymentMethod === "stripe" && !hasStripeConfig()) {
-    return orderError(
-      request,
-      parsed.data.locale,
-      "Stripe is not configured. Choose cash or bank transfer.",
-      503,
-    );
-  }
-
-  const useB2BPrice = canViewB2BPrice(auth);
-  const { company } = await getAccountCompany(auth);
-  const requiresCompanyProfile = !auth.isAdmin && useB2BPrice;
-  const missingCompanyFields = requiresCompanyProfile
-    ? getCheckoutCompanyMissingFields(company)
-    : [];
-
-  if (missingCompanyFields.length > 0) {
-    return companyProfileError(request, parsed.data.locale, missingCompanyFields);
-  }
-
-  const orderId = crypto.randomUUID();
-  const supabase = getSupabaseAdminClient();
-  const now = new Date();
-  const reservationExpiresAt = getReservationExpiry(now);
-
-  let lines;
-  try {
-    lines = await loadSupabaseOrderLines(items, useB2BPrice);
-  } catch (error) {
-    return orderError(
-      request,
-      parsed.data.locale,
-      error instanceof Error ? error.message : "Unable to load order items",
-      400,
-    );
-  }
-
-  const subtotal = lines.reduce((sum, line) => sum + line.totals.subtotal, 0);
-  const vat = lines.reduce((sum, line) => sum + line.totals.vat, 0);
-  const total = subtotal + vat;
-
-  let createdOrder: Awaited<ReturnType<typeof createSupabaseOrderWithReservations>>;
-  try {
-    createdOrder = await createSupabaseOrderWithReservations({
-      supabase,
-      orderId,
-      profileId: auth.user.id,
-      status: getInitialOrderStatus(paymentMethod),
-      paymentStatus: getPaymentStatus(paymentMethod),
-      reservationExpiresAt: reservationExpiresAt.toISOString(),
-      reservedAt: now.toISOString(),
-      paymentMethod,
-      email: auth.user.email || null,
-      customerName: company?.contactName || null,
-      companyName: company?.companyName || null,
-      vatNumber: company?.vatNumber || null,
-      fiscalCode: company?.fiscalCode || null,
-      sdi: company?.sdi || null,
-      pec: company?.pec || null,
-      shippingAddress: company?.shippingAddress || null,
-      metadata: {
-        ...parsed.data,
-        companyProfileId: company?.id ?? null,
-        companyProfileRequired: requiresCompanyProfile,
-      },
-      lines,
+      locale: parsed.data.locale,
+      message: result.error.message,
+      missingFields: result.error.missingFields,
+      status: result.status,
+      type: result.error.code === "COMPANY_PROFILE_REQUIRED" ? "company" : "checkout",
     });
-  } catch (error) {
-    return orderError(
-      request,
-      parsed.data.locale,
-      error instanceof Error ? error.message : "Unable to create order reservation",
-      409,
-    );
   }
 
-  const orderNumber = createdOrder.order_number ?? orderId;
-
-  if (paymentMethod === "stripe") {
-    try {
-      const stripe = getStripe();
-      const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        success_url: `${getSiteUrl()}/${parsed.data.locale}/account/orders/${encodeURIComponent(orderNumber)}?checkout=success`,
-        cancel_url: `${getSiteUrl()}/${parsed.data.locale}/cart?checkout=cancelled&order=${encodeURIComponent(orderNumber)}`,
-        client_reference_id: orderId,
-        customer_email: auth.user.email || undefined,
-        line_items: lines.map((line) => ({
-          quantity: line.quantity,
-          price_data: {
-            currency: "eur",
-            unit_amount: Math.round(line.totals.unitPrice * (1 + line.vatRate) * 100),
-            product_data: {
-              name: line.name,
-              metadata: { sku: line.sku },
-            },
-          },
-        })),
-        metadata: { orderId },
-        expires_at: Math.floor(reservationExpiresAt.getTime() / 1000),
-      });
-
-      await supabase
-        .from("orders")
-        .update({
-          stripe_checkout_session_id: session.id,
-          stripe_payment_intent_id:
-            typeof session.payment_intent === "string" ? session.payment_intent : null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", orderId);
-
-      if (wantsRedirect(request) && session.url) {
-        const response = NextResponse.redirect(session.url, 303);
-        response.cookies.delete(checkoutCartCookieName);
-        return response;
-      }
-
-      const response = NextResponse.json({
-        orderId,
-        orderNumber,
-        status: "checkout_created",
-        checkoutUrl: session.url,
-      });
-      response.cookies.delete(checkoutCartCookieName);
-      return response;
-    } catch (error) {
-      await releaseOrderReservations({
-        orderId,
-        paymentStatus: "failed",
-        status: "cancelled",
-        note: "Stripe checkout creation failed",
-      });
-      return orderError(
-        request,
-        parsed.data.locale,
-        error instanceof Error ? error.message : "Unable to create Stripe checkout",
-        502,
-      );
-    }
+  if (wantsRedirect(request) && result.data.status === "checkout_created" && result.data.checkoutUrl) {
+    const response = NextResponse.redirect(result.data.checkoutUrl, 303);
+    response.cookies.delete(checkoutCartCookieName);
+    return response;
   }
-
-  const result = {
-    orderId,
-    orderNumber,
-    status: "pending_payment",
-    paymentStatus: getPaymentStatus(paymentMethod),
-    total,
-    message:
-      paymentMethod === "cash"
-        ? "Cash order created."
-        : "Bank transfer order created.",
-  };
 
   if (wantsRedirect(request)) {
     const accountUrl = new URL(
-      `/${parsed.data.locale}/account/orders/${encodeURIComponent(orderNumber)}`,
+      `/${parsed.data.locale}/account/orders/${encodeURIComponent(result.data.orderNumber)}`,
       request.url,
     );
-    accountUrl.searchParams.set("status", result.paymentStatus);
+    accountUrl.searchParams.set("status", result.data.paymentStatus);
     const response = NextResponse.redirect(accountUrl, 303);
     response.cookies.delete(checkoutCartCookieName);
     return response;
   }
 
-  const response = NextResponse.json(result);
+  const response = NextResponse.json(result.data);
   response.cookies.delete(checkoutCartCookieName);
   return response;
-}
-
-function parseItems(
-  items: Array<{ sku: string; quantity: number }> | undefined,
-  itemsJson?: string,
-) {
-  if (items?.length) {
-    return items;
-  }
-
-  if (!itemsJson) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(itemsJson);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed
-      .map((item) => ({
-        sku: String(item.sku ?? ""),
-        quantity: Number(item.quantity ?? 0),
-      }))
-      .filter((item) => item.sku && item.quantity > 0);
-  } catch {
-    return [];
-  }
 }
 
 function wantsRedirect(request: Request) {
@@ -264,34 +58,42 @@ function wantsRedirect(request: Request) {
   return contentType.includes("application/x-www-form-urlencoded") || accept.includes("text/html");
 }
 
-function orderError(
-  request: Request,
-  locale: string,
-  message: string,
-  status: number,
-) {
+function orderError({
+  request,
+  locale,
+  message,
+  missingFields,
+  status,
+  type,
+}: {
+  request: Request;
+  locale: string;
+  message: string;
+  missingFields?: string[];
+  status: number;
+  type: "checkout" | "company";
+}) {
   if (wantsRedirect(request)) {
-    const url = new URL(`/${locale}/checkout`, request.url);
-    url.searchParams.set("error", message);
-    return NextResponse.redirect(url, 303);
-  }
+    const url =
+      type === "company"
+        ? new URL(`/${locale}/account/company`, request.url)
+        : new URL(`/${locale}/checkout`, request.url);
 
-  return NextResponse.json({ error: message }, { status });
-}
+    if (type === "company") {
+      url.searchParams.set("next", `/${locale}/checkout`);
+      url.searchParams.set("error", "company-required");
+    } else {
+      url.searchParams.set("error", message);
+    }
 
-function companyProfileError(request: Request, locale: string, missingFields: string[]) {
-  if (wantsRedirect(request)) {
-    const url = new URL(`/${locale}/account/company`, request.url);
-    url.searchParams.set("next", `/${locale}/checkout`);
-    url.searchParams.set("error", "company-required");
     return NextResponse.redirect(url, 303);
   }
 
   return NextResponse.json(
     {
-      error: "Company profile is required for wholesale checkout.",
-      missingFields,
+      error: message,
+      ...(missingFields ? { missingFields } : {}),
     },
-    { status: 409 },
+    { status },
   );
 }

@@ -233,6 +233,7 @@ export const adminOrderStatusSchema = z.object({
   status: z.enum([
     "pending_payment",
     "paid",
+    "processing",
     "shipped",
     "completed",
     "cancelled",

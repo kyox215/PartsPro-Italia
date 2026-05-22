@@ -1,13 +1,14 @@
-import { NextResponse } from "next/server";
-import { recordAdminActivity } from "@/lib/admin-audit";
+import { adminReleaseOrderReservations } from "@/admin/services/order-mutations";
 import {
-  getAdminBackUrl,
-  redirectOnInvalidAdminCsrf,
-} from "@/lib/admin-security";
+  adminAccessError,
+  adminCsrfError,
+  adminValidationError,
+  respondAdminMutation,
+} from "@/admin/services/mutations";
+import { assertAdminCsrf } from "@/lib/admin-csrf";
+import { getAdminBackUrl } from "@/lib/admin-security";
 import { assertAdminPermission } from "@/lib/auth";
-import { releaseOrderReservations } from "@/lib/order-workflow";
 import { parseRequestBody } from "@/lib/request";
-import { hasSupabaseAdminConfig } from "@/lib/supabase/admin";
 import { adminOrderWorkflowSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
@@ -24,54 +25,47 @@ export async function POST(request: Request) {
   });
 
   if (!parsed.success) {
-    backUrl.searchParams.set(
-      "error",
-      parsed.error.issues.map((issue) => issue.message).join(", "),
-    );
-    return NextResponse.redirect(backUrl, 303);
+    return respondAdminMutation({
+      request,
+      backUrl,
+      result: adminValidationError(parsed.error),
+      successCode: "released",
+      errorStatus: 400,
+    });
   }
 
-  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
-  if (csrfRedirect) return csrfRedirect;
+  const csrf = assertAdminCsrf(request, rawBody);
+  if (!csrf.ok) {
+    return respondAdminMutation({
+      request,
+      backUrl,
+      result: adminCsrfError(csrf.error),
+      successCode: "released",
+      errorStatus: csrf.status,
+    });
+  }
 
   const admin = await assertAdminPermission("orders:write");
   if (!admin.ok) {
-    backUrl.searchParams.set("error", admin.error);
-    return NextResponse.redirect(backUrl, 303);
-  }
-
-  if (!hasSupabaseAdminConfig()) {
-    backUrl.searchParams.set("saved", "demo");
-    return NextResponse.redirect(backUrl, 303);
-  }
-
-  try {
-    await releaseOrderReservations({
-      orderId: parsed.data.id,
-      paymentStatus: "cancelled",
-      status: "cancelled",
-      note: "Order cancelled by admin",
-      actorProfileId: admin.context.user?.id,
-    });
-    await recordAdminActivity({
+    return respondAdminMutation({
       request,
-      actor: admin.context,
-      action: "order.release",
-      entityType: "order",
-      entityId: parsed.data.id,
-      afterData: {
-        status: "cancelled",
-        paymentStatus: "cancelled",
-        note: "Order cancelled by admin",
-      },
+      backUrl,
+      result: adminAccessError(admin.status, admin.error),
+      successCode: "released",
+      errorStatus: admin.status,
     });
-    backUrl.searchParams.set("saved", "released");
-  } catch (error) {
-    backUrl.searchParams.set(
-      "error",
-      error instanceof Error ? error.message : "Release failed",
-    );
   }
 
-  return NextResponse.redirect(backUrl, 303);
+  const result = await adminReleaseOrderReservations(parsed.data, {
+    request,
+    actor: admin.context,
+    demoMode: admin.demoMode,
+  });
+
+  return respondAdminMutation({
+    request,
+    backUrl,
+    result,
+    successCode: result.ok && "demoMode" in result.data ? "demo" : "released",
+  });
 }

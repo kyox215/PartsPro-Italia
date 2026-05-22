@@ -8,13 +8,24 @@ export type StaffRole = string;
 
 export type AdminPermission =
   | "admin:access"
+  | "orders:read"
+  | "orders:write"
+  | "customers:read"
+  | "customers:write"
+  | "inventory:read"
+  | "inventory:write"
+  | "products:read"
+  | "products:write"
+  | "finance:read"
+  | "finance:write"
+  | "staff:read"
+  | "staff:write"
+  | "settings:read"
+  | "settings:write"
+  | "audit:read"
   | "accounts:read"
   | "accounts:write"
   | "staff:manage"
-  | "audit:read"
-  | "products:write"
-  | "inventory:write"
-  | "orders:write"
   | "payments:confirm"
   | "system:read";
 
@@ -86,49 +97,134 @@ export function getStaffRoleDescription(role: StaffRole | null | undefined, loca
 
 const allPermissions: AdminPermission[] = [
   "admin:access",
+  "orders:read",
+  "orders:write",
+  "customers:read",
+  "customers:write",
+  "inventory:read",
+  "inventory:write",
+  "products:read",
+  "products:write",
+  "finance:read",
+  "finance:write",
+  "staff:read",
+  "staff:write",
+  "settings:read",
+  "settings:write",
+  "audit:read",
   "accounts:read",
   "accounts:write",
   "staff:manage",
-  "audit:read",
-  "products:write",
-  "inventory:write",
-  "orders:write",
   "payments:confirm",
   "system:read",
 ];
 
-const configurablePermissions: AdminPermission[] = allPermissions;
+const configurablePermissions: AdminPermission[] = [
+  "admin:access",
+  "orders:read",
+  "orders:write",
+  "customers:read",
+  "customers:write",
+  "inventory:read",
+  "inventory:write",
+  "products:read",
+  "products:write",
+  "finance:read",
+  "finance:write",
+  "staff:read",
+  "staff:write",
+  "settings:read",
+  "settings:write",
+  "audit:read",
+];
 
 const staffPermissions: Record<string, AdminPermission[]> = {
   owner: allPermissions,
   manager: [
     "admin:access",
+    "orders:read",
+    "orders:write",
+    "customers:read",
+    "customers:write",
+    "inventory:read",
+    "inventory:write",
+    "products:read",
+    "products:write",
+    "finance:read",
+    "finance:write",
+    "staff:read",
+    "staff:write",
+    "settings:read",
+    "audit:read",
     "accounts:read",
     "accounts:write",
     "staff:manage",
-    "audit:read",
-    "products:write",
-    "inventory:write",
-    "orders:write",
     "payments:confirm",
   ],
   sales: [
     "admin:access",
+    "orders:read",
+    "orders:write",
+    "customers:read",
+    "customers:write",
+    "audit:read",
     "accounts:read",
     "accounts:write",
-    "audit:read",
     "orders:write",
   ],
-  catalog: ["admin:access", "products:write", "system:read"],
-  warehouse: ["admin:access", "inventory:write", "orders:write", "system:read"],
-  finance: [
+  catalog: ["admin:access", "products:read", "products:write", "settings:read", "system:read"],
+  warehouse: [
     "admin:access",
+    "inventory:read",
+    "inventory:write",
+    "orders:read",
     "orders:write",
-    "payments:confirm",
-    "audit:read",
+    "settings:read",
     "system:read",
   ],
-  support: ["admin:access", "accounts:read", "audit:read"],
+  finance: [
+    "admin:access",
+    "orders:read",
+    "finance:read",
+    "finance:write",
+    "audit:read",
+    "settings:read",
+    "orders:write",
+    "payments:confirm",
+    "system:read",
+  ],
+  support: [
+    "admin:access",
+    "orders:read",
+    "customers:read",
+    "customers:write",
+    "audit:read",
+    "accounts:read",
+  ],
+};
+
+const permissionAliases: Record<AdminPermission, AdminPermission[]> = {
+  "admin:access": ["admin:access"],
+  "orders:read": ["orders:write"],
+  "orders:write": [],
+  "customers:read": ["customers:write", "accounts:read", "accounts:write"],
+  "customers:write": ["accounts:write"],
+  "inventory:read": ["inventory:write"],
+  "inventory:write": [],
+  "products:read": ["products:write"],
+  "products:write": [],
+  "finance:read": ["finance:write", "payments:confirm"],
+  "finance:write": ["payments:confirm"],
+  "staff:read": ["staff:write", "staff:manage", "accounts:read"],
+  "staff:write": ["staff:manage"],
+  "settings:read": ["settings:write", "system:read"],
+  "settings:write": ["staff:manage"],
+  "audit:read": ["audit:read"],
+  "accounts:read": ["customers:read", "customers:write", "staff:read", "staff:write"],
+  "accounts:write": ["customers:write"],
+  "staff:manage": ["staff:write", "settings:write"],
+  "payments:confirm": ["finance:write"],
+  "system:read": ["settings:read"],
 };
 
 export function getStaffPermissions(role: StaffRole | null | undefined) {
@@ -211,5 +307,7 @@ export function hasAdminPermission(
   permission: AdminPermission,
 ) {
   if (auth.isAdmin) return true;
-  return auth.adminPermissions.includes(permission);
+  if (auth.adminPermissions.includes(permission)) return true;
+  const granted = new Set(auth.adminPermissions);
+  return permissionAliases[permission].some((alias) => granted.has(alias));
 }

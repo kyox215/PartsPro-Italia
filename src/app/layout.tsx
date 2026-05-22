@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AntdRegistry } from "@ant-design/nextjs-registry";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -20,7 +21,9 @@ export default function RootLayout({
       lang="it"
       className="h-full antialiased"
     >
-      <body className="min-h-full bg-slate-50 text-slate-950">{children}</body>
+      <body className="min-h-full bg-slate-50 text-slate-950">
+        <AntdRegistry>{children}</AntdRegistry>
+      </body>
     </html>
   );
 }

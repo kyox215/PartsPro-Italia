@@ -10,6 +10,7 @@ import {
 import {
   getAllAdminPermissions,
   getStaffPermissionsForRole,
+  hasAdminPermission,
   isStaffRole,
   type AdminPermission,
   type StaffRole,
@@ -201,7 +202,7 @@ export async function assertAdminPermission(permission: AdminPermission) {
   if (!access.ok) return access;
   if (access.demoMode) return access;
 
-  if (!access.context.isAdmin && !access.context.adminPermissions.includes(permission)) {
+  if (!hasAdminPermission(access.context, permission)) {
     return {
       ok: false as const,
       context: access.context,

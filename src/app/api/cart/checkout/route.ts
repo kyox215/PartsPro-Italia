@@ -1,23 +1,10 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
-import { normalizeCartItems } from "@/lib/cart-quote";
+import { checkoutCartSchema } from "@/admin/schemas/order-checkout";
+import { prepareCheckoutCart } from "@/admin/services/order-checkout";
 import { checkoutCartCookieName, encodeCheckoutCart } from "@/lib/checkout-cart-cookie";
-import { isLocale, localizePath, type Locale } from "@/lib/i18n";
 import { parseRequestBody } from "@/lib/request";
 
 export const runtime = "nodejs";
-
-const checkoutCartSchema = z.object({
-  locale: z.enum(["it", "zh"]).default("it"),
-  items: z
-    .array(
-      z.object({
-        sku: z.string().min(1),
-        quantity: z.coerce.number().int().positive(),
-      }),
-    )
-    .default([]),
-});
 
 export async function POST(request: Request) {
   const body = await parseRequestBody(request);
@@ -30,18 +17,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const locale: Locale = isLocale(parsed.data.locale) ? parsed.data.locale : "it";
-  const items = normalizeCartItems(parsed.data.items);
+  const prepared = prepareCheckoutCart(parsed.data);
 
-  if (items.length === 0) {
-    return NextResponse.json({ error: "Cart is empty." }, { status: 400 });
+  if (!prepared.ok) {
+    return NextResponse.json(
+      { error: prepared.error.message },
+      { status: prepared.status },
+    );
   }
 
-  const redirectTo = localizePath(locale, "/checkout");
-  const response = NextResponse.json({ redirectTo });
+  const response = NextResponse.json({ redirectTo: prepared.data.redirectTo });
   const secure = new URL(request.url).protocol === "https:";
 
-  response.cookies.set(checkoutCartCookieName, encodeCheckoutCart(items), {
+  response.cookies.set(checkoutCartCookieName, encodeCheckoutCart(prepared.data.items), {
     httpOnly: true,
     maxAge: 60 * 30,
     path: "/",

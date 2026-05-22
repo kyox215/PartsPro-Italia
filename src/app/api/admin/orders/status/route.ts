@@ -1,17 +1,14 @@
-import { NextResponse } from "next/server";
-import { recordAdminActivity } from "@/lib/admin-audit";
+import { adminUpdateOrderStatus } from "@/admin/services/order-mutations";
 import {
-  getAdminBackUrl,
-  redirectOnInvalidAdminCsrf,
-} from "@/lib/admin-security";
+  adminAccessError,
+  adminCsrfError,
+  adminValidationError,
+  respondAdminMutation,
+} from "@/admin/services/mutations";
+import { assertAdminCsrf } from "@/lib/admin-csrf";
+import { getAdminBackUrl } from "@/lib/admin-security";
 import { assertAdminPermission } from "@/lib/auth";
 import { parseRequestBody } from "@/lib/request";
-import {
-  getSupabaseAdminClient,
-  hasSupabaseAdminConfig,
-} from "@/lib/supabase/admin";
-import { notifyOrderCustomer } from "@/lib/notifications";
-import { recordOrderEvent } from "@/lib/order-workflow";
 import { adminOrderStatusSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
@@ -28,77 +25,47 @@ export async function POST(request: Request) {
   const parsed = adminOrderStatusSchema.safeParse(rawBody);
 
   if (!parsed.success) {
-    backUrl.searchParams.set(
-      "error",
-      parsed.error.issues.map((issue) => issue.message).join(", "),
-    );
-    return NextResponse.redirect(backUrl, 303);
+    return respondAdminMutation({
+      request,
+      backUrl,
+      result: adminValidationError(parsed.error),
+      successCode: "1",
+      errorStatus: 400,
+    });
   }
 
-  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
-  if (csrfRedirect) return csrfRedirect;
+  const csrf = assertAdminCsrf(request, rawBody);
+  if (!csrf.ok) {
+    return respondAdminMutation({
+      request,
+      backUrl,
+      result: adminCsrfError(csrf.error),
+      successCode: "1",
+      errorStatus: csrf.status,
+    });
+  }
 
   const admin = await assertAdminPermission("orders:write");
-
   if (!admin.ok) {
-    backUrl.searchParams.set("error", admin.error);
-    return NextResponse.redirect(backUrl, 303);
+    return respondAdminMutation({
+      request,
+      backUrl,
+      result: adminAccessError(admin.status, admin.error),
+      successCode: "1",
+      errorStatus: admin.status,
+    });
   }
 
-  if (!hasSupabaseAdminConfig()) {
-    backUrl.searchParams.set("saved", "demo");
-    return NextResponse.redirect(backUrl, 303);
-  }
-
-  const supabase = getSupabaseAdminClient();
-  const { error } = await supabase
-    .from("orders")
-    .update({
-      status: parsed.data.status,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", parsed.data.id);
-
-  if (error) {
-    backUrl.searchParams.set("error", error.message);
-    return NextResponse.redirect(backUrl, 303);
-  }
-
-  await recordAdminActivity({
+  const result = await adminUpdateOrderStatus(parsed.data, {
     request,
     actor: admin.context,
-    action: "order.status.update",
-    entityType: "order",
-    entityId: parsed.data.id,
-    afterData: {
-      status: parsed.data.status,
-    },
+    demoMode: admin.demoMode,
   });
 
-  await recordOrderEvent({
-    orderId: parsed.data.id,
-    eventType: "status_updated",
-    title: `Status updated to ${parsed.data.status}`,
-    body: "Admin manually changed the order status.",
-    actorProfileId: admin.context.user?.id,
-    metadata: {
-      status: parsed.data.status,
-    },
+  return respondAdminMutation({
+    request,
+    backUrl,
+    result,
+    successCode: result.ok && "demoMode" in result.data ? "demo" : "1",
   });
-
-  try {
-    await notifyOrderCustomer({
-      orderId: parsed.data.id,
-      type: "status_updated",
-      locale: parsed.data.locale,
-      metadata: {
-        status: parsed.data.status,
-      },
-    });
-  } catch (notificationError) {
-    console.error("Failed to notify order customer", notificationError);
-  }
-
-  backUrl.searchParams.set("saved", "1");
-  return NextResponse.redirect(backUrl, 303);
 }

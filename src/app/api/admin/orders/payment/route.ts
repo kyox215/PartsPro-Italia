@@ -1,13 +1,14 @@
-import { NextResponse } from "next/server";
-import { recordAdminActivity } from "@/lib/admin-audit";
+import { adminConfirmOrderPayment } from "@/admin/services/order-mutations";
 import {
-  getAdminBackUrl,
-  redirectOnInvalidAdminCsrf,
-} from "@/lib/admin-security";
+  adminAccessError,
+  adminCsrfError,
+  adminValidationError,
+  respondAdminMutation,
+} from "@/admin/services/mutations";
+import { assertAdminCsrf } from "@/lib/admin-csrf";
+import { getAdminBackUrl } from "@/lib/admin-security";
 import { assertAdminPermission } from "@/lib/auth";
-import { confirmManualPayment } from "@/lib/order-workflow";
 import { parseRequestBody } from "@/lib/request";
-import { hasSupabaseAdminConfig } from "@/lib/supabase/admin";
 import { adminOrderPaymentSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
@@ -24,57 +25,47 @@ export async function POST(request: Request) {
   });
 
   if (!parsed.success) {
-    backUrl.searchParams.set(
-      "error",
-      parsed.error.issues.map((issue) => issue.message).join(", "),
-    );
-    return NextResponse.redirect(backUrl, 303);
-  }
-
-  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
-  if (csrfRedirect) return csrfRedirect;
-
-  const admin = await assertAdminPermission("payments:confirm");
-  if (!admin.ok) {
-    backUrl.searchParams.set("error", admin.error);
-    return NextResponse.redirect(backUrl, 303);
-  }
-
-  if (!hasSupabaseAdminConfig()) {
-    backUrl.searchParams.set("saved", "demo");
-    return NextResponse.redirect(backUrl, 303);
-  }
-
-  try {
-    await confirmManualPayment({
-      orderId: parsed.data.id,
-      expectedMethod:
-        parsed.data.action === "confirm_cash" ? "cash" : "bank_transfer",
-      actorProfileId: admin.context.user?.id,
-      locale: parsed.data.locale,
-    });
-    await recordAdminActivity({
+    return respondAdminMutation({
       request,
-      actor: admin.context,
-      action:
-        parsed.data.action === "confirm_cash"
-          ? "order.payment.confirm_cash"
-          : "order.payment.confirm_bank_transfer",
-      entityType: "order",
-      entityId: parsed.data.id,
-      afterData: {
-        paymentMethod:
-          parsed.data.action === "confirm_cash" ? "cash" : "bank_transfer",
-        paymentStatus: "paid",
-      },
+      backUrl,
+      result: adminValidationError(parsed.error),
+      successCode: "payment",
+      errorStatus: 400,
     });
-    backUrl.searchParams.set("saved", "payment");
-  } catch (error) {
-    backUrl.searchParams.set(
-      "error",
-      error instanceof Error ? error.message : "Payment update failed",
-    );
   }
 
-  return NextResponse.redirect(backUrl, 303);
+  const csrf = assertAdminCsrf(request, rawBody);
+  if (!csrf.ok) {
+    return respondAdminMutation({
+      request,
+      backUrl,
+      result: adminCsrfError(csrf.error),
+      successCode: "payment",
+      errorStatus: csrf.status,
+    });
+  }
+
+  const admin = await assertAdminPermission("finance:write");
+  if (!admin.ok) {
+    return respondAdminMutation({
+      request,
+      backUrl,
+      result: adminAccessError(admin.status, admin.error),
+      successCode: "payment",
+      errorStatus: admin.status,
+    });
+  }
+
+  const result = await adminConfirmOrderPayment(parsed.data, {
+    request,
+    actor: admin.context,
+    demoMode: admin.demoMode,
+  });
+
+  return respondAdminMutation({
+    request,
+    backUrl,
+    result,
+    successCode: result.ok && "demoMode" in result.data ? "demo" : "payment",
+  });
 }

@@ -1,13 +1,13 @@
-import { NextResponse } from "next/server";
-import { recordAdminActivity } from "@/lib/admin-audit";
+import { adminAddOrderPaymentProof } from "@/admin/services/order-mutations";
 import {
-  getAdminBackUrl,
-  redirectOnInvalidAdminCsrf,
-} from "@/lib/admin-security";
-import { uploadAdminAttachmentFile } from "@/lib/admin-attachment-storage";
+  adminAccessError,
+  adminCsrfError,
+  adminValidationError,
+  respondAdminMutation,
+} from "@/admin/services/mutations";
+import { assertAdminCsrf } from "@/lib/admin-csrf";
+import { getAdminBackUrl } from "@/lib/admin-security";
 import { assertAdminPermission } from "@/lib/auth";
-import { addOrderPaymentProof } from "@/lib/order-workflow";
-import { hasSupabaseAdminConfig } from "@/lib/supabase/admin";
 import { adminOrderPaymentProofSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
@@ -25,61 +25,53 @@ export async function POST(request: Request) {
   });
 
   if (!parsed.success) {
-    backUrl.searchParams.set(
-      "error",
-      parsed.error.issues.map((issue) => issue.message).join(", "),
-    );
-    return NextResponse.redirect(backUrl, 303);
+    return respondAdminMutation({
+      request,
+      backUrl,
+      result: adminValidationError(parsed.error),
+      successCode: "payment_proof",
+      errorStatus: 400,
+    });
   }
 
-  const csrfRedirect = redirectOnInvalidAdminCsrf(request, rawBody, backUrl);
-  if (csrfRedirect) return csrfRedirect;
+  const csrf = assertAdminCsrf(request, rawBody);
+  if (!csrf.ok) {
+    return respondAdminMutation({
+      request,
+      backUrl,
+      result: adminCsrfError(csrf.error),
+      successCode: "payment_proof",
+      errorStatus: csrf.status,
+    });
+  }
 
-  const admin = await assertAdminPermission("payments:confirm");
+  const admin = await assertAdminPermission("finance:write");
   if (!admin.ok) {
-    backUrl.searchParams.set("error", admin.error);
-    return NextResponse.redirect(backUrl, 303);
+    return respondAdminMutation({
+      request,
+      backUrl,
+      result: adminAccessError(admin.status, admin.error),
+      successCode: "payment_proof",
+      errorStatus: admin.status,
+    });
   }
 
-  if (!hasSupabaseAdminConfig()) {
-    backUrl.searchParams.set("saved", "demo");
-    return NextResponse.redirect(backUrl, 303);
-  }
-
-  try {
-    const uploaded = await uploadAdminAttachmentFile({
+  const result = await adminAddOrderPaymentProof(
+    {
+      ...parsed.data,
       file: formData.get("file"),
-      scope: "order-payment-proofs",
-      entityId: parsed.data.id,
-    });
-    const result = await addOrderPaymentProof({
-      orderId: parsed.data.id,
-      paymentMethod: parsed.data.paymentMethod,
-      paymentStatus: parsed.data.paymentStatus,
-      amount: parsed.data.amount,
-      providerReference: parsed.data.providerReference || null,
-      proofUrl: uploaded?.reference ?? (parsed.data.proofUrl || null),
-      proofLabel: parsed.data.proofLabel || uploaded?.label || null,
-      note: parsed.data.note || null,
-      actorProfileId: admin.context.user?.id,
-      locale: parsed.data.locale,
-    });
-
-    await recordAdminActivity({
+    },
+    {
       request,
       actor: admin.context,
-      action: "order.payment.proof.add",
-      entityType: "order",
-      entityId: parsed.data.id,
-      afterData: result,
-    });
-    backUrl.searchParams.set("saved", "payment_proof");
-  } catch (error) {
-    backUrl.searchParams.set(
-      "error",
-      error instanceof Error ? error.message : "Payment proof update failed",
-    );
-  }
+      demoMode: admin.demoMode,
+    },
+  );
 
-  return NextResponse.redirect(backUrl, 303);
+  return respondAdminMutation({
+    request,
+    backUrl,
+    result,
+    successCode: result.ok && "demoMode" in result.data ? "demo" : "payment_proof",
+  });
 }
