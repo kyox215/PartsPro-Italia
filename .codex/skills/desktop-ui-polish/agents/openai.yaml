@@ -1,0 +1,4 @@
+interface:
+  display_name: "Desktop UI Polish"
+  short_description: "Audit and polish desktop UI without mobile regressions"
+  default_prompt: "Use $desktop-ui-polish to inspect and improve the desktop frontend layout while preserving mobile behavior."
