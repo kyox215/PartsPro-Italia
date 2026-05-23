@@ -7090,11 +7090,52 @@ a {
   }
 
   .product-grid.is-list-view .product-card .ant-card-body {
-    grid-template-columns: minmax(0, 1fr) minmax(210px, auto);
+    grid-template-columns: minmax(0, 1fr) 196px;
+    min-height: 128px;
+    align-items: center;
+    gap: 14px;
+    padding: 10px;
   }
 
   .product-grid.is-list-view .product-card-link {
-    grid-template-columns: 108px minmax(0, 1fr);
+    grid-column: 1;
+    grid-row: 1;
+    grid-template-columns: 118px minmax(0, 1fr);
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    gap: 12px;
+  }
+
+  .product-grid.is-list-view .product-media {
+    width: 118px;
+    padding: 7px;
+    border-radius: 10px;
+  }
+
+  .product-grid.is-list-view .product-card h3 {
+    max-width: 100%;
+    font-size: 15px;
+  }
+
+  .product-grid.is-list-view .product-buy-row {
+    grid-column: 2;
+    grid-row: 1;
+    grid-template-columns: 1fr;
+    justify-items: end;
+    align-content: center;
+    width: 100%;
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .product-grid.is-list-view .product-price {
+    margin-top: 0;
+    text-align: right;
+  }
+
+  .product-grid.is-list-view .product-actions {
+    justify-content: end;
   }
 
   .cart-layout,
