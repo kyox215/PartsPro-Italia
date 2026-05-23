@@ -3,12 +3,17 @@ import type {
   AdminOrder,
   AdminOrderStatus,
   AdminProduct,
+  AdminStaffProfile,
+  AdminStaffRole,
   B2BApproval,
   B2BApprovalStatus,
   CustomerAccount,
+  CustomerAccountPatch,
+  CustomerTier,
   InventoryItem,
   PriceGroup,
   StockMovement,
+  StockMovementType,
 } from '@/types/admin'
 import { shouldUseSupabaseData, supabase } from '@/lib/supabase'
 import { hasDemoAuthProfile } from '@/services/demo-auth.service'
@@ -47,12 +52,18 @@ type AdminProductRow = {
 
 type CustomerRow = {
   id: string
+  user_id: string | null
   company_name: string | null
   contact_name: string | null
   email: string
+  phone: string | null
   vat_number: string | null
+  fiscal_code: string | null
   sdi: string | null
   pec: string | null
+  registered_address: string | null
+  billing_address: string | null
+  shipping_address: string | null
   tier: CustomerAccount['tier']
   price_group_id: string | null
   status: CustomerAccount['status']
@@ -62,6 +73,9 @@ type CustomerRow = {
   last_order_at: string | null
   credit_limit: number
   payment_terms: string | null
+  profile_completed_at: string | null
+  created_at: string
+  updated_at: string
 }
 
 type B2BApprovalRow = {
@@ -75,12 +89,48 @@ type B2BApprovalRow = {
   sdi: string
   pec: string
   company_type: string
+  registered_address: string
+  shipping_address: string
   monthly_purchase: string
   interested_categories: string[] | null
+  payment_needs: string[] | null
   status: B2BApproval['status']
   submitted_at: string
   requested_price_group_id: string
   review_note: string
+}
+
+type InventoryItemRow = {
+  id: string
+  sku_code: string
+  product_name: string
+  brand: string
+  model: string
+  quality_grade: string
+  batch_code: string
+  location: string
+  actual_qty: number
+  locked_qty: number
+  available_qty: number
+  incoming_qty: number
+  qc_qty: number
+  rma_qty: number
+  defective_qty: number
+  supplier: string
+  last_movement_at: string
+}
+
+type StockMovementRow = {
+  id: string
+  created_at: string
+  type: StockMovementType
+  sku_code: string
+  batch_code: string
+  location: string
+  quantity: number
+  reference: string
+  operator: string
+  note: string
 }
 
 type PriceGroupRow = {
@@ -110,6 +160,14 @@ type BatchRow = {
   msds_url: string
   un38_url: string
   notes: string
+}
+
+type StaffProfileRow = {
+  id: string
+  email: string
+  role: AdminStaffRole
+  created_at: string
+  updated_at: string
 }
 
 export const orderStatusFlow: AdminOrderStatus[] = [
@@ -585,119 +643,9 @@ const adminProducts: AdminProduct[] = [
   },
 ]
 
-const customers: CustomerAccount[] = [
-  {
-    id: 'cus-ripara-milano',
-    companyName: 'RiparaVeloce Milano',
-    contactName: 'Luca Ferri',
-    email: 'acquisti@riparaveloce.example',
-    vatNumber: 'IT12345678901',
-    sdi: 'A1B2C3D',
-    pec: 'amministrazione@riparaveloce.example',
-    tier: 'gold',
-    priceGroupId: 'pg-gold-lab',
-    status: 'active',
-    monthlyPurchase: '€3.000 - €5.000',
-    ordersCount: 42,
-    revenue: 18420,
-    lastOrderAt: '2026-05-22T09:14:00+02:00',
-    creditLimit: 2500,
-    paymentTerms: '银行卡 / PayPal / 银行转账 7 天',
-  },
-  {
-    id: 'cus-centro-roma',
-    companyName: 'Centro Repair Roma',
-    contactName: 'Giulia Conti',
-    email: 'fatture@centrorepair.example',
-    vatNumber: 'IT09876543210',
-    sdi: '0000000',
-    pec: 'fatture@centrorepair.example',
-    tier: 'silver',
-    priceGroupId: 'pg-silver-shop',
-    status: 'active',
-    monthlyPurchase: '€1.000 - €3.000',
-    ordersCount: 18,
-    revenue: 7210,
-    lastOrderAt: '2026-05-22T08:32:00+02:00',
-    creditLimit: 900,
-    paymentTerms: '预付银行转账',
-  },
-  {
-    id: 'cus-fixlab-firenze',
-    companyName: 'FixLab Firenze',
-    contactName: 'Marco Bianchi',
-    email: 'ordini@fixlab.example',
-    vatNumber: 'IT11223344556',
-    sdi: 'KRRH6B9',
-    pec: 'fixlab@pec.example',
-    tier: 'standard',
-    priceGroupId: 'pg-standard-b2b',
-    status: 'active',
-    monthlyPurchase: '< €1.000',
-    ordersCount: 7,
-    revenue: 1680,
-    lastOrderAt: '2026-05-21T16:48:00+02:00',
-    creditLimit: 0,
-    paymentTerms: 'Stripe / PayPal',
-  },
-]
+const customers: CustomerAccount[] = []
 
-const b2bApprovals: B2BApproval[] = [
-  {
-    id: 'b2b-20260522-014',
-    companyName: 'Repair Hub Napoli',
-    contactName: 'Antonio Russo',
-    email: 'info@repairhubnapoli.example',
-    phone: '+39 081 000 1234',
-    vatNumber: 'IT13579246801',
-    fiscalCode: '13579246801',
-    sdi: 'M5UXCR1',
-    pec: 'repairhubnapoli@pec.example',
-    companyType: '维修实验室',
-    monthlyPurchase: '€1.000 - €3.000',
-    interestedCategories: ['Screens', 'Batteries', 'Charging Ports'],
-    status: 'submitted',
-    submittedAt: '2026-05-22T10:18:00+02:00',
-    requestedPriceGroupId: 'pg-silver-shop',
-    reviewNote: '需要核对 P.IVA 和初始采购量。',
-  },
-  {
-    id: 'b2b-20260521-011',
-    companyName: 'Smart Parts Veneto',
-    contactName: 'Elena Costa',
-    email: 'sales@smartpartsveneto.example',
-    phone: '+39 041 000 5588',
-    vatNumber: 'IT24681357902',
-    fiscalCode: '24681357902',
-    sdi: 'A4707H7',
-    pec: 'smartpartsveneto@pec.example',
-    companyType: '经销商',
-    monthlyPurchase: '€3.000 - €5.000',
-    interestedCategories: ['Screens', 'Cameras', 'Back Covers'],
-    status: 'submitted',
-    submittedAt: '2026-05-21T15:04:00+02:00',
-    requestedPriceGroupId: 'pg-gold-lab',
-    reviewNote: '申请经销商价格表和 7 天银行转账账期。',
-  },
-  {
-    id: 'b2b-20260520-008',
-    companyName: 'Mobile Care Bari',
-    contactName: 'Sara Greco',
-    email: 'amministrazione@mobilecarebari.example',
-    phone: '+39 080 000 7788',
-    vatNumber: 'IT99887766554',
-    fiscalCode: '99887766554',
-    sdi: '0000000',
-    pec: 'mobilecarebari@pec.example',
-    companyType: '维修门店',
-    monthlyPurchase: '< €1.000',
-    interestedCategories: ['Batteries', 'Tools'],
-    status: 'approved',
-    submittedAt: '2026-05-20T12:40:00+02:00',
-    requestedPriceGroupId: 'pg-standard-b2b',
-    reviewNote: '已按标准 B2B 客户通过。',
-  },
-]
+const b2bApprovals: B2BApproval[] = []
 
 const priceGroups: PriceGroup[] = [
   {
@@ -795,6 +743,37 @@ const batches: AdminBatch[] = [
   },
 ]
 
+const staffProfiles: AdminStaffProfile[] = [
+  {
+    id: 'profile-admin',
+    email: 'admin@partspro.example',
+    role: 'admin',
+    createdAt: '2026-05-18T08:00:00+02:00',
+    updatedAt: '2026-05-22T09:00:00+02:00',
+  },
+  {
+    id: 'profile-sales',
+    email: 'sales@partspro.example',
+    role: 'sales',
+    createdAt: '2026-05-18T08:10:00+02:00',
+    updatedAt: '2026-05-21T16:00:00+02:00',
+  },
+  {
+    id: 'profile-warehouse',
+    email: 'warehouse@partspro.example',
+    role: 'warehouse',
+    createdAt: '2026-05-18T08:20:00+02:00',
+    updatedAt: '2026-05-21T16:05:00+02:00',
+  },
+  {
+    id: 'profile-customer',
+    email: 'amministrazione@mobilecarebari.example',
+    role: 'customer',
+    createdAt: '2026-05-20T12:40:00+02:00',
+    updatedAt: '2026-05-20T12:45:00+02:00',
+  },
+]
+
 export function getAdminOrders() {
   return orders.map((order) => ({ ...order, lines: order.lines.map((line) => ({ ...line })) }))
 }
@@ -851,6 +830,10 @@ export function getStockMovements() {
   return movements.map((movement) => ({ ...movement }))
 }
 
+export function getStaffProfiles() {
+  return staffProfiles.map((profile) => ({ ...profile }))
+}
+
 export function getAdminDashboardStats() {
   const openOrders = orders.filter((order) => order.status !== 'completed').length
   const lowStock = inventory.filter((item) => item.availableQty <= 10 || item.qcQty > 0).length
@@ -887,6 +870,42 @@ export async function updateAdminProduct(productId: string, patch: Partial<Admin
   return getAdminProducts().find((item) => item.id === productId) || null
 }
 
+function deriveCustomerTier(priceGroupId: string): CustomerTier {
+  const normalizedGroupId = priceGroupId.toLowerCase()
+
+  if (normalizedGroupId.includes('gold')) {
+    return 'gold'
+  }
+
+  if (normalizedGroupId.includes('silver')) {
+    return 'silver'
+  }
+
+  return 'standard'
+}
+
+function creditLimitForTier(tier: CustomerTier) {
+  const limits: Record<CustomerTier, number> = {
+    standard: 0,
+    silver: 900,
+    gold: 2500,
+  }
+
+  return limits[tier]
+}
+
+export async function updateStaffProfileRole(profileId: string, role: AdminStaffRole) {
+  const profile = staffProfiles.find((item) => item.id === profileId)
+
+  if (!profile) {
+    throw new Error('未找到员工账号。')
+  }
+
+  profile.role = role
+  profile.updatedAt = new Date().toISOString()
+  return { ...profile }
+}
+
 export function getCustomerAccounts() {
   return customers.map((customer) => ({ ...customer }))
 }
@@ -896,27 +915,6 @@ export function getB2BApprovals() {
     ...approval,
     interestedCategories: [...approval.interestedCategories],
   }))
-}
-
-export async function reviewB2BApproval(
-  approvalId: string,
-  status: Extract<B2BApprovalStatus, 'approved' | 'rejected'>,
-  priceGroupId: string,
-) {
-  const approval = b2bApprovals.find((item) => item.id === approvalId)
-
-  if (!approval) {
-    throw new Error('未找到 B2B 申请。')
-  }
-
-  approval.status = status
-  approval.requestedPriceGroupId = priceGroupId
-  approval.reviewNote =
-    status === 'approved'
-      ? `已通过，分配价格组 ${priceGroupId}。`
-      : '已拒绝：公司资料或采购量不符合要求。'
-
-  return getB2BApprovals().find((item) => item.id === approvalId) || null
 }
 
 export function getPriceGroups() {
@@ -935,12 +933,32 @@ function warnAdminFallback(scope: string, error: unknown) {
   console.warn(`[PartsPro] Supabase ${scope} fallback to mock data`, error)
 }
 
+function warnAdminDataError(scope: string, error: unknown) {
+  console.warn(`[PartsPro] Supabase ${scope} failed`, error)
+}
+
 async function hasRealSupabaseSession() {
   const {
     data: { session },
   } = await supabase.auth.getSession()
 
   return Boolean(session)
+}
+
+async function requireRealSupabaseAdminData(scope: string) {
+  if (!shouldUseSupabaseData) {
+    throw new Error(`${scope} 需要配置 Supabase URL 和 anon key。`)
+  }
+
+  if (await hasRealSupabaseSession()) {
+    return
+  }
+
+  if (hasDemoAuthProfile()) {
+    throw new Error(`${scope} 需要使用真实 Supabase 管理员账号，演示账号不会显示客户真实数据。`)
+  }
+
+  throw new Error(`${scope} 需要真实 Supabase 登录会话。`)
 }
 
 function mapAdminProduct(row: AdminProductRow): AdminProduct {
@@ -980,12 +998,18 @@ function mapAdminProduct(row: AdminProductRow): AdminProduct {
 function mapCustomer(row: CustomerRow): CustomerAccount {
   return {
     id: row.id,
+    userId: row.user_id || '',
     companyName: row.company_name || '',
     contactName: row.contact_name || '',
     email: row.email || '',
+    phone: row.phone || '',
     vatNumber: row.vat_number || '',
+    fiscalCode: row.fiscal_code || '',
     sdi: row.sdi || '',
     pec: row.pec || '',
+    registeredAddress: row.registered_address || '',
+    billingAddress: row.billing_address || '',
+    shippingAddress: row.shipping_address || '',
     tier: row.tier,
     priceGroupId: row.price_group_id || '',
     status: row.status,
@@ -995,6 +1019,9 @@ function mapCustomer(row: CustomerRow): CustomerAccount {
     lastOrderAt: row.last_order_at,
     creditLimit: Number(row.credit_limit),
     paymentTerms: row.payment_terms || '',
+    profileCompletedAt: row.profile_completed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   }
 }
 
@@ -1010,12 +1037,52 @@ function mapApproval(row: B2BApprovalRow): B2BApproval {
     sdi: row.sdi,
     pec: row.pec,
     companyType: row.company_type,
+    registeredAddress: row.registered_address,
+    shippingAddress: row.shipping_address,
     monthlyPurchase: row.monthly_purchase,
     interestedCategories: row.interested_categories || [],
+    paymentNeeds: row.payment_needs || [],
     status: row.status,
     submittedAt: row.submitted_at,
     requestedPriceGroupId: row.requested_price_group_id,
     reviewNote: row.review_note,
+  }
+}
+
+function mapInventoryItem(row: InventoryItemRow): InventoryItem {
+  return {
+    id: row.id,
+    skuCode: row.sku_code,
+    productName: row.product_name,
+    brand: row.brand,
+    model: row.model,
+    qualityGrade: row.quality_grade,
+    batchCode: row.batch_code,
+    location: row.location,
+    actualQty: row.actual_qty,
+    lockedQty: row.locked_qty,
+    availableQty: row.available_qty,
+    incomingQty: row.incoming_qty,
+    qcQty: row.qc_qty,
+    rmaQty: row.rma_qty,
+    defectiveQty: row.defective_qty,
+    supplier: row.supplier,
+    lastMovementAt: row.last_movement_at,
+  }
+}
+
+function mapStockMovement(row: StockMovementRow): StockMovement {
+  return {
+    id: row.id,
+    createdAt: row.created_at,
+    type: row.type,
+    skuCode: row.sku_code,
+    batchCode: row.batch_code,
+    location: row.location,
+    quantity: row.quantity,
+    reference: row.reference,
+    operator: row.operator,
+    note: row.note,
   }
 }
 
@@ -1052,6 +1119,122 @@ function mapBatch(row: BatchRow): AdminBatch {
   }
 }
 
+function mapStaffProfile(row: StaffProfileRow): AdminStaffProfile {
+  return {
+    id: row.id,
+    email: row.email,
+    role: row.role,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+async function findCustomerIdForApproval(approval: B2BApprovalRow) {
+  const normalizedEmail = approval.email.trim()
+
+  if (normalizedEmail) {
+    const { data, error } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('email', normalizedEmail)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      throw error
+    }
+
+    if (data?.id) {
+      return data.id as string
+    }
+  }
+
+  if (approval.vat_number) {
+    const { data, error } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('vat_number', approval.vat_number)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      throw error
+    }
+
+    if (data?.id) {
+      return data.id as string
+    }
+  }
+
+  return ''
+}
+
+async function fetchPriceGroupTerms(priceGroupId: string) {
+  const demoGroup = priceGroups.find((group) => group.id === priceGroupId)
+
+  if (!priceGroupId) {
+    return demoGroup?.paymentTerms || ''
+  }
+
+  const { data, error } = await supabase
+    .from('price_groups')
+    .select('payment_terms')
+    .eq('id', priceGroupId)
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  return String(data?.payment_terms || demoGroup?.paymentTerms || '')
+}
+
+async function upsertSupabaseCustomerFromApproval(approval: B2BApprovalRow, priceGroupId: string) {
+  const resolvedPriceGroupId = priceGroupId || approval.requested_price_group_id || 'pg-standard-b2b'
+  const tier = deriveCustomerTier(resolvedPriceGroupId)
+  const existingCustomerId = await findCustomerIdForApproval(approval)
+  const registeredAddress = approval.registered_address || approval.shipping_address || ''
+  const shippingAddress = approval.shipping_address || registeredAddress
+  const payload = {
+    company_name: approval.company_name || approval.email,
+    contact_name: approval.contact_name || approval.email,
+    email: approval.email,
+    phone: approval.phone || '',
+    vat_number: approval.vat_number || '',
+    fiscal_code: approval.fiscal_code || '',
+    sdi: approval.sdi || '',
+    pec: approval.pec || '',
+    registered_address: registeredAddress,
+    billing_address: registeredAddress,
+    shipping_address: shippingAddress,
+    tier,
+    price_group_id: resolvedPriceGroupId,
+    status: 'active' as const,
+    monthly_purchase: approval.monthly_purchase || '',
+    credit_limit: creditLimitForTier(tier),
+    payment_terms: await fetchPriceGroupTerms(resolvedPriceGroupId),
+    profile_completed_at: registeredAddress && shippingAddress && approval.phone ? new Date().toISOString() : null,
+  }
+
+  if (existingCustomerId) {
+    const { error } = await supabase.from('customers').update(payload).eq('id', existingCustomerId)
+
+    if (error) {
+      throw error
+    }
+
+    return
+  }
+
+  const { error } = await supabase.from('customers').insert(payload)
+
+  if (error) {
+    throw error
+  }
+}
+
 export async function fetchAdminProducts() {
   if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
     return getAdminProducts()
@@ -1072,6 +1255,51 @@ export async function fetchAdminProducts() {
   } catch (error) {
     warnAdminFallback('admin products', error)
     return getAdminProducts()
+  }
+}
+
+export async function fetchInventoryItems() {
+  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
+    return getInventoryItems()
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('inventory_items')
+      .select('*')
+      .order('last_movement_at', { ascending: false })
+
+    if (error) {
+      throw error
+    }
+
+    return data.map((row) => mapInventoryItem(row as InventoryItemRow))
+  } catch (error) {
+    warnAdminFallback('inventory items', error)
+    return getInventoryItems()
+  }
+}
+
+export async function fetchStockMovements() {
+  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
+    return getStockMovements()
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('stock_movements')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(200)
+
+    if (error) {
+      throw error
+    }
+
+    return data.map((row) => mapStockMovement(row as StockMovementRow))
+  } catch (error) {
+    warnAdminFallback('stock movements', error)
+    return getStockMovements()
   }
 }
 
@@ -1127,12 +1355,13 @@ export async function saveAdminProduct(productId: string, patch: Partial<AdminPr
 }
 
 export async function fetchCustomerAccounts() {
-  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
-    return getCustomerAccounts()
-  }
+  await requireRealSupabaseAdminData('客户管理')
 
   try {
-    const { data, error } = await supabase.from('customers').select('*').order('company_name')
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .order('created_at', { ascending: false })
 
     if (error) {
       throw error
@@ -1140,15 +1369,91 @@ export async function fetchCustomerAccounts() {
 
     return data.map((row) => mapCustomer(row as CustomerRow))
   } catch (error) {
-    warnAdminFallback('customers', error)
-    return getCustomerAccounts()
+    warnAdminDataError('customers', error)
+    throw error
   }
 }
 
-export async function fetchB2BApprovals() {
-  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
-    return getB2BApprovals()
+function buildCustomerUpdatePayload(patch: CustomerAccountPatch) {
+  const payload: Record<string, string | number | null> = {}
+
+  if (patch.status !== undefined) {
+    payload.status = patch.status
   }
+
+  if (patch.tier !== undefined) {
+    payload.tier = patch.tier
+  }
+
+  if (patch.priceGroupId !== undefined) {
+    payload.price_group_id = patch.priceGroupId || null
+  }
+
+  if (patch.monthlyPurchase !== undefined) {
+    payload.monthly_purchase = patch.monthlyPurchase
+  }
+
+  if (patch.creditLimit !== undefined) {
+    payload.credit_limit = patch.creditLimit
+  }
+
+  if (patch.paymentTerms !== undefined) {
+    payload.payment_terms = patch.paymentTerms
+  }
+
+  return payload
+}
+
+export async function saveCustomerAccount(customerId: string, patch: CustomerAccountPatch) {
+  await requireRealSupabaseAdminData('客户审批')
+
+  const payload = buildCustomerUpdatePayload(patch)
+
+  if (Object.keys(payload).length === 0) {
+    throw new Error('没有可保存的客户变更。')
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('customers')
+      .update(payload)
+      .eq('id', customerId)
+      .select('*')
+      .maybeSingle()
+
+    if (error) {
+      throw error
+    }
+
+    if (!data) {
+      throw new Error('未找到客户，或当前账号没有审批权限。')
+    }
+
+    return mapCustomer(data as CustomerRow)
+  } catch (error) {
+    warnAdminDataError('save customer', error)
+    throw error
+  }
+}
+
+export async function approveCustomerAccount(customerId: string, priceGroupId: string) {
+  await requireRealSupabaseAdminData('客户审批')
+
+  const resolvedPriceGroupId = priceGroupId || 'pg-standard-b2b'
+  const tier = deriveCustomerTier(resolvedPriceGroupId)
+  const paymentTerms = await fetchPriceGroupTerms(resolvedPriceGroupId)
+
+  return saveCustomerAccount(customerId, {
+    status: 'active',
+    tier,
+    priceGroupId: resolvedPriceGroupId,
+    creditLimit: creditLimitForTier(tier),
+    paymentTerms,
+  })
+}
+
+export async function fetchB2BApprovals() {
+  await requireRealSupabaseAdminData('B2B 审核')
 
   try {
     const { data, error } = await supabase
@@ -1162,8 +1467,8 @@ export async function fetchB2BApprovals() {
 
     return data.map((row) => mapApproval(row as B2BApprovalRow))
   } catch (error) {
-    warnAdminFallback('b2b approvals', error)
-    return getB2BApprovals()
+    warnAdminDataError('b2b approvals', error)
+    throw error
   }
 }
 
@@ -1172,9 +1477,7 @@ export async function approveB2BApplication(
   status: Extract<B2BApprovalStatus, 'approved' | 'rejected'>,
   priceGroupId: string,
 ) {
-  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
-    return reviewB2BApproval(approvalId, status, priceGroupId)
-  }
+  await requireRealSupabaseAdminData('B2B 审核')
 
   try {
     const { data, error } = await supabase
@@ -1196,15 +1499,22 @@ export async function approveB2BApplication(
       throw error
     }
 
+    if (data && status === 'approved') {
+      await upsertSupabaseCustomerFromApproval(data as B2BApprovalRow, priceGroupId)
+    }
+
     return data ? mapApproval(data as B2BApprovalRow) : null
   } catch (error) {
-    warnAdminFallback('review b2b approval', error)
-    return reviewB2BApproval(approvalId, status, priceGroupId)
+    warnAdminDataError('review b2b approval', error)
+    throw error
   }
 }
 
-export async function fetchPriceGroups() {
-  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
+export async function fetchPriceGroups(options: { realOnly?: boolean } = {}) {
+  if (options.realOnly) {
+    await requireRealSupabaseAdminData('价格组')
+  } else if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
+
     return getPriceGroups()
   }
 
@@ -1217,6 +1527,11 @@ export async function fetchPriceGroups() {
 
     return data.map((row) => mapPriceGroup(row as PriceGroupRow))
   } catch (error) {
+    if (options.realOnly) {
+      warnAdminDataError('price groups', error)
+      throw error
+    }
+
     warnAdminFallback('price groups', error)
     return getPriceGroups()
   }
@@ -1241,5 +1556,48 @@ export async function fetchAdminBatches() {
   } catch (error) {
     warnAdminFallback('batches', error)
     return getAdminBatches()
+  }
+}
+
+export async function fetchStaffProfiles() {
+  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
+    return getStaffProfiles()
+  }
+
+  try {
+    const { data, error } = await supabase.from('profiles').select('*').order('email')
+
+    if (error) {
+      throw error
+    }
+
+    return data.map((row) => mapStaffProfile(row as StaffProfileRow))
+  } catch (error) {
+    warnAdminFallback('staff profiles', error)
+    return getStaffProfiles()
+  }
+}
+
+export async function saveStaffProfileRole(profileId: string, role: AdminStaffRole) {
+  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
+    return updateStaffProfileRole(profileId, role)
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ role })
+      .eq('id', profileId)
+      .select('*')
+      .maybeSingle()
+
+    if (error) {
+      throw error
+    }
+
+    return data ? mapStaffProfile(data as StaffProfileRow) : null
+  } catch (error) {
+    warnAdminFallback('save staff profile', error)
+    return updateStaffProfileRole(profileId, role)
   }
 }

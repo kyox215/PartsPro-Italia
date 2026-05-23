@@ -2,13 +2,10 @@
 import { computed, h, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  AuditOutlined,
   AppstoreOutlined,
-  BarcodeOutlined,
   CloseOutlined,
   DashboardOutlined,
   DownOutlined,
-  FileDoneOutlined,
   HomeOutlined,
   InboxOutlined,
   MenuFoldOutlined,
@@ -36,10 +33,7 @@ const adminText = {
     orders: '订单',
     products: '商品 / PIM',
     inventory: '库存',
-    stockMovements: '库存流水',
-    batches: '批次',
     customers: '客户',
-    approvals: 'B2B 审核',
     prices: '价格组',
     users: '员工设置',
     search: '搜索订单、SKU、客户...',
@@ -55,10 +49,7 @@ const adminText = {
     orders: '订单',
     products: '商品 / PIM',
     inventory: '库存',
-    stockMovements: '库存流水',
-    batches: '批次',
     customers: '客户',
-    approvals: 'B2B 审核',
     prices: '价格组',
     users: '员工设置',
     search: '搜索订单、SKU、客户...',
@@ -94,24 +85,9 @@ const menuItems = computed(() => [
     label: text.value.inventory,
   },
   {
-    key: '/admin/stock-movements',
-    icon: () => h(FileDoneOutlined),
-    label: text.value.stockMovements,
-  },
-  {
-    key: '/admin/batches',
-    icon: () => h(BarcodeOutlined),
-    label: text.value.batches,
-  },
-  {
     key: '/admin/customers',
     icon: () => h(TeamOutlined),
     label: text.value.customers,
-  },
-  {
-    key: '/admin/b2b-approvals',
-    icon: () => h(AuditOutlined),
-    label: text.value.approvals,
   },
   {
     key: '/admin/prices',
@@ -134,17 +110,17 @@ const adminNavigationSections = computed(() => [
   {
     key: 'catalog',
     label: '商品与库存',
-    items: menuItems.value.slice(2, 6),
+    items: menuItems.value.slice(2, 4),
   },
   {
     key: 'b2b',
     label: '客户与价格',
-    items: menuItems.value.slice(6, 9),
+    items: menuItems.value.slice(4, 6),
   },
   {
     key: 'settings',
     label: '设置',
-    items: menuItems.value.slice(9),
+    items: menuItems.value.slice(6),
   },
 ])
 

@@ -2896,6 +2896,16 @@ a {
   overflow-x: auto;
 }
 
+.admin-table-card .ant-tabs-nav {
+  margin-bottom: 8px;
+}
+
+.admin-table-card .ant-tabs-tab {
+  padding: 6px 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .admin-taxonomy-card.ant-card {
   border-color: #e2e8f0;
   border-radius: 8px;

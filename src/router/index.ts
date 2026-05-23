@@ -19,8 +19,6 @@ const CheckoutPage = () => import('@/pages/storefront/CheckoutPage.vue')
 const RmaPage = () => import('@/pages/storefront/RmaPage.vue')
 const LegalPage = () => import('@/pages/storefront/LegalPage.vue')
 const PlaceholderPage = () => import('@/pages/storefront/PlaceholderPage.vue')
-const AdminB2BApprovalsPage = () => import('@/pages/admin/AdminB2BApprovalsPage.vue')
-const AdminBatchesPage = () => import('@/pages/admin/AdminBatchesPage.vue')
 const AdminCustomersPage = () => import('@/pages/admin/AdminCustomersPage.vue')
 const AdminDashboardPage = () => import('@/pages/admin/AdminDashboardPage.vue')
 const AdminInventoryPage = () => import('@/pages/admin/AdminInventoryPage.vue')
@@ -29,7 +27,7 @@ const AdminOrdersPage = () => import('@/pages/admin/AdminOrdersPage.vue')
 const AdminPlaceholderPage = () => import('@/pages/admin/AdminPlaceholderPage.vue')
 const AdminPricesPage = () => import('@/pages/admin/AdminPricesPage.vue')
 const AdminProductsPage = () => import('@/pages/admin/AdminProductsPage.vue')
-const AdminStockMovementsPage = () => import('@/pages/admin/AdminStockMovementsPage.vue')
+const AdminSettingsUsersPage = () => import('@/pages/admin/AdminSettingsUsersPage.vue')
 
 function getSafeReturnUrl(value: unknown) {
   const returnUrl = Array.isArray(value) ? value[0] : value
@@ -315,22 +313,12 @@ export const router = createRouter({
         {
           path: 'stock-movements',
           name: 'admin-stock-movements',
-          component: AdminStockMovementsPage,
-          meta: {
-            title: '库存流水',
-            description: '入库、出库、锁定、发货、RMA 和库存调整。',
-            access: 'staff',
-          },
+          redirect: { name: 'admin-inventory', query: { tab: 'movements' } },
         },
         {
           path: 'batches',
           name: 'admin-batches',
-          component: AdminBatchesPage,
-          meta: {
-            title: '批次',
-            description: '批次、供应商、QC、电池安全和追踪。',
-            access: 'staff',
-          },
+          redirect: { name: 'admin-inventory', query: { tab: 'batches' } },
         },
         {
           path: 'customers',
@@ -345,12 +333,7 @@ export const router = createRouter({
         {
           path: 'b2b-approvals',
           name: 'admin-b2b-approvals',
-          component: AdminB2BApprovalsPage,
-          meta: {
-            title: 'B2B 审核',
-            description: '审核开户申请、客户等级和价格组。',
-            access: 'staff',
-          },
+          redirect: { name: 'admin-customers', query: { tab: 'approvals' } },
         },
         {
           path: 'prices',
@@ -375,7 +358,7 @@ export const router = createRouter({
         {
           path: 'settings/users',
           name: 'admin-users',
-          component: AdminPlaceholderPage,
+          component: AdminSettingsUsersPage,
           meta: {
             title: '员工设置',
             description: '销售、仓库、采购和管理员角色。',

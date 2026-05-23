@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import {
-  getB2BApprovals,
+  fetchB2BApprovals,
   getInventoryItems,
   getStockMovements,
 } from '@/services/admin.service'
@@ -9,7 +9,7 @@ import {
   fetchAdminOrders,
   orderStatusFlow,
 } from '@/services/order.service'
-import type { AdminOrder, AdminOrderStatus, PaymentStatus, StockRisk } from '@/types/admin'
+import type { AdminOrder, AdminOrderStatus, B2BApproval, PaymentStatus, StockRisk } from '@/types/admin'
 import {
   labelApprovalStatus,
   labelMovementType,
@@ -20,7 +20,7 @@ import {
 
 const orders = ref<AdminOrder[]>([])
 const inventory = getInventoryItems()
-const approvals = getB2BApprovals()
+const approvals = ref<B2BApproval[]>([])
 const movements = getStockMovements()
 
 const priorityOrders = computed(() =>
@@ -36,7 +36,7 @@ const paymentQueue = computed(() =>
 )
 
 const approvalQueue = computed(() =>
-  approvals.filter((approval) => approval.status === 'submitted').slice(0, 4),
+  approvals.value.filter((approval) => approval.status === 'submitted').slice(0, 4),
 )
 
 const shipmentQueue = computed(() =>
@@ -145,7 +145,17 @@ async function loadDashboardOrders() {
   orders.value = await fetchAdminOrders()
 }
 
-onMounted(loadDashboardOrders)
+async function loadDashboardApprovals() {
+  try {
+    approvals.value = await fetchB2BApprovals()
+  } catch {
+    approvals.value = []
+  }
+}
+
+onMounted(async () => {
+  await Promise.all([loadDashboardOrders(), loadDashboardApprovals()])
+})
 </script>
 
 <template>

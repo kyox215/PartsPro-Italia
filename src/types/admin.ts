@@ -1,3 +1,5 @@
+import type { UserRole } from '@/types/auth'
+
 export type AdminOrderStatus =
   | 'submitted'
   | 'accepted'
@@ -130,12 +132,18 @@ export type CustomerStatus = 'active' | 'pending' | 'suspended'
 
 export type CustomerAccount = {
   id: string
+  userId: string
   companyName: string
   contactName: string
   email: string
+  phone: string
   vatNumber: string
+  fiscalCode: string
   sdi: string
   pec: string
+  registeredAddress: string
+  billingAddress: string
+  shippingAddress: string
   tier: CustomerTier
   priceGroupId: string
   status: CustomerStatus
@@ -145,7 +153,17 @@ export type CustomerAccount = {
   lastOrderAt: string | null
   creditLimit: number
   paymentTerms: string
+  profileCompletedAt: string | null
+  createdAt: string
+  updatedAt: string
 }
+
+export type CustomerAccountPatch = Partial<
+  Pick<
+    CustomerAccount,
+    'status' | 'tier' | 'priceGroupId' | 'monthlyPurchase' | 'creditLimit' | 'paymentTerms'
+  >
+>
 
 export type B2BApprovalStatus = 'submitted' | 'approved' | 'rejected'
 
@@ -160,8 +178,11 @@ export type B2BApproval = {
   sdi: string
   pec: string
   companyType: string
+  registeredAddress: string
+  shippingAddress: string
   monthlyPurchase: string
   interestedCategories: string[]
+  paymentNeeds: string[]
   status: B2BApprovalStatus
   submittedAt: string
   requestedPriceGroupId: string
@@ -197,4 +218,14 @@ export type AdminBatch = {
   msdsUrl: string
   un38Url: string
   notes: string
+}
+
+export type AdminStaffRole = Exclude<UserRole, 'guest'>
+
+export type AdminStaffProfile = {
+  id: string
+  email: string
+  role: AdminStaffRole
+  createdAt: string
+  updatedAt: string
 }

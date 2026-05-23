@@ -2,6 +2,7 @@ import type {
   AdminBatch,
   AdminOrderStatus,
   AdminProduct,
+  AdminStaffRole,
   B2BApprovalStatus,
   CustomerStatus,
   CustomerTier,
@@ -94,6 +95,14 @@ export const movementTypeLabels: Record<StockMovementType, string> = {
   adjustment: '库存调整',
 }
 
+export const staffRoleLabels: Record<AdminStaffRole, string> = {
+  customer: '客户账号',
+  sales: '销售',
+  warehouse: '仓库',
+  purchasing: '采购',
+  admin: '管理员',
+}
+
 export const categoryLabels: Record<string, string> = {
   Screens: '屏幕',
   Batteries: '电池',
@@ -153,4 +162,8 @@ export function labelQcStatus(value: AdminBatch['qcStatus']) {
 
 export function labelMovementType(value: StockMovementType) {
   return movementTypeLabels[value] || value
+}
+
+export function labelStaffRole(value: AdminStaffRole) {
+  return staffRoleLabels[value] || value
 }
