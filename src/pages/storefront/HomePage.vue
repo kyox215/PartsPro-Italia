@@ -67,6 +67,11 @@ const qualityLabels = computed<Record<string, string>>(() => {
 const copy = computed(() => {
   if (uiStore.language === 'zh') {
     return {
+      heroTag: '意大利 B2B 手机维修配件供应',
+      heroTitle: '为专业维修商准备的高周转配件采购平台',
+      heroText:
+        '从屏幕、电池、尾插到摄像头和耗材，PartsPro 把库存状态、质量等级、配送时效、发票资料和售后规则提前展示，帮助门店更快完成补货决策。',
+      heroBullets: ['意大利库存优先', '登录查看批发价', '订单与 RMA 可追踪'],
       primary: '进入商品目录',
       secondary: '申请 B2B 账户',
       visualTitle: '高周转维修配件',
@@ -85,6 +90,11 @@ const copy = computed(() => {
   }
 
   return {
+    heroTag: 'Fornitura B2B ricambi smartphone in Italia',
+    heroTitle: 'Ricambi selezionati per laboratori, negozi e rivenditori',
+    heroText:
+      'Schermi, batterie, connettori, fotocamere e consumabili sono organizzati per stock, qualita, compatibilita, fattura e RMA prima dell’ordine.',
+    heroBullets: ['Stock Italia prioritario', 'Prezzi B2B dopo login', 'Ordini e RMA tracciabili'],
     primary: 'Vedi catalogo',
     secondary: 'Richiedi account B2B',
     visualTitle: 'Ricambi ad alta rotazione',
@@ -271,6 +281,18 @@ onMounted(async () => {
   <main class="home-page customer-home home-marketing-page">
     <section class="customer-hero home-intro-hero">
       <div class="customer-hero-copy home-intro-copy home-intro-actions-only">
+        <div class="desktop-home-hero-message">
+          <span class="desktop-home-kicker">{{ copy.heroTag }}</span>
+          <h1>{{ copy.heroTitle }}</h1>
+          <p>{{ copy.heroText }}</p>
+          <div class="desktop-home-bullets">
+            <span v-for="bullet in copy.heroBullets" :key="bullet">
+              <CheckCircleOutlined />
+              {{ bullet }}
+            </span>
+          </div>
+        </div>
+
         <div class="home-hero-actions">
           <a-button type="primary" size="large" @click="goToProducts">
             {{ copy.primary }}
