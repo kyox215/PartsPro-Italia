@@ -7,7 +7,12 @@ import {
 } from '@/services/auth.service'
 import { readDemoAuthProfile, writeDemoAuthProfile } from '@/services/demo-auth.service'
 import type { AuthProfile, RouteAccess, UserRole } from '@/types/auth'
-import { staffRoles } from '@/types/auth'
+import {
+  defaultPermissionsForRole,
+  profileCanViewStaffSettings,
+  profileHasPermission,
+  staffRoles,
+} from '@/types/auth'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -19,9 +24,21 @@ export const useAuthStore = defineStore('auth', {
     authError: '',
   }),
   getters: {
-    isStaff: (state) => staffRoles.includes(state.role),
+    isStaff: (state) =>
+      staffRoles.includes(state.role) ||
+      Boolean(state.profile?.staffEnabled) ||
+      Boolean(state.profile?.permissions?.length),
     canViewCustomerPrices: (state) =>
-      state.isAuthenticated && (state.role === 'customer' || staffRoles.includes(state.role)),
+      state.isAuthenticated &&
+      (state.role === 'customer' ||
+        staffRoles.includes(state.role) ||
+        Boolean(state.profile?.staffEnabled)),
+    hasPermission:
+      (state) =>
+      (permission: Parameters<typeof profileHasPermission>[1]) =>
+        profileHasPermission(state.profile, permission),
+    canViewStaffSettings: (state) => profileCanViewStaffSettings(state.profile),
+    canManageStaffPermissions: (state) => profileHasPermission(state.profile, 'staff_settings.manage'),
     canAccess:
       (state) =>
       (access: RouteAccess = 'public') => {
@@ -34,7 +51,15 @@ export const useAuthStore = defineStore('auth', {
         }
 
         if (access === 'staff') {
-          return staffRoles.includes(state.role)
+          return (
+            staffRoles.includes(state.role) ||
+            Boolean(state.profile?.staffEnabled) ||
+            Boolean(state.profile?.permissions?.length)
+          )
+        }
+
+        if (access === 'staff-settings') {
+          return profileCanViewStaffSettings(state.profile)
         }
 
         return state.role === 'admin'
@@ -98,6 +123,8 @@ export const useAuthStore = defineStore('auth', {
         id: `demo-${role}`,
         email: `${role}@demo.partspro.local`,
         role,
+        permissions: defaultPermissionsForRole(role),
+        staffEnabled: staffRoles.includes(role),
         source: 'demo',
       }
       writeDemoAuthProfile(profile)

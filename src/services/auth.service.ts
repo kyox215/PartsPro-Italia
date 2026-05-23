@@ -1,12 +1,17 @@
 import type { User } from '@supabase/supabase-js'
 import { hasSupabaseConfig, supabase } from '@/lib/supabase'
 import type { AuthProfile, UserRole } from '@/types/auth'
+import { resolveStaffPermissions, staffRoles } from '@/types/auth'
 
 type ProfileRow = {
   role: UserRole
+  permissions: unknown
+  staff_enabled: boolean | null
 }
 
-function normalizeRole(role: unknown): UserRole {
+type ProfileState = Pick<AuthProfile, 'role' | 'permissions' | 'staffEnabled'>
+
+function normalizeRole(role: unknown): Exclude<UserRole, 'guest'> {
   if (
     role === 'customer' ||
     role === 'sales' ||
@@ -20,10 +25,10 @@ function normalizeRole(role: unknown): UserRole {
   return 'customer'
 }
 
-async function fetchProfileRole(user: User) {
+async function fetchProfileState(user: User): Promise<ProfileState> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role,permissions,staff_enabled')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -31,14 +36,23 @@ async function fetchProfileRole(user: User) {
     console.warn('[PartsPro] Supabase profile role fallback to app_metadata', error)
   }
 
-  return normalizeRole((data as ProfileRow | null)?.role || user.app_metadata?.role)
+  const row = data as ProfileRow | null
+  const role = normalizeRole(row?.role || user.app_metadata?.role)
+
+  return {
+    role,
+    permissions: resolveStaffPermissions(role, row?.permissions),
+    staffEnabled: Boolean(row?.staff_enabled) || staffRoles.includes(role),
+  }
 }
 
 async function profileFromUser(user: User): Promise<AuthProfile> {
+  const profileState = await fetchProfileState(user)
+
   return {
     id: user.id,
     email: user.email || 'unknown@partspro.local',
-    role: await fetchProfileRole(user),
+    ...profileState,
     source: 'supabase',
   }
 }

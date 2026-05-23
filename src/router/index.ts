@@ -19,6 +19,7 @@ const CheckoutPage = () => import('@/pages/storefront/CheckoutPage.vue')
 const RmaPage = () => import('@/pages/storefront/RmaPage.vue')
 const LegalPage = () => import('@/pages/storefront/LegalPage.vue')
 const PlaceholderPage = () => import('@/pages/storefront/PlaceholderPage.vue')
+const AdminCustomerDetailPage = () => import('@/pages/admin/AdminCustomerDetailPage.vue')
 const AdminCustomersPage = () => import('@/pages/admin/AdminCustomersPage.vue')
 const AdminDashboardPage = () => import('@/pages/admin/AdminDashboardPage.vue')
 const AdminInventoryPage = () => import('@/pages/admin/AdminInventoryPage.vue')
@@ -331,6 +332,16 @@ export const router = createRouter({
           },
         },
         {
+          path: 'customers/:id',
+          name: 'admin-customer-detail',
+          component: AdminCustomerDetailPage,
+          meta: {
+            title: '客户详情',
+            description: '客户主档、订单历史、售后、B2B 审核、商务信用和操作审计。',
+            access: 'staff',
+          },
+        },
+        {
           path: 'b2b-approvals',
           name: 'admin-b2b-approvals',
           redirect: { name: 'admin-customers', query: { tab: 'approvals' } },
@@ -361,8 +372,8 @@ export const router = createRouter({
           component: AdminSettingsUsersPage,
           meta: {
             title: '员工设置',
-            description: '销售、仓库、采购和管理员角色。',
-            access: 'admin',
+            description: '员工账号、后台角色和功能权限。',
+            access: 'staff-settings',
           },
         },
       ],

@@ -3,20 +3,37 @@ import type {
   AdminOrder,
   AdminOrderStatus,
   AdminProduct,
+  AdminProductPatch,
   AdminStaffProfile,
   AdminStaffRole,
+  AuditLog,
   B2BApproval,
   B2BApprovalStatus,
   CustomerAccount,
   CustomerAccountPatch,
+  CustomerDetail,
+  CustomerOrderFilters,
+  CustomerRmaCase,
+  CustomerTimelineItem,
   CustomerTier,
   InventoryItem,
   PriceGroup,
+  ProductImportPreview,
+  ProductImportResult,
   StockMovement,
   StockMovementType,
 } from '@/types/admin'
+import type { StaffPermission } from '@/types/auth'
 import { shouldUseSupabaseData, supabase } from '@/lib/supabase'
-import { hasDemoAuthProfile } from '@/services/demo-auth.service'
+import { hasDemoAuthProfile, readDemoAuthProfile } from '@/services/demo-auth.service'
+import {
+  defaultPermissionsForRole,
+  normalizeStaffPermissions,
+  profileHasPermission,
+  resolveStaffPermissions,
+  staffPermissionLabels,
+  staffRoles,
+} from '@/types/auth'
 
 type AdminProductRow = {
   id: string
@@ -25,13 +42,17 @@ type AdminProductRow = {
   brand: string
   model: string
   model_code: string
+  model_codes: string[] | null
   category: string
   quality_grade: string
   color: string
   frame: AdminProduct['frame']
+  stock_status: AdminProduct['stockStatus']
+  moq: number
   cost_price: number
   retail_price: number
   b2b_price: number
+  vat_mode: AdminProduct['vatMode']
   tier_prices: AdminProduct['tierPrices'] | null
   stock_qty: number
   location: string
@@ -39,14 +60,22 @@ type AdminProductRow = {
   supplier: string
   warranty_days: number
   weight_gram: number
+  image_path: string | null
+  image_alt: string | null
+  gallery_image_paths: string[] | null
   is_battery: boolean
   is_dangerous_goods: boolean
   msds_url: string
   un38_url: string
+  compatibility: AdminProduct['compatibility'] | null
   compatibility_models: string[] | null
   alternative_skus: string[] | null
   add_on_skus: string[] | null
+  highlights: string[] | null
   status: AdminProduct['status']
+  archived_at: string | null
+  archived_by: string | null
+  archive_reason: string | null
   updated_at: string
 }
 
@@ -73,9 +102,70 @@ type CustomerRow = {
   last_order_at: string | null
   credit_limit: number
   payment_terms: string | null
+  admin_note: string | null
   profile_completed_at: string | null
+  archived_at: string | null
+  archived_by: string | null
+  archive_reason: string | null
   created_at: string
   updated_at: string
+}
+
+type AuditLogRow = {
+  id: string
+  actor_id: string | null
+  actor_email: string | null
+  entity_type: AuditLog['entityType']
+  entity_id: string
+  action: string
+  summary: string
+  metadata: Record<string, unknown> | null
+  created_at: string
+}
+
+type CustomerTimelineOrderRow = {
+  id: string
+  order_no: string
+  customer_name?: string
+  customer_tier?: AdminOrder['customerTier']
+  status: AdminOrderStatus
+  payment_status?: AdminOrder['paymentStatus']
+  stock_risk?: AdminOrder['stockRisk']
+  total_net: number
+  vat?: number
+  shipping?: number
+  shipping_method?: string
+  fiscal?: Record<string, unknown> | null
+  delivery_address?: string
+  customer_note?: string
+  staff_note?: string
+  created_at: string
+  order_lines?: CustomerOrderLineRow[] | null
+}
+
+type CustomerOrderLineRow = {
+  id: string
+  sku_code: string
+  product_name: string
+  quality_grade: string
+  quantity: number
+  unit_price: number
+  stock_status: AdminOrder['lines'][number]['stockStatus']
+  batch_code: string
+  location: string
+}
+
+type CustomerTimelineRmaRow = {
+  id: string
+  user_id: string | null
+  order_no: string
+  sku_code: string
+  status: string
+  problem_type: string
+  description: string
+  quantity: number
+  requested_resolution: string
+  created_at: string
 }
 
 type B2BApprovalRow = {
@@ -166,6 +256,11 @@ type StaffProfileRow = {
   id: string
   email: string
   role: AdminStaffRole
+  permissions: unknown
+  staff_enabled: boolean | null
+  staff_enabled_by: string | null
+  staff_enabled_at: string | null
+  customers?: { company_name: string | null }[] | { company_name: string | null } | null
   created_at: string
   updated_at: string
 }
@@ -178,6 +273,37 @@ export const orderStatusFlow: AdminOrderStatus[] = [
   'shipped',
   'completed',
 ]
+
+const productImageBucket = 'product-images'
+const customerOrderSelect = `
+  id,
+  order_no,
+  customer_name,
+  customer_tier,
+  status,
+  payment_status,
+  stock_risk,
+  total_net,
+  vat,
+  shipping,
+  created_at,
+  shipping_method,
+  fiscal,
+  delivery_address,
+  customer_note,
+  staff_note,
+  order_lines (
+    id,
+    sku_code,
+    product_name,
+    quality_grade,
+    quantity,
+    unit_price,
+    stock_status,
+    batch_code,
+    location
+  )
+`
 
 const orders: AdminOrder[] = [
   {
@@ -512,13 +638,17 @@ const adminProducts: AdminProduct[] = [
     brand: 'Apple',
     model: 'iPhone 11',
     modelCode: 'A2111 / A2221 / A2223',
+    modelCodes: ['A2111', 'A2221', 'A2223'],
     category: 'Screens',
     qualityGrade: 'Soft OLED',
     color: 'Black',
     frame: 'Without Frame',
+    stockStatus: 'in_stock',
+    moq: 1,
     costPrice: 24.8,
     retailPrice: 49.9,
     b2bPrice: 32,
+    vatMode: 'IVA esclusa',
     tierPrices: [
       { minQty: 5, unitPrice: 30.8 },
       { minQty: 10, unitPrice: 29.6 },
@@ -529,14 +659,24 @@ const adminProducts: AdminProduct[] = [
     supplier: 'Shenzhen Display Co.',
     warrantyDays: 180,
     weightGram: 92,
+    imagePath: 'screens/IP11-SCR-SOFT-BLK.webp',
+    imageAlt: 'iPhone 11 display Soft OLED black without frame',
+    galleryImagePaths: [],
     isBattery: false,
     isDangerousGoods: false,
     msdsUrl: '',
     un38Url: '',
+    compatibility: [
+      { model: 'iPhone 11', code: 'A2111 / A2221 / A2223', note: 'Compatibile' },
+    ],
     compatibilityModels: ['iPhone 11 A2111', 'iPhone 11 A2221', 'iPhone 11 A2223'],
     alternativeSkus: ['IP11-SCR-HARD-BLK', 'IP11-SCR-TFT-BLK'],
     addOnSkus: ['TOOL-WATERPROOF-SET'],
+    highlights: ['Test before installation', 'B2B price after login', 'RMA tracciabile'],
     status: 'active',
+    archivedAt: null,
+    archivedBy: '',
+    archiveReason: '',
     updatedAt: '2026-05-22T10:40:00+02:00',
   },
   {
@@ -546,13 +686,17 @@ const adminProducts: AdminProduct[] = [
     brand: 'Apple',
     model: 'iPhone 12',
     modelCode: 'A2172 / A2402 / A2403',
+    modelCodes: ['A2172', 'A2402', 'A2403'],
     category: 'Batteries',
     qualityGrade: 'High Quality Compatible',
     color: 'Black',
     frame: 'N/A',
+    stockStatus: 'low_stock',
+    moq: 1,
     costPrice: 9.8,
     retailPrice: 24.9,
     b2bPrice: 14.5,
+    vatMode: 'IVA esclusa',
     tierPrices: [
       { minQty: 5, unitPrice: 13.8 },
       { minQty: 20, unitPrice: 12.9 },
@@ -563,14 +707,24 @@ const adminProducts: AdminProduct[] = [
     supplier: 'Battery Lab HK',
     warrantyDays: 180,
     weightGram: 48,
+    imagePath: 'batteries/IP12-BAT-HQ-2815.webp',
+    imageAlt: 'iPhone 12 compatible high quality battery',
+    galleryImagePaths: [],
     isBattery: true,
     isDangerousGoods: true,
     msdsUrl: 'MSDS-IP12-BAT-HQ.pdf',
     un38Url: 'UN38.3-IP12-BAT-HQ.pdf',
+    compatibility: [
+      { model: 'iPhone 12', code: 'A2172 / A2402 / A2403', note: 'Verificare connettore' },
+    ],
     compatibilityModels: ['iPhone 12 A2172', 'iPhone 12 A2402', 'iPhone 12 A2403'],
     alternativeSkus: ['IP12-BAT-OEM-PULL'],
     addOnSkus: ['TOOL-WATERPROOF-SET'],
+    highlights: ['Battery safety notice', 'MSDS/UN38.3 required', 'Low stock'],
     status: 'active',
+    archivedAt: null,
+    archivedBy: '',
+    archiveReason: '',
     updatedAt: '2026-05-22T09:28:00+02:00',
   },
   {
@@ -580,13 +734,17 @@ const adminProducts: AdminProduct[] = [
     brand: 'Samsung',
     model: 'Galaxy A52',
     modelCode: 'SM-A525F / SM-A526B',
+    modelCodes: ['SM-A525F', 'SM-A526B'],
     category: 'Charging Ports',
     qualityGrade: 'Compatible High Quality',
     color: 'Black',
     frame: 'N/A',
+    stockStatus: 'in_stock',
+    moq: 2,
     costPrice: 3.4,
     retailPrice: 12.9,
     b2bPrice: 5.9,
+    vatMode: 'IVA esclusa',
     tierPrices: [
       { minQty: 10, unitPrice: 5.4 },
       { minQty: 30, unitPrice: 4.9 },
@@ -597,14 +755,25 @@ const adminProducts: AdminProduct[] = [
     supplier: 'K-Tech Parts',
     warrantyDays: 120,
     weightGram: 12,
+    imagePath: 'charging-ports/SA52-CHG-EU-BLK.webp',
+    imageAlt: 'Samsung Galaxy A52 charging port flex EU version',
+    galleryImagePaths: [],
     isBattery: false,
     isDangerousGoods: false,
     msdsUrl: '',
     un38Url: '',
+    compatibility: [
+      { model: 'Galaxy A52', code: 'SM-A525F', note: 'EU version' },
+      { model: 'Galaxy A52 5G', code: 'SM-A526B', note: 'Verificare versione' },
+    ],
     compatibilityModels: ['Galaxy A52 SM-A525F', 'Galaxy A52 5G SM-A526B'],
     alternativeSkus: ['SA52-CHG-5G-BLK'],
     addOnSkus: [],
+    highlights: ['EU version', 'MOQ 2', 'Fast dispatch'],
     status: 'active',
+    archivedAt: null,
+    archivedBy: '',
+    archiveReason: '',
     updatedAt: '2026-05-22T08:56:00+02:00',
   },
   {
@@ -614,13 +783,17 @@ const adminProducts: AdminProduct[] = [
     brand: 'Xiaomi',
     model: 'Redmi Note 10',
     modelCode: 'M2101K7AG',
+    modelCodes: ['M2101K7AG'],
     category: 'Back Covers',
     qualityGrade: 'Compatible High Quality',
     color: 'Blue',
     frame: 'N/A',
+    stockStatus: 'incoming',
+    moq: 1,
     costPrice: 4.6,
     retailPrice: 14.9,
     b2bPrice: 7.8,
+    vatMode: 'IVA esclusa',
     tierPrices: [
       { minQty: 5, unitPrice: 7.2 },
       { minQty: 20, unitPrice: 6.7 },
@@ -631,14 +804,24 @@ const adminProducts: AdminProduct[] = [
     supplier: 'CN Mobile Parts',
     warrantyDays: 90,
     weightGram: 36,
+    imagePath: 'back-covers/RN10-BKC-BLU.webp',
+    imageAlt: 'Xiaomi Redmi Note 10 blue back cover',
+    galleryImagePaths: [],
     isBattery: false,
     isDangerousGoods: false,
     msdsUrl: '',
     un38Url: '',
+    compatibility: [
+      { model: 'Redmi Note 10', code: 'M2101K7AG', note: 'Blue version' },
+    ],
     compatibilityModels: ['Redmi Note 10 M2101K7AG'],
     alternativeSkus: ['RN10-BKC-BLK'],
     addOnSkus: ['TOOL-PRY-SET'],
+    highlights: ['Incoming stock', 'Color matched', 'B2B reserved price'],
     status: 'draft',
+    archivedAt: null,
+    archivedBy: '',
+    archiveReason: '',
     updatedAt: '2026-05-22T07:45:00+02:00',
   },
 ]
@@ -748,6 +931,11 @@ const staffProfiles: AdminStaffProfile[] = [
     id: 'profile-admin',
     email: 'admin@partspro.example',
     role: 'admin',
+    permissions: defaultPermissionsForRole('admin'),
+    staffEnabled: true,
+    staffEnabledBy: 'system',
+    staffEnabledAt: '2026-05-18T08:00:00+02:00',
+    customerCompanyName: 'PartsPro',
     createdAt: '2026-05-18T08:00:00+02:00',
     updatedAt: '2026-05-22T09:00:00+02:00',
   },
@@ -755,6 +943,11 @@ const staffProfiles: AdminStaffProfile[] = [
     id: 'profile-sales',
     email: 'sales@partspro.example',
     role: 'sales',
+    permissions: defaultPermissionsForRole('sales'),
+    staffEnabled: true,
+    staffEnabledBy: 'profile-admin',
+    staffEnabledAt: '2026-05-18T08:10:00+02:00',
+    customerCompanyName: 'PartsPro',
     createdAt: '2026-05-18T08:10:00+02:00',
     updatedAt: '2026-05-21T16:00:00+02:00',
   },
@@ -762,6 +955,11 @@ const staffProfiles: AdminStaffProfile[] = [
     id: 'profile-warehouse',
     email: 'warehouse@partspro.example',
     role: 'warehouse',
+    permissions: defaultPermissionsForRole('warehouse'),
+    staffEnabled: true,
+    staffEnabledBy: 'profile-admin',
+    staffEnabledAt: '2026-05-18T08:20:00+02:00',
+    customerCompanyName: 'PartsPro',
     createdAt: '2026-05-18T08:20:00+02:00',
     updatedAt: '2026-05-21T16:05:00+02:00',
   },
@@ -769,6 +967,11 @@ const staffProfiles: AdminStaffProfile[] = [
     id: 'profile-customer',
     email: 'amministrazione@mobilecarebari.example',
     role: 'customer',
+    permissions: [],
+    staffEnabled: false,
+    staffEnabledBy: '',
+    staffEnabledAt: null,
+    customerCompanyName: 'Mobile Care Bari',
     createdAt: '2026-05-20T12:40:00+02:00',
     updatedAt: '2026-05-20T12:45:00+02:00',
   },
@@ -831,7 +1034,10 @@ export function getStockMovements() {
 }
 
 export function getStaffProfiles() {
-  return staffProfiles.map((profile) => ({ ...profile }))
+  return staffProfiles.map((profile) => ({
+    ...profile,
+    permissions: [...profile.permissions],
+  }))
 }
 
 export function getAdminDashboardStats() {
@@ -849,10 +1055,14 @@ export function getAdminDashboardStats() {
 export function getAdminProducts() {
   return adminProducts.map((product) => ({
     ...product,
+    modelCodes: [...product.modelCodes],
     tierPrices: product.tierPrices.map((tier) => ({ ...tier })),
+    galleryImagePaths: [...product.galleryImagePaths],
+    compatibility: product.compatibility.map((item) => ({ ...item })),
     compatibilityModels: [...product.compatibilityModels],
     alternativeSkus: [...product.alternativeSkus],
     addOnSkus: [...product.addOnSkus],
+    highlights: [...product.highlights],
   }))
 }
 
@@ -867,6 +1077,97 @@ export async function updateAdminProduct(productId: string, patch: Partial<Admin
     updatedAt: new Date().toISOString(),
   })
 
+  return getAdminProducts().find((item) => item.id === productId) || null
+}
+
+function createLocalProductId(skuCode: string) {
+  return `pim-${skuCode.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`
+}
+
+export async function insertLocalAdminProduct(product: AdminProductPatch) {
+  const skuCode = product.skuCode?.trim()
+
+  if (!skuCode) {
+    throw new Error('SKU 不能为空。')
+  }
+
+  if (adminProducts.some((item) => item.skuCode.toLowerCase() === skuCode.toLowerCase())) {
+    throw new Error(`SKU ${skuCode} 已存在。`)
+  }
+
+  const now = new Date().toISOString()
+  const nextProduct: AdminProduct = {
+    id: createLocalProductId(skuCode),
+    skuCode,
+    name: product.name || skuCode,
+    brand: product.brand || '',
+    model: product.model || '',
+    modelCode: product.modelCode || '',
+    modelCodes: product.modelCodes || [],
+    category: product.category || '',
+    qualityGrade: product.qualityGrade || '',
+    color: product.color || '',
+    frame: product.frame || 'N/A',
+    stockStatus: product.stockStatus || 'incoming',
+    moq: product.moq || 1,
+    costPrice: product.costPrice || 0,
+    retailPrice: product.retailPrice || 0,
+    b2bPrice: product.b2bPrice || 0,
+    vatMode: product.vatMode || 'IVA esclusa',
+    tierPrices: product.tierPrices || [],
+    stockQty: product.stockQty || 0,
+    location: product.location || '',
+    batchCode: product.batchCode || '',
+    supplier: product.supplier || '',
+    warrantyDays: product.warrantyDays || 180,
+    weightGram: product.weightGram || 0,
+    imagePath: product.imagePath || '',
+    imageAlt: product.imageAlt || product.name || skuCode,
+    galleryImagePaths: product.galleryImagePaths || [],
+    isBattery: Boolean(product.isBattery),
+    isDangerousGoods: Boolean(product.isDangerousGoods),
+    msdsUrl: product.msdsUrl || '',
+    un38Url: product.un38Url || '',
+    compatibility: product.compatibility || [],
+    compatibilityModels: product.compatibilityModels || [],
+    alternativeSkus: product.alternativeSkus || [],
+    addOnSkus: product.addOnSkus || [],
+    highlights: product.highlights || [],
+    status: product.status || 'draft',
+    archivedAt: null,
+    archivedBy: '',
+    archiveReason: '',
+    updatedAt: now,
+  }
+
+  adminProducts.unshift(nextProduct)
+  return getAdminProducts().find((item) => item.id === nextProduct.id) || nextProduct
+}
+
+export async function archiveLocalAdminProduct(productId: string, reason: string) {
+  const product = adminProducts.find((item) => item.id === productId)
+
+  if (!product) {
+    throw new Error('未找到商品。')
+  }
+
+  product.archivedAt = new Date().toISOString()
+  product.archiveReason = reason
+  product.updatedAt = new Date().toISOString()
+  return getAdminProducts().find((item) => item.id === productId) || null
+}
+
+export async function restoreLocalAdminProduct(productId: string) {
+  const product = adminProducts.find((item) => item.id === productId)
+
+  if (!product) {
+    throw new Error('未找到商品。')
+  }
+
+  product.archivedAt = null
+  product.archivedBy = ''
+  product.archiveReason = ''
+  product.updatedAt = new Date().toISOString()
   return getAdminProducts().find((item) => item.id === productId) || null
 }
 
@@ -895,15 +1196,31 @@ function creditLimitForTier(tier: CustomerTier) {
 }
 
 export async function updateStaffProfileRole(profileId: string, role: AdminStaffRole) {
+  return updateStaffProfilePermissions(profileId, role, defaultPermissionsForRole(role))
+}
+
+export async function updateStaffProfilePermissions(
+  profileId: string,
+  role: AdminStaffRole,
+  permissions: StaffPermission[],
+) {
   const profile = staffProfiles.find((item) => item.id === profileId)
 
   if (!profile) {
     throw new Error('未找到员工账号。')
   }
 
+  const normalizedPermissions = normalizeStaffPermissions(permissions, role)
+  ensureLocalPermissionManagerRemains(profileId, role, normalizedPermissions)
+
   profile.role = role
+  profile.permissions = normalizedPermissions
+  profile.staffEnabled = role !== 'customer' || normalizedPermissions.length > 0
+  if (profile.staffEnabled) {
+    profile.staffEnabledAt = profile.staffEnabledAt || new Date().toISOString()
+  }
   profile.updatedAt = new Date().toISOString()
-  return { ...profile }
+  return { ...profile, permissions: [...profile.permissions] }
 }
 
 export function getCustomerAccounts() {
@@ -955,10 +1272,264 @@ async function requireRealSupabaseAdminData(scope: string) {
   }
 
   if (hasDemoAuthProfile()) {
-    throw new Error(`${scope} 需要使用真实 Supabase 管理员账号，演示账号不会显示客户真实数据。`)
+    throw new Error(`${scope} 需要使用真实 Supabase 管理员账号，演示账号不会显示后台真实数据。`)
   }
 
   throw new Error(`${scope} 需要真实 Supabase 登录会话。`)
+}
+
+async function getCurrentActor() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  return {
+    id: session?.user?.id || '',
+    email: session?.user?.email || '',
+  }
+}
+
+async function requireCurrentAdmin(scope: string) {
+  await requireRealSupabaseAdminData(scope)
+  const actor = await getCurrentActor()
+
+  if (!actor.id) {
+    throw new Error(`${scope} 需要管理员账号。`)
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', actor.id)
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  if (data?.role !== 'admin') {
+    throw new Error(`${scope} 仅管理员可操作。`)
+  }
+}
+
+function normalizeAdminStaffRole(value: unknown): AdminStaffRole {
+  if (
+    value === 'customer' ||
+    value === 'sales' ||
+    value === 'warehouse' ||
+    value === 'purchasing' ||
+    value === 'admin'
+  ) {
+    return value
+  }
+
+  return 'customer'
+}
+
+function isPermissionManager(role: AdminStaffRole, permissions: unknown) {
+  return (
+    role === 'admin' ||
+    normalizeStaffPermissions(permissions, role).includes('staff_settings.manage')
+  )
+}
+
+function permissionSummary(permissions: StaffPermission[]) {
+  return permissions.map((permission) => staffPermissionLabels[permission]).join('、') || '无功能权限'
+}
+
+async function requireStaffPermissionManager(scope: string) {
+  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
+    const demoProfile = readDemoAuthProfile()
+
+    if (!profileHasPermission(demoProfile, 'staff_settings.manage')) {
+      throw new Error(`${scope} 需要员工权限管理权限。`)
+    }
+
+    return {
+      id: demoProfile?.id || 'demo-admin',
+      email: demoProfile?.email || 'demo@partspro.local',
+      role: normalizeAdminStaffRole(demoProfile?.role),
+      permissions: normalizeStaffPermissions(demoProfile?.permissions, demoProfile?.role),
+    }
+  }
+
+  await requireRealSupabaseAdminData(scope)
+  const actor = await getCurrentActor()
+
+  if (!actor.id) {
+    throw new Error(`${scope} 需要真实登录账号。`)
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('role,permissions')
+    .eq('id', actor.id)
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  const role = normalizeAdminStaffRole((data as Pick<StaffProfileRow, 'role'> | null)?.role)
+  const permissions = normalizeStaffPermissions(
+    (data as Pick<StaffProfileRow, 'permissions'> | null)?.permissions,
+    role,
+  )
+
+  if (!isPermissionManager(role, permissions)) {
+    throw new Error(`${scope} 需要员工权限管理权限。`)
+  }
+
+  return {
+    ...actor,
+    role,
+    permissions,
+  }
+}
+
+function ensureCanAssignStaffRole(
+  actorRole: AdminStaffRole,
+  nextRole: AdminStaffRole,
+  nextPermissions: StaffPermission[],
+  previousPermissions: StaffPermission[] = [],
+) {
+  if (nextRole === 'admin' && actorRole !== 'admin') {
+    throw new Error('只有超级管理员可以把账号提升为管理员。')
+  }
+
+  if (actorRole !== 'admin') {
+    const nextStaffSettings = nextPermissions.filter((permission) => permission.startsWith('staff_settings.'))
+    const previousStaffSettings = previousPermissions.filter((permission) =>
+      permission.startsWith('staff_settings.'),
+    )
+    const previousSet = new Set(previousStaffSettings)
+    const hasStaffSettingsChanged =
+      nextStaffSettings.length !== previousStaffSettings.length ||
+      nextStaffSettings.some((permission) => !previousSet.has(permission))
+
+    if (hasStaffSettingsChanged) {
+      throw new Error('非超级管理员只能分配普通业务权限，不能授予或移除员工设置权限。')
+    }
+  }
+}
+
+function ensureLocalPermissionManagerRemains(
+  profileId: string,
+  nextRole: AdminStaffRole,
+  nextPermissions: StaffPermission[],
+) {
+  const remainingManagers = staffProfiles.filter((profile) => {
+    if (profile.id === profileId) {
+      return isPermissionManager(nextRole, nextPermissions)
+    }
+
+    return isPermissionManager(profile.role, profile.permissions)
+  })
+
+  if (remainingManagers.length === 0) {
+    throw new Error('至少需要保留一个管理员或员工权限管理员，避免锁死后台。')
+  }
+}
+
+async function ensureRemotePermissionManagerRemains(
+  profileId: string,
+  nextRole: AdminStaffRole,
+  nextPermissions: StaffPermission[],
+) {
+  const { data, error } = await supabase.from('profiles').select('id,role,permissions')
+
+  if (error) {
+    throw error
+  }
+
+  const remainingManagers = (data || []).filter((row) => {
+    const profile = row as Pick<StaffProfileRow, 'id' | 'role' | 'permissions'>
+    if (profile.id === profileId) {
+      return isPermissionManager(nextRole, nextPermissions)
+    }
+
+    return isPermissionManager(normalizeAdminStaffRole(profile.role), profile.permissions)
+  })
+
+  if (remainingManagers.length === 0) {
+    throw new Error('至少需要保留一个管理员或员工权限管理员，避免锁死后台。')
+  }
+}
+
+async function recordAdminAuditLog(
+  entityType: AuditLog['entityType'],
+  entityId: string,
+  action: string,
+  summary: string,
+  metadata: Record<string, unknown> = {},
+) {
+  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
+    return null
+  }
+
+  const actor = await getCurrentActor()
+  const { error } = await supabase.from('admin_audit_logs').insert({
+    actor_id: actor.id || null,
+    actor_email: actor.email,
+    entity_type: entityType,
+    entity_id: entityId,
+    action,
+    summary,
+    metadata,
+  })
+
+  if (error) {
+    warnAdminDataError('admin audit log', error)
+  }
+
+  return null
+}
+
+function cleanString(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function buildProductPayload(patch: AdminProductPatch, options: { includeStockQty?: boolean } = {}) {
+  const payload: Record<string, unknown> = {}
+
+  if (patch.skuCode !== undefined) payload.sku_code = cleanString(patch.skuCode)
+  if (patch.name !== undefined) payload.name = cleanString(patch.name)
+  if (patch.brand !== undefined) payload.brand = cleanString(patch.brand)
+  if (patch.model !== undefined) payload.model = cleanString(patch.model)
+  if (patch.modelCode !== undefined) payload.model_code = cleanString(patch.modelCode)
+  if (patch.modelCodes !== undefined) payload.model_codes = patch.modelCodes
+  if (patch.category !== undefined) payload.category = cleanString(patch.category)
+  if (patch.qualityGrade !== undefined) payload.quality_grade = cleanString(patch.qualityGrade)
+  if (patch.color !== undefined) payload.color = cleanString(patch.color)
+  if (patch.frame !== undefined) payload.frame = patch.frame
+  if (patch.stockStatus !== undefined) payload.stock_status = patch.stockStatus
+  if (patch.moq !== undefined) payload.moq = patch.moq
+  if (patch.costPrice !== undefined) payload.cost_price = patch.costPrice
+  if (patch.retailPrice !== undefined) payload.retail_price = patch.retailPrice
+  if (patch.b2bPrice !== undefined) payload.b2b_price = patch.b2bPrice
+  if (patch.vatMode !== undefined) payload.vat_mode = patch.vatMode
+  if (patch.tierPrices !== undefined) payload.tier_prices = patch.tierPrices
+  if (options.includeStockQty && patch.stockQty !== undefined) payload.stock_qty = patch.stockQty
+  if (patch.location !== undefined) payload.location = cleanString(patch.location)
+  if (patch.batchCode !== undefined) payload.batch_code = cleanString(patch.batchCode)
+  if (patch.supplier !== undefined) payload.supplier = cleanString(patch.supplier)
+  if (patch.warrantyDays !== undefined) payload.warranty_days = patch.warrantyDays
+  if (patch.weightGram !== undefined) payload.weight_gram = patch.weightGram
+  if (patch.imagePath !== undefined) payload.image_path = cleanString(patch.imagePath)
+  if (patch.imageAlt !== undefined) payload.image_alt = cleanString(patch.imageAlt)
+  if (patch.galleryImagePaths !== undefined) payload.gallery_image_paths = patch.galleryImagePaths
+  if (patch.isBattery !== undefined) payload.is_battery = patch.isBattery
+  if (patch.isDangerousGoods !== undefined) payload.is_dangerous_goods = patch.isDangerousGoods
+  if (patch.msdsUrl !== undefined) payload.msds_url = cleanString(patch.msdsUrl)
+  if (patch.un38Url !== undefined) payload.un38_url = cleanString(patch.un38Url)
+  if (patch.compatibility !== undefined) payload.compatibility = patch.compatibility
+  if (patch.compatibilityModels !== undefined) payload.compatibility_models = patch.compatibilityModels
+  if (patch.alternativeSkus !== undefined) payload.alternative_skus = patch.alternativeSkus
+  if (patch.addOnSkus !== undefined) payload.add_on_skus = patch.addOnSkus
+  if (patch.highlights !== undefined) payload.highlights = patch.highlights
+  if (patch.status !== undefined) payload.status = patch.status
+
+  return payload
 }
 
 function mapAdminProduct(row: AdminProductRow): AdminProduct {
@@ -969,13 +1540,17 @@ function mapAdminProduct(row: AdminProductRow): AdminProduct {
     brand: row.brand,
     model: row.model,
     modelCode: row.model_code,
+    modelCodes: row.model_codes || [],
     category: row.category,
     qualityGrade: row.quality_grade,
     color: row.color,
     frame: row.frame,
+    stockStatus: row.stock_status,
+    moq: row.moq,
     costPrice: Number(row.cost_price),
     retailPrice: Number(row.retail_price),
     b2bPrice: Number(row.b2b_price),
+    vatMode: row.vat_mode,
     tierPrices: row.tier_prices || [],
     stockQty: row.stock_qty,
     location: row.location,
@@ -983,14 +1558,22 @@ function mapAdminProduct(row: AdminProductRow): AdminProduct {
     supplier: row.supplier,
     warrantyDays: row.warranty_days,
     weightGram: row.weight_gram,
+    imagePath: row.image_path || '',
+    imageAlt: row.image_alt || row.name,
+    galleryImagePaths: row.gallery_image_paths || [],
     isBattery: row.is_battery,
     isDangerousGoods: row.is_dangerous_goods,
     msdsUrl: row.msds_url,
     un38Url: row.un38_url,
+    compatibility: row.compatibility || [],
     compatibilityModels: row.compatibility_models || [],
     alternativeSkus: row.alternative_skus || [],
     addOnSkus: row.add_on_skus || [],
+    highlights: row.highlights || [],
     status: row.status,
+    archivedAt: row.archived_at,
+    archivedBy: row.archived_by || '',
+    archiveReason: row.archive_reason || '',
     updatedAt: row.updated_at,
   }
 }
@@ -1019,9 +1602,88 @@ function mapCustomer(row: CustomerRow): CustomerAccount {
     lastOrderAt: row.last_order_at,
     creditLimit: Number(row.credit_limit),
     paymentTerms: row.payment_terms || '',
+    adminNote: row.admin_note || '',
     profileCompletedAt: row.profile_completed_at,
+    archivedAt: row.archived_at,
+    archivedBy: row.archived_by || '',
+    archiveReason: row.archive_reason || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  }
+}
+
+function mapAuditLog(row: AuditLogRow): AuditLog {
+  return {
+    id: row.id,
+    actorId: row.actor_id || '',
+    actorEmail: row.actor_email || '',
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    action: row.action,
+    summary: row.summary,
+    metadata: row.metadata || {},
+    createdAt: row.created_at,
+  }
+}
+
+function mapCustomerOrderFiscal(rawFiscal: Record<string, unknown> | null): AdminOrder['fiscal'] {
+  const fiscal = rawFiscal || {}
+
+  return {
+    vatNumber: String(fiscal.vatNumber || ''),
+    fiscalCode: String(fiscal.fiscalCode || ''),
+    sdi: String(fiscal.sdi || ''),
+    pec: String(fiscal.pec || ''),
+  }
+}
+
+function mapCustomerOrderLine(row: CustomerOrderLineRow): AdminOrder['lines'][number] {
+  return {
+    skuCode: row.sku_code,
+    productName: row.product_name,
+    qualityGrade: row.quality_grade,
+    quantity: Number(row.quantity),
+    unitPrice: Number(row.unit_price),
+    stockStatus: row.stock_status,
+    batchCode: row.batch_code,
+    location: row.location,
+  }
+}
+
+function mapCustomerOrder(row: CustomerTimelineOrderRow): AdminOrder {
+  return {
+    id: row.id,
+    orderNo: row.order_no,
+    customerName: row.customer_name || '',
+    customerTier: row.customer_tier || 'standard',
+    status: row.status,
+    paymentStatus: row.payment_status || 'pending',
+    stockRisk: row.stock_risk || 'clear',
+    totalNet: Number(row.total_net),
+    vat: Number(row.vat || 0),
+    shipping: Number(row.shipping || 0),
+    createdAt: row.created_at,
+    shippingMethod: row.shipping_method || '',
+    fiscal: mapCustomerOrderFiscal(row.fiscal || null),
+    deliveryAddress: row.delivery_address || '',
+    customerNote: row.customer_note || '',
+    staffNote: row.staff_note || '',
+    lines: (row.order_lines || []).map((line) => mapCustomerOrderLine(line)),
+  }
+}
+
+function mapCustomerRma(row: CustomerTimelineRmaRow): CustomerRmaCase {
+  return {
+    id: row.id,
+    userId: row.user_id || '',
+    orderNo: row.order_no,
+    skuCode: row.sku_code,
+    status: row.status,
+    problemType: row.problem_type,
+    description: row.description,
+    quantity: Number(row.quantity),
+    requestedResolution: row.requested_resolution,
+    createdAt: row.created_at,
   }
 }
 
@@ -1120,10 +1782,21 @@ function mapBatch(row: BatchRow): AdminBatch {
 }
 
 function mapStaffProfile(row: StaffProfileRow): AdminStaffProfile {
+  const role = normalizeAdminStaffRole(row.role)
+  const customerRelation = row.customers
+  const customerCompanyName = Array.isArray(customerRelation)
+    ? customerRelation[0]?.company_name || ''
+    : customerRelation?.company_name || ''
+
   return {
     id: row.id,
     email: row.email,
-    role: row.role,
+    role,
+    permissions: resolveStaffPermissions(role, row.permissions),
+    staffEnabled: Boolean(row.staff_enabled) || staffRoles.includes(role),
+    staffEnabledBy: row.staff_enabled_by || '',
+    staffEnabledAt: row.staff_enabled_at,
+    customerCompanyName,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -1137,6 +1810,7 @@ async function findCustomerIdForApproval(approval: B2BApprovalRow) {
       .from('customers')
       .select('id')
       .eq('email', normalizedEmail)
+      .is('archived_at', null)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -1155,6 +1829,7 @@ async function findCustomerIdForApproval(approval: B2BApprovalRow) {
       .from('customers')
       .select('id')
       .eq('vat_number', approval.vat_number)
+      .is('archived_at', null)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -1236,9 +1911,7 @@ async function upsertSupabaseCustomerFromApproval(approval: B2BApprovalRow, pric
 }
 
 export async function fetchAdminProducts() {
-  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
-    return getAdminProducts()
-  }
+  await requireRealSupabaseAdminData('商品管理')
 
   try {
     const { data, error } = await supabase
@@ -1253,8 +1926,8 @@ export async function fetchAdminProducts() {
 
     return data.map((row) => mapAdminProduct(row as AdminProductRow))
   } catch (error) {
-    warnAdminFallback('admin products', error)
-    return getAdminProducts()
+    warnAdminDataError('admin products', error)
+    throw error
   }
 }
 
@@ -1304,38 +1977,10 @@ export async function fetchStockMovements() {
 }
 
 export async function saveAdminProduct(productId: string, patch: Partial<AdminProduct>) {
-  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
-    return updateAdminProduct(productId, patch)
-  }
+  await requireRealSupabaseAdminData('商品保存')
 
   try {
-    const payload = {
-      name: patch.name,
-      brand: patch.brand,
-      model: patch.model,
-      model_code: patch.modelCode,
-      category: patch.category,
-      quality_grade: patch.qualityGrade,
-      color: patch.color,
-      frame: patch.frame,
-      cost_price: patch.costPrice,
-      retail_price: patch.retailPrice,
-      b2b_price: patch.b2bPrice,
-      stock_qty: patch.stockQty,
-      location: patch.location,
-      batch_code: patch.batchCode,
-      supplier: patch.supplier,
-      warranty_days: patch.warrantyDays,
-      weight_gram: patch.weightGram,
-      is_battery: patch.isBattery,
-      is_dangerous_goods: patch.isDangerousGoods,
-      msds_url: patch.msdsUrl,
-      un38_url: patch.un38Url,
-      compatibility_models: patch.compatibilityModels,
-      alternative_skus: patch.alternativeSkus,
-      add_on_skus: patch.addOnSkus,
-      status: patch.status,
-    }
+    const payload = buildProductPayload(patch)
     const { data, error } = await supabase
       .from('products')
       .update(payload)
@@ -1347,11 +1992,189 @@ export async function saveAdminProduct(productId: string, patch: Partial<AdminPr
       throw error
     }
 
+    await recordAdminAuditLog('product', productId, 'product.update', `更新商品 ${patch.skuCode || productId}`, {
+      changedFields: Object.keys(payload),
+    })
+
     return data ? mapAdminProduct(data as AdminProductRow) : null
   } catch (error) {
-    warnAdminFallback('save admin product', error)
-    return updateAdminProduct(productId, patch)
+    warnAdminDataError('save admin product', error)
+    throw error
   }
+}
+
+export async function createAdminProduct(product: AdminProductPatch) {
+  await requireRealSupabaseAdminData('商品新增')
+
+  const payload = buildProductPayload(
+    {
+      ...product,
+      status: product.status || 'draft',
+      stockStatus: product.stockStatus || 'incoming',
+      moq: product.moq || 1,
+      vatMode: product.vatMode || 'IVA esclusa',
+      warrantyDays: product.warrantyDays || 180,
+      stockQty: product.stockQty || 0,
+    },
+    { includeStockQty: true },
+  )
+
+  if (!payload.sku_code || !payload.name || !payload.brand || !payload.model || !payload.category) {
+    throw new Error('新增商品需要 SKU、名称、品牌、机型和分类。')
+  }
+
+  const { data, error } = await supabase.from('products').insert(payload).select('*').maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  await recordAdminAuditLog('product', String(data?.id || product.skuCode || ''), 'product.create', `新增商品 ${product.skuCode}`, {
+    skuCode: product.skuCode,
+  })
+
+  return data ? mapAdminProduct(data as AdminProductRow) : null
+}
+
+export async function archiveAdminProduct(productId: string, reason: string) {
+  await requireRealSupabaseAdminData('商品归档')
+  const actor = await getCurrentActor()
+  const { data, error } = await supabase
+    .from('products')
+    .update({
+      archived_at: new Date().toISOString(),
+      archived_by: actor.id || null,
+      archive_reason: reason,
+      status: 'hidden',
+    })
+    .eq('id', productId)
+    .select('*')
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  await recordAdminAuditLog('product', productId, 'product.archive', `归档商品：${reason}`, { reason })
+  return data ? mapAdminProduct(data as AdminProductRow) : null
+}
+
+export async function restoreAdminProduct(productId: string) {
+  await requireCurrentAdmin('商品恢复')
+  const { data, error } = await supabase
+    .from('products')
+    .update({
+      archived_at: null,
+      archived_by: null,
+      archive_reason: '',
+    })
+    .eq('id', productId)
+    .select('*')
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  await recordAdminAuditLog('product', productId, 'product.restore', '恢复归档商品')
+  return data ? mapAdminProduct(data as AdminProductRow) : null
+}
+
+export async function bulkImportProducts(previews: ProductImportPreview[]): Promise<ProductImportResult> {
+  const validRows = previews.filter((preview) => preview.errors.length === 0)
+  const result: ProductImportResult = {
+    created: 0,
+    updated: 0,
+    skipped: previews.length - validRows.length,
+    errors: previews
+      .filter((preview) => preview.errors.length > 0)
+      .map((preview) => ({
+        rowNumber: preview.rowNumber,
+        message: preview.errors.join('；'),
+      })),
+  }
+
+  if (!validRows.length) {
+    return result
+  }
+
+  await requireCurrentAdmin('商品批量导入')
+
+  const existingSkuResponse = await supabase
+    .from('products')
+    .select('sku_code')
+    .in(
+      'sku_code',
+      validRows.map((row) => String(row.product.skuCode || '')),
+    )
+
+  if (existingSkuResponse.error) {
+    throw existingSkuResponse.error
+  }
+
+  const existingSkuCodes = new Set(
+    existingSkuResponse.data?.map((row) => String(row.sku_code).toLowerCase()) || [],
+  )
+
+  const payloads = validRows.map((row) =>
+    buildProductPayload(
+      {
+        status: 'draft',
+        stockStatus: 'incoming',
+        moq: 1,
+        vatMode: 'IVA esclusa',
+        warrantyDays: 180,
+        stockQty: 0,
+        ...row.product,
+      },
+      { includeStockQty: true },
+    ),
+  )
+
+  const { error } = await supabase.from('products').upsert(payloads, { onConflict: 'sku_code' })
+
+  if (error) {
+    throw error
+  }
+
+  for (const row of validRows) {
+    if (existingSkuCodes.has(String(row.product.skuCode || '').toLowerCase())) {
+      result.updated += 1
+    } else {
+      result.created += 1
+    }
+  }
+
+  await recordAdminAuditLog('product', 'bulk-import', 'product.bulk_import', `批量导入 ${validRows.length} 个 SKU`, {
+    created: result.created,
+    updated: result.updated,
+    skipped: result.skipped,
+  })
+
+  return result
+}
+
+export async function uploadProductImage(file: File, skuCode: string, slot: 'main' | 'gallery' = 'main') {
+  await requireRealSupabaseAdminData('商品图片上传')
+
+  const extension = file.name.split('.').pop() || 'webp'
+  const safeSku = skuCode.trim().toUpperCase().replace(/[^A-Z0-9-]+/g, '-')
+  const path = `${slot === 'main' ? 'products' : 'products/gallery'}/${safeSku}-${Date.now()}.${extension}`
+  const { data, error } = await supabase.storage.from(productImageBucket).upload(path, file, {
+    cacheControl: '3600',
+    upsert: true,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  await recordAdminAuditLog('product', safeSku, 'product.image_upload', `上传商品图片 ${safeSku}`, {
+    path: data.path,
+    slot,
+  })
+
+  return data.path
 }
 
 export async function fetchCustomerAccounts() {
@@ -1377,6 +2200,50 @@ export async function fetchCustomerAccounts() {
 function buildCustomerUpdatePayload(patch: CustomerAccountPatch) {
   const payload: Record<string, string | number | null> = {}
 
+  if (patch.companyName !== undefined) {
+    payload.company_name = patch.companyName
+  }
+
+  if (patch.contactName !== undefined) {
+    payload.contact_name = patch.contactName
+  }
+
+  if (patch.email !== undefined) {
+    payload.email = patch.email
+  }
+
+  if (patch.phone !== undefined) {
+    payload.phone = patch.phone
+  }
+
+  if (patch.vatNumber !== undefined) {
+    payload.vat_number = patch.vatNumber
+  }
+
+  if (patch.fiscalCode !== undefined) {
+    payload.fiscal_code = patch.fiscalCode
+  }
+
+  if (patch.sdi !== undefined) {
+    payload.sdi = patch.sdi
+  }
+
+  if (patch.pec !== undefined) {
+    payload.pec = patch.pec
+  }
+
+  if (patch.registeredAddress !== undefined) {
+    payload.registered_address = patch.registeredAddress
+  }
+
+  if (patch.billingAddress !== undefined) {
+    payload.billing_address = patch.billingAddress
+  }
+
+  if (patch.shippingAddress !== undefined) {
+    payload.shipping_address = patch.shippingAddress
+  }
+
   if (patch.status !== undefined) {
     payload.status = patch.status
   }
@@ -1399,6 +2266,10 @@ function buildCustomerUpdatePayload(patch: CustomerAccountPatch) {
 
   if (patch.paymentTerms !== undefined) {
     payload.payment_terms = patch.paymentTerms
+  }
+
+  if (patch.adminNote !== undefined) {
+    payload.admin_note = patch.adminNote
   }
 
   return payload
@@ -1429,11 +2300,19 @@ export async function saveCustomerAccount(customerId: string, patch: CustomerAcc
       throw new Error('未找到客户，或当前账号没有审批权限。')
     }
 
+    await recordAdminAuditLog('customer', customerId, 'customer.update', `更新客户 ${patch.companyName || customerId}`, {
+      changedFields: Object.keys(payload),
+    })
+
     return mapCustomer(data as CustomerRow)
   } catch (error) {
     warnAdminDataError('save customer', error)
     throw error
   }
+}
+
+export async function saveCustomerProfileAdmin(customerId: string, patch: CustomerAccountPatch) {
+  return saveCustomerAccount(customerId, patch)
 }
 
 export async function approveCustomerAccount(customerId: string, priceGroupId: string) {
@@ -1450,6 +2329,325 @@ export async function approveCustomerAccount(customerId: string, priceGroupId: s
     creditLimit: creditLimitForTier(tier),
     paymentTerms,
   })
+}
+
+export async function archiveCustomer(customerId: string, reason: string) {
+  await requireRealSupabaseAdminData('客户归档')
+  const actor = await getCurrentActor()
+  const { data, error } = await supabase
+    .from('customers')
+    .update({
+      archived_at: new Date().toISOString(),
+      archived_by: actor.id || null,
+      archive_reason: reason,
+      status: 'suspended',
+    })
+    .eq('id', customerId)
+    .select('*')
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  await recordAdminAuditLog('customer', customerId, 'customer.archive', `归档客户：${reason}`, { reason })
+  return data ? mapCustomer(data as CustomerRow) : null
+}
+
+export async function restoreCustomer(customerId: string) {
+  await requireCurrentAdmin('客户恢复')
+  const { data, error } = await supabase
+    .from('customers')
+    .update({
+      archived_at: null,
+      archived_by: null,
+      archive_reason: '',
+    })
+    .eq('id', customerId)
+    .select('*')
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  await recordAdminAuditLog('customer', customerId, 'customer.restore', '恢复归档客户')
+  return data ? mapCustomer(data as CustomerRow) : null
+}
+
+export async function fetchCustomerOrdersAdmin(
+  customerId: string,
+  filters: CustomerOrderFilters = {},
+): Promise<AdminOrder[]> {
+  await requireRealSupabaseAdminData('客户订单记录')
+
+  let query = supabase
+    .from('orders')
+    .select(customerOrderSelect)
+    .eq('customer_id', customerId)
+    .order('created_at', { ascending: false })
+
+  if (filters.status && filters.status !== 'all') {
+    query = query.eq('status', filters.status)
+  }
+
+  if (filters.paymentStatus && filters.paymentStatus !== 'all') {
+    query = query.eq('payment_status', filters.paymentStatus)
+  }
+
+  if (filters.limit) {
+    query = query.limit(filters.limit)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    throw error
+  }
+
+  return ((data || []) as unknown as CustomerTimelineOrderRow[]).map((row) => mapCustomerOrder(row))
+}
+
+export async function fetchCustomerRmasAdmin(customer: CustomerAccount): Promise<CustomerRmaCase[]> {
+  await requireRealSupabaseAdminData('客户 RMA 记录')
+
+  const { data: orderNoRows, error: orderNoError } = await supabase
+    .from('orders')
+    .select('order_no')
+    .eq('customer_id', customer.id)
+
+  if (orderNoError) {
+    throw orderNoError
+  }
+
+  const orderNos = Array.from(
+    new Set((orderNoRows || []).map((row) => String(row.order_no || '')).filter(Boolean)),
+  )
+  const rmaSelect =
+    'id,user_id,order_no,sku_code,status,problem_type,description,quantity,requested_resolution,created_at'
+  const requests = []
+
+  if (customer.userId) {
+    requests.push(
+      supabase
+        .from('rma_requests')
+        .select(rmaSelect)
+        .eq('user_id', customer.userId)
+        .order('created_at', { ascending: false }),
+    )
+  }
+
+  if (orderNos.length) {
+    requests.push(
+      supabase
+        .from('rma_requests')
+        .select(rmaSelect)
+        .in('order_no', orderNos)
+        .order('created_at', { ascending: false }),
+    )
+  }
+
+  if (!requests.length) {
+    return []
+  }
+
+  const responses = await Promise.all(requests)
+  const rowsById = new Map<string, CustomerRmaCase>()
+
+  responses.forEach((response) => {
+    if (response.error) {
+      throw response.error
+    }
+
+    ;((response.data || []) as CustomerTimelineRmaRow[]).forEach((row) => {
+      rowsById.set(row.id, mapCustomerRma(row))
+    })
+  })
+
+  return Array.from(rowsById.values()).sort(
+    (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  )
+}
+
+export async function fetchCustomerAuditLogs(customerId: string): Promise<AuditLog[]> {
+  await requireRealSupabaseAdminData('客户操作审计')
+
+  const { data, error } = await supabase
+    .from('admin_audit_logs')
+    .select('*')
+    .eq('entity_type', 'customer')
+    .eq('entity_id', customerId)
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  if (error) {
+    throw error
+  }
+
+  return ((data || []) as AuditLogRow[]).map((row) => mapAuditLog(row))
+}
+
+async function fetchCustomerB2BApplications(customer: CustomerAccount) {
+  const requests = []
+
+  if (customer.email) {
+    requests.push(
+      supabase
+        .from('b2b_applications')
+        .select('*')
+        .eq('email', customer.email)
+        .order('submitted_at', { ascending: false }),
+    )
+  }
+
+  if (customer.vatNumber) {
+    requests.push(
+      supabase
+        .from('b2b_applications')
+        .select('*')
+        .eq('vat_number', customer.vatNumber)
+        .order('submitted_at', { ascending: false }),
+    )
+  }
+
+  if (!requests.length) {
+    return []
+  }
+
+  const responses = await Promise.all(requests)
+  const approvalsById = new Map<string, B2BApproval>()
+
+  responses.forEach((response) => {
+    if (response.error) {
+      throw response.error
+    }
+
+    ;((response.data || []) as B2BApprovalRow[]).forEach((row) => {
+      approvalsById.set(row.id, mapApproval(row))
+    })
+  })
+
+  return Array.from(approvalsById.values()).sort(
+    (left, right) => new Date(right.submittedAt).getTime() - new Date(left.submittedAt).getTime(),
+  )
+}
+
+async function fetchCustomerPriceGroup(priceGroupId: string) {
+  if (!priceGroupId) {
+    return null
+  }
+
+  const { data, error } = await supabase.from('price_groups').select('*').eq('id', priceGroupId).maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  return data ? mapPriceGroup(data as PriceGroupRow) : null
+}
+
+function buildCustomerDetailMetrics(
+  profile: CustomerAccount,
+  orders: AdminOrder[],
+  rmas: CustomerRmaCase[],
+): CustomerDetail['metrics'] {
+  const ordersCount = orders.length || profile.ordersCount
+  const revenue = orders.length ? orders.reduce((total, order) => total + order.totalNet, 0) : profile.revenue
+  const lastOrderAt = orders[0]?.createdAt || profile.lastOrderAt
+  const pendingPaymentAmount = orders
+    .filter((order) => order.paymentStatus !== 'paid')
+    .reduce((total, order) => total + order.totalNet + order.vat + order.shipping, 0)
+
+  return {
+    ordersCount,
+    revenue,
+    averageOrderValue: ordersCount > 0 ? revenue / ordersCount : 0,
+    lastOrderAt,
+    openOrdersCount: orders.filter((order) => order.status !== 'completed').length,
+    pendingPaymentAmount,
+    rmaCount: rmas.length,
+  }
+}
+
+export async function fetchCustomerDetail(customerId: string): Promise<CustomerDetail> {
+  await requireRealSupabaseAdminData('客户详情')
+
+  const { data, error } = await supabase.from('customers').select('*').eq('id', customerId).maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  if (!data) {
+    throw new Error('未找到客户，或当前账号没有客户详情权限。')
+  }
+
+  const profile = mapCustomer(data as CustomerRow)
+  const [orders, rmas, auditLogs, b2bApplications, priceGroup] = await Promise.all([
+    fetchCustomerOrdersAdmin(profile.id),
+    fetchCustomerRmasAdmin(profile),
+    fetchCustomerAuditLogs(profile.id),
+    fetchCustomerB2BApplications(profile),
+    fetchCustomerPriceGroup(profile.priceGroupId),
+  ])
+
+  return {
+    profile,
+    metrics: buildCustomerDetailMetrics(profile, orders, rmas),
+    orders,
+    rmas,
+    b2bApplications,
+    auditLogs,
+    priceGroup,
+  }
+}
+
+export async function fetchCustomerTimeline(customer: CustomerAccount): Promise<CustomerTimelineItem[]> {
+  await requireRealSupabaseAdminData('客户时间线')
+
+  const [auditLogs, orders, rmas] = await Promise.all([
+    fetchCustomerAuditLogs(customer.id),
+    fetchCustomerOrdersAdmin(customer.id, { limit: 5 }),
+    fetchCustomerRmasAdmin(customer),
+  ])
+
+  const auditItems = auditLogs.slice(0, 5).map((audit) => ({
+    id: audit.id,
+    type: 'audit' as const,
+    source: 'audit' as const,
+    title: audit.summary || audit.action,
+    description: audit.actorEmail ? `${audit.actorEmail} / ${audit.action}` : audit.action,
+    status: audit.action,
+    targetRoute: `/admin/customers/${customer.id}?tab=audit`,
+    createdAt: audit.createdAt,
+  }))
+
+  const orderItems = orders.slice(0, 5).map((order) => ({
+    id: order.id,
+    type: 'order' as const,
+    source: 'order' as const,
+    title: `订单 ${order.orderNo}`,
+    description: `${order.status} / ${order.paymentStatus} / ${order.lines.length} 个 SKU`,
+    amount: order.totalNet,
+    status: order.status,
+    targetRoute: `/admin/orders/${order.id}`,
+    createdAt: order.createdAt,
+  }))
+
+  const rmaItems = rmas.slice(0, 5).map((rma) => ({
+    id: rma.id,
+    type: 'rma' as const,
+    source: 'rma' as const,
+    title: `RMA ${rma.orderNo}`,
+    description: `${rma.skuCode} / ${rma.status}`,
+    status: rma.status,
+    targetRoute: `/admin/customers/${customer.id}?tab=rmas&rma=${rma.id}`,
+    createdAt: rma.createdAt,
+  }))
+
+  return [...auditItems, ...orderItems, ...rmaItems].sort(
+    (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  )
 }
 
 export async function fetchB2BApprovals() {
@@ -1502,6 +2700,14 @@ export async function approveB2BApplication(
     if (data && status === 'approved') {
       await upsertSupabaseCustomerFromApproval(data as B2BApprovalRow, priceGroupId)
     }
+
+    await recordAdminAuditLog(
+      'b2b_approval',
+      approvalId,
+      status === 'approved' ? 'b2b.approve' : 'b2b.reject',
+      status === 'approved' ? `通过 B2B 申请并分配 ${priceGroupId}` : '拒绝 B2B 申请',
+      { priceGroupId },
+    )
 
     return data ? mapApproval(data as B2BApprovalRow) : null
   } catch (error) {
@@ -1571,7 +2777,34 @@ export async function fetchStaffProfiles() {
       throw error
     }
 
-    return data.map((row) => mapStaffProfile(row as StaffProfileRow))
+    const profiles = data.map((row) => mapStaffProfile(row as StaffProfileRow))
+    const profileIds = profiles.map((profile) => profile.id)
+
+    if (profileIds.length === 0) {
+      return profiles
+    }
+
+    const { data: customerRows, error: customerError } = await supabase
+      .from('customers')
+      .select('user_id,company_name')
+      .in('user_id', profileIds)
+
+    if (customerError) {
+      warnAdminDataError('staff customer company lookup', customerError)
+      return profiles
+    }
+
+    const companyByUserId = new Map(
+      (customerRows || []).map((customer) => [
+        (customer as Pick<CustomerRow, 'user_id'>).user_id || '',
+        (customer as Pick<CustomerRow, 'company_name'>).company_name || '',
+      ]),
+    )
+
+    return profiles.map((profile) => ({
+      ...profile,
+      customerCompanyName: companyByUserId.get(profile.id) || profile.customerCompanyName,
+    }))
   } catch (error) {
     warnAdminFallback('staff profiles', error)
     return getStaffProfiles()
@@ -1579,14 +2812,65 @@ export async function fetchStaffProfiles() {
 }
 
 export async function saveStaffProfileRole(profileId: string, role: AdminStaffRole) {
+  return saveStaffProfilePermissions(profileId, role, defaultPermissionsForRole(role))
+}
+
+export async function saveStaffProfilePermissions(
+  profileId: string,
+  role: AdminStaffRole,
+  permissions: StaffPermission[],
+) {
+  const normalizedRole = normalizeAdminStaffRole(role)
+  const normalizedPermissions = normalizeStaffPermissions(permissions, normalizedRole)
+  const actor = await requireStaffPermissionManager('员工权限保存')
+
   if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
-    return updateStaffProfileRole(profileId, role)
+    const previousProfile = staffProfiles.find((profile) => profile.id === profileId)
+    ensureCanAssignStaffRole(
+      actor.role,
+      normalizedRole,
+      normalizedPermissions,
+      previousProfile?.permissions || [],
+    )
+    return updateStaffProfilePermissions(profileId, normalizedRole, normalizedPermissions)
   }
 
   try {
+    const { data: currentProfile, error: currentError } = await supabase
+      .from('profiles')
+      .select('role,permissions,staff_enabled,staff_enabled_at')
+      .eq('id', profileId)
+      .maybeSingle()
+
+    if (currentError) {
+      throw currentError
+    }
+
+    const previousRole = normalizeAdminStaffRole(
+      (currentProfile as Pick<StaffProfileRow, 'role'> | null)?.role,
+    )
+    const previousPermissions = resolveStaffPermissions(
+      previousRole,
+      (currentProfile as Pick<StaffProfileRow, 'permissions'> | null)?.permissions,
+    )
+
+    ensureCanAssignStaffRole(actor.role, normalizedRole, normalizedPermissions, previousPermissions)
+    await ensureRemotePermissionManagerRemains(profileId, normalizedRole, normalizedPermissions)
+
+    const now = new Date().toISOString()
+    const staffEnabled = normalizedRole !== 'customer' || normalizedPermissions.length > 0
     const { data, error } = await supabase
       .from('profiles')
-      .update({ role })
+      .update({
+        role: normalizedRole,
+        permissions: normalizedPermissions,
+        staff_enabled: staffEnabled,
+        staff_enabled_by: staffEnabled ? actor.id || null : null,
+        staff_enabled_at:
+          staffEnabled && !(currentProfile as Pick<StaffProfileRow, 'staff_enabled_at'> | null)?.staff_enabled_at
+            ? now
+            : (currentProfile as Pick<StaffProfileRow, 'staff_enabled_at'> | null)?.staff_enabled_at || null,
+      })
       .eq('id', profileId)
       .select('*')
       .maybeSingle()
@@ -1595,9 +2879,190 @@ export async function saveStaffProfileRole(profileId: string, role: AdminStaffRo
       throw error
     }
 
+    await recordAdminAuditLog(
+      'staff_profile',
+      profileId,
+      'staff_profile.permissions.update',
+      `更新员工权限：${permissionSummary(normalizedPermissions)}`,
+      {
+        source: 'staff_settings',
+        previous: currentProfile || null,
+        next: {
+          role: normalizedRole,
+          permissions: normalizedPermissions,
+          staffEnabled,
+        },
+      },
+    )
+
     return data ? mapStaffProfile(data as StaffProfileRow) : null
   } catch (error) {
     warnAdminFallback('save staff profile', error)
-    return updateStaffProfileRole(profileId, role)
+    return updateStaffProfilePermissions(profileId, normalizedRole, normalizedPermissions)
   }
+}
+
+export async function enableCustomerStaffAccess(
+  customerId: string,
+  role: AdminStaffRole,
+  permissions: StaffPermission[],
+) {
+  const normalizedRole = normalizeAdminStaffRole(role)
+  const normalizedPermissions = normalizeStaffPermissions(permissions, normalizedRole)
+  const actor = await requireStaffPermissionManager('客户后台员工开通')
+
+  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
+    const customer = customers.find((item) => item.id === customerId)
+
+    if (!customer) {
+      throw new Error('未找到客户。')
+    }
+
+    if (!customer.userId) {
+      throw new Error('该客户尚未绑定登录账号，不能开通后台员工。')
+    }
+
+    const existingProfile = staffProfiles.find((profile) => profile.id === customer.userId)
+    ensureCanAssignStaffRole(
+      actor.role,
+      normalizedRole,
+      normalizedPermissions,
+      existingProfile?.permissions || [],
+    )
+    if (existingProfile) {
+      return updateStaffProfilePermissions(existingProfile.id, normalizedRole, normalizedPermissions)
+    }
+
+    const now = new Date().toISOString()
+    const nextProfile: AdminStaffProfile = {
+      id: customer.userId,
+      email: customer.email,
+      role: normalizedRole,
+      permissions: normalizedPermissions,
+      staffEnabled: true,
+      staffEnabledBy: actor.id,
+      staffEnabledAt: now,
+      customerCompanyName: customer.companyName,
+      createdAt: now,
+      updatedAt: now,
+    }
+    staffProfiles.push(nextProfile)
+    return { ...nextProfile, permissions: [...nextProfile.permissions] }
+  }
+
+  const { data: customerData, error: customerError } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('id', customerId)
+    .maybeSingle()
+
+  if (customerError) {
+    throw customerError
+  }
+
+  const customer = customerData ? mapCustomer(customerData as CustomerRow) : null
+
+  if (!customer) {
+    throw new Error('未找到客户。')
+  }
+
+  if (!customer.userId) {
+    throw new Error('该客户尚未绑定登录账号，不能开通后台员工。')
+  }
+
+  await ensureRemotePermissionManagerRemains(customer.userId, normalizedRole, normalizedPermissions)
+
+  const { data: currentProfile, error: currentError } = await supabase
+    .from('profiles')
+    .select('id,email,role,permissions,staff_enabled,staff_enabled_at,created_at,updated_at')
+    .eq('id', customer.userId)
+    .maybeSingle()
+
+  if (currentError) {
+    throw currentError
+  }
+
+  const previousRole = normalizeAdminStaffRole(
+    (currentProfile as Pick<StaffProfileRow, 'role'> | null)?.role,
+  )
+  const previousPermissions = currentProfile
+    ? resolveStaffPermissions(
+        previousRole,
+        (currentProfile as Pick<StaffProfileRow, 'permissions'> | null)?.permissions,
+      )
+    : []
+
+  ensureCanAssignStaffRole(actor.role, normalizedRole, normalizedPermissions, previousPermissions)
+  const now = new Date().toISOString()
+  const staffEnabledAt =
+    (currentProfile as Pick<StaffProfileRow, 'staff_enabled_at'> | null)?.staff_enabled_at || now
+  const payload = {
+    role: normalizedRole,
+    permissions: normalizedPermissions,
+    staff_enabled: true,
+    staff_enabled_by: actor.id || null,
+    staff_enabled_at: staffEnabledAt,
+    updated_at: now,
+  }
+  const query = currentProfile
+    ? supabase
+        .from('profiles')
+        .update(payload)
+        .eq('id', customer.userId)
+        .select('*')
+        .maybeSingle()
+    : supabase
+        .from('profiles')
+        .insert({
+          id: customer.userId,
+          email: customer.email,
+          ...payload,
+        })
+        .select('*')
+        .maybeSingle()
+
+  const { data, error } = await query
+
+  if (error) {
+    throw error
+  }
+
+  await recordAdminAuditLog(
+    'staff_profile',
+    customer.userId,
+    currentProfile ? 'staff_profile.customer_access.update' : 'staff_profile.customer_access.enable',
+    `从客户管理开通后台员工：${customer.companyName || customer.email}`,
+    {
+      source: 'customers',
+      customerId: customer.id,
+      customerEmail: customer.email,
+      customerCompanyName: customer.companyName,
+      previous: currentProfile || null,
+      next: {
+        role: normalizedRole,
+        permissions: normalizedPermissions,
+        staffEnabled: true,
+      },
+    },
+  )
+
+  await recordAdminAuditLog(
+    'customer',
+    customer.id,
+    'customer.staff_access.enable',
+    `开通后台员工：${role} / ${permissionSummary(normalizedPermissions)}`,
+    {
+      source: 'customers',
+      profileId: customer.userId,
+      role: normalizedRole,
+      permissions: normalizedPermissions,
+    },
+  )
+
+  return data
+    ? {
+        ...mapStaffProfile(data as StaffProfileRow),
+        customerCompanyName: customer.companyName,
+      }
+    : null
 }

@@ -22,6 +22,7 @@ type ProductRow = {
   warranty_days: number
   compatibility: Product['compatibility'] | null
   highlights: string[] | null
+  archived_at?: string | null
 }
 
 type FetchProductOptions = {
@@ -29,7 +30,7 @@ type FetchProductOptions = {
 }
 
 const publicProductColumns =
-  'sku_code,name,brand,model,model_codes,category,quality_grade,color,frame,stock_status,image_path,image_alt,gallery_image_paths,moq,vat_mode,warranty_days,compatibility,highlights'
+  'sku_code,name,brand,model,model_codes,category,quality_grade,color,frame,stock_status,image_path,image_alt,gallery_image_paths,moq,vat_mode,warranty_days,compatibility,highlights,archived_at'
 
 const authenticatedProductColumns = `${publicProductColumns},b2b_price`
 const productImageBucket = 'product-images'
@@ -304,6 +305,7 @@ export async function fetchProducts(options: FetchProductOptions = {}) {
       .from('products')
       .select(columns as string)
       .eq('status', 'active')
+      .is('archived_at', null)
       .order('brand', { ascending: true })
       .order('model', { ascending: true })
 
@@ -333,6 +335,7 @@ export async function fetchProductBySku(skuCode: string, options: FetchProductOp
       .from('products')
       .select(columns as string)
       .eq('sku_code', skuCode)
+      .is('archived_at', null)
       .maybeSingle()
 
     if (error) {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, ref, watch } from 'vue'
+import { computed, h, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   AppstoreOutlined,
@@ -24,7 +24,6 @@ const authStore = useAuthStore()
 const uiStore = useUiStore()
 const isAdminMenuOpen = ref(false)
 const openAdminSectionKey = ref('operations')
-const globalSearchQuery = ref('')
 
 const adminText = {
   zh: {
@@ -36,7 +35,6 @@ const adminText = {
     customers: '客户',
     prices: '价格组',
     users: '员工设置',
-    search: '搜索订单、SKU、客户...',
     demo: '演示权限',
     role: '角色',
     home: '回到主页',
@@ -52,7 +50,6 @@ const adminText = {
     customers: '客户',
     prices: '价格组',
     users: '员工设置',
-    search: '搜索订单、SKU、客户...',
     demo: '演示权限',
     role: '角色',
     home: '回到主页',
@@ -63,7 +60,7 @@ const adminText = {
 
 const text = computed(() => adminText[uiStore.adminLanguage])
 
-const menuItems = computed(() => [
+const operationsMenuItems = computed(() => [
   {
     key: '/admin',
     icon: () => h(DashboardOutlined),
@@ -74,6 +71,9 @@ const menuItems = computed(() => [
     icon: () => h(ShoppingOutlined),
     label: text.value.orders,
   },
+])
+
+const catalogMenuItems = computed(() => [
   {
     key: '/admin/products',
     icon: () => h(AppstoreOutlined),
@@ -84,6 +84,9 @@ const menuItems = computed(() => [
     icon: () => h(InboxOutlined),
     label: text.value.inventory,
   },
+])
+
+const b2bMenuItems = computed(() => [
   {
     key: '/admin/customers',
     icon: () => h(TeamOutlined),
@@ -94,35 +97,49 @@ const menuItems = computed(() => [
     icon: () => h(PercentageOutlined),
     label: text.value.prices,
   },
-  {
-    key: '/admin/settings/users',
-    icon: () => h(SettingOutlined),
-    label: text.value.users,
-  },
+])
+
+const settingsMenuItems = computed(() =>
+  authStore.canViewStaffSettings
+    ? [
+        {
+          key: '/admin/settings/users',
+          icon: () => h(SettingOutlined),
+          label: text.value.users,
+        },
+      ]
+    : [],
+)
+
+const menuItems = computed(() => [
+  ...operationsMenuItems.value,
+  ...catalogMenuItems.value,
+  ...b2bMenuItems.value,
+  ...settingsMenuItems.value,
 ])
 
 const adminNavigationSections = computed(() => [
   {
     key: 'operations',
     label: '运营',
-    items: menuItems.value.slice(0, 2),
+    items: operationsMenuItems.value,
   },
   {
     key: 'catalog',
     label: '商品与库存',
-    items: menuItems.value.slice(2, 4),
+    items: catalogMenuItems.value,
   },
   {
     key: 'b2b',
     label: '客户与价格',
-    items: menuItems.value.slice(4, 6),
+    items: b2bMenuItems.value,
   },
   {
     key: 'settings',
     label: '设置',
-    items: menuItems.value.slice(6),
+    items: settingsMenuItems.value,
   },
-])
+].filter((section) => section.items.length > 0))
 
 const selectedKeys = computed(() => {
   const current = menuItems.value
@@ -133,77 +150,9 @@ const selectedKeys = computed(() => {
   return [current || '/admin']
 })
 
-function readRouteQuery(value: unknown) {
-  return Array.isArray(value) ? value[0] || '' : typeof value === 'string' ? value : ''
-}
-
-function getAdminSearchPath(query: string) {
-  const normalizedQuery = query.toLowerCase()
-
-  if (/^so[-\s]/i.test(query)) {
-    return '/admin/orders'
-  }
-
-  if (
-    normalizedQuery.includes('@') ||
-    normalizedQuery.includes('p.iva') ||
-    normalizedQuery.includes('pec') ||
-    normalizedQuery.includes('cliente') ||
-    normalizedQuery.includes('customer') ||
-    normalizedQuery.includes('repair') ||
-    normalizedQuery.includes('ripara') ||
-    normalizedQuery.includes('centro') ||
-    normalizedQuery.includes('fixlab') ||
-    normalizedQuery.includes('phone doctor') ||
-    normalizedQuery.includes('repair hub') ||
-    normalizedQuery.includes('smart parts') ||
-    normalizedQuery.includes('milano') ||
-    normalizedQuery.includes('roma') ||
-    normalizedQuery.includes('firenze') ||
-    normalizedQuery.includes('napoli') ||
-    /^it\d{5,}/i.test(query)
-  ) {
-    return '/admin/customers'
-  }
-
-  if (
-    normalizedQuery.includes('stock') ||
-    normalizedQuery.includes('库存') ||
-    normalizedQuery.includes('batch') ||
-    normalizedQuery.includes('批次') ||
-    normalizedQuery.includes('库位')
-  ) {
-    return '/admin/inventory'
-  }
-
-  if (
-    query.includes('-') ||
-    /(sku|screen|display|battery|iphone|samsung|xiaomi|apple|ip\d|sa\d|bat|scr|chg|cam|tool|屏|电池|尾插|摄像头)/i.test(
-      query,
-    )
-  ) {
-    return '/admin/products'
-  }
-
-  return '/admin/orders'
-}
-
 function handleMenuClick({ key }: { key: string }) {
   router.push(key)
   isAdminMenuOpen.value = false
-}
-
-function handleAdminGlobalSearch(value: string) {
-  const query = value.trim()
-
-  if (!query) {
-    return
-  }
-
-  router.push({
-    path: getAdminSearchPath(query),
-    query: { q: query },
-  })
 }
 
 function handleAdminLanguageChange(value: string | number) {
@@ -213,14 +162,6 @@ function handleAdminLanguageChange(value: string | number) {
 function toggleAdminSection(sectionKey: string) {
   openAdminSectionKey.value = openAdminSectionKey.value === sectionKey ? '' : sectionKey
 }
-
-watch(
-  () => route.query.q,
-  (value) => {
-    globalSearchQuery.value = readRouteQuery(value)
-  },
-  { immediate: true },
-)
 </script>
 
 <template>
@@ -247,13 +188,6 @@ watch(
           </a-button>
           <RouterLink class="admin-mobile-brand" to="/admin">{{ text.brand }}</RouterLink>
         </div>
-        <a-input-search
-          v-model:value="globalSearchQuery"
-          class="admin-search"
-          :placeholder="text.search"
-          allow-clear
-          @search="handleAdminGlobalSearch"
-        />
         <a-space class="admin-header-actions">
           <RouterLink to="/">
             <a-button class="admin-home-button" :aria-label="text.home">

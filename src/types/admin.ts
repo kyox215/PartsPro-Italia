@@ -1,4 +1,4 @@
-import type { UserRole } from '@/types/auth'
+import type { StaffPermission, UserRole } from '@/types/auth'
 
 export type AdminOrderStatus =
   | 'submitted'
@@ -94,6 +94,8 @@ export type PriceTier = {
 }
 
 export type AdminProductStatus = 'active' | 'draft' | 'hidden' | 'blocked'
+export type AdminProductStockStatus = 'in_stock' | 'low_stock' | 'out_of_stock' | 'incoming'
+export type AdminProductVatMode = 'IVA esclusa' | 'IVA inclusa'
 
 export type AdminProduct = {
   id: string
@@ -102,13 +104,17 @@ export type AdminProduct = {
   brand: string
   model: string
   modelCode: string
+  modelCodes: string[]
   category: string
   qualityGrade: string
   color: string
   frame: 'With Frame' | 'Without Frame' | 'N/A'
+  stockStatus: AdminProductStockStatus
+  moq: number
   costPrice: number
   retailPrice: number
   b2bPrice: number
+  vatMode: AdminProductVatMode
   tierPrices: PriceTier[]
   stockQty: number
   location: string
@@ -116,15 +122,46 @@ export type AdminProduct = {
   supplier: string
   warrantyDays: number
   weightGram: number
+  imagePath: string
+  imageAlt: string
+  galleryImagePaths: string[]
   isBattery: boolean
   isDangerousGoods: boolean
   msdsUrl: string
   un38Url: string
+  compatibility: Array<{
+    model: string
+    code: string
+    note: string
+  }>
   compatibilityModels: string[]
   alternativeSkus: string[]
   addOnSkus: string[]
+  highlights: string[]
   status: AdminProductStatus
+  archivedAt: string | null
+  archivedBy: string
+  archiveReason: string
   updatedAt: string
+}
+
+export type AdminProductPatch = Partial<Omit<AdminProduct, 'id' | 'updatedAt'>>
+
+export type ProductImportPreview = {
+  rowNumber: number
+  product: AdminProductPatch
+  errors: string[]
+  warnings: string[]
+}
+
+export type ProductImportResult = {
+  created: number
+  updated: number
+  skipped: number
+  errors: Array<{
+    rowNumber: number
+    message: string
+  }>
 }
 
 export type CustomerTier = 'standard' | 'silver' | 'gold'
@@ -153,7 +190,11 @@ export type CustomerAccount = {
   lastOrderAt: string | null
   creditLimit: number
   paymentTerms: string
+  adminNote: string
   profileCompletedAt: string | null
+  archivedAt: string | null
+  archivedBy: string
+  archiveReason: string
   createdAt: string
   updatedAt: string
 }
@@ -161,9 +202,39 @@ export type CustomerAccount = {
 export type CustomerAccountPatch = Partial<
   Pick<
     CustomerAccount,
-    'status' | 'tier' | 'priceGroupId' | 'monthlyPurchase' | 'creditLimit' | 'paymentTerms'
+    | 'companyName'
+    | 'contactName'
+    | 'email'
+    | 'phone'
+    | 'vatNumber'
+    | 'fiscalCode'
+    | 'sdi'
+    | 'pec'
+    | 'registeredAddress'
+    | 'billingAddress'
+    | 'shippingAddress'
+    | 'status'
+    | 'tier'
+    | 'priceGroupId'
+    | 'monthlyPurchase'
+    | 'creditLimit'
+    | 'paymentTerms'
+    | 'adminNote'
   >
 >
+
+export type CustomerRmaCase = {
+  id: string
+  userId: string
+  orderNo: string
+  skuCode: string
+  status: string
+  problemType: string
+  description: string
+  quantity: number
+  requestedResolution: string
+  createdAt: string
+}
 
 export type B2BApprovalStatus = 'submitted' | 'approved' | 'rejected'
 
@@ -226,6 +297,70 @@ export type AdminStaffProfile = {
   id: string
   email: string
   role: AdminStaffRole
+  permissions: StaffPermission[]
+  staffEnabled: boolean
+  staffEnabledBy: string
+  staffEnabledAt: string | null
+  customerCompanyName: string
   createdAt: string
   updatedAt: string
+}
+
+export type AuditEntityType =
+  | 'product'
+  | 'customer'
+  | 'b2b_approval'
+  | 'price_group'
+  | 'inventory'
+  | 'order'
+  | 'staff_profile'
+
+export type AuditLog = {
+  id: string
+  actorId: string
+  actorEmail: string
+  entityType: AuditEntityType
+  entityId: string
+  action: string
+  summary: string
+  metadata: Record<string, unknown>
+  createdAt: string
+}
+
+export type CustomerDetailMetrics = {
+  ordersCount: number
+  revenue: number
+  averageOrderValue: number
+  lastOrderAt: string | null
+  openOrdersCount: number
+  pendingPaymentAmount: number
+  rmaCount: number
+}
+
+export type CustomerDetail = {
+  profile: CustomerAccount
+  metrics: CustomerDetailMetrics
+  orders: AdminOrder[]
+  rmas: CustomerRmaCase[]
+  b2bApplications: B2BApproval[]
+  auditLogs: AuditLog[]
+  priceGroup: PriceGroup | null
+}
+
+export type CustomerOrderFilters = {
+  status?: AdminOrderStatus | 'all'
+  paymentStatus?: PaymentStatus | 'all'
+  limit?: number
+}
+
+export type CustomerTimelineItem = {
+  id: string
+  type: 'audit' | 'order' | 'rma'
+  title: string
+  description: string
+  amount?: number
+  status?: string
+  source?: 'audit' | 'order' | 'rma'
+  targetRoute?: string
+  createdAt: string
 }

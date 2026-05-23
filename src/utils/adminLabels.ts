@@ -42,6 +42,13 @@ export const stockStatusLabels: Record<'available' | 'low_stock' | 'reserved' | 
   incoming: '在途',
 }
 
+export const productStockStatusLabels: Record<AdminProduct['stockStatus'], string> = {
+  in_stock: '现货',
+  low_stock: '低库存',
+  out_of_stock: '缺货',
+  incoming: '在途',
+}
+
 export const productStatusLabels: Record<AdminProduct['status'], string> = {
   active: '已上架',
   draft: '草稿',
@@ -130,6 +137,10 @@ export function labelStockRisk(value: StockRisk) {
 
 export function labelStockStatus(value: keyof typeof stockStatusLabels) {
   return stockStatusLabels[value] || value
+}
+
+export function labelProductStockStatus(value: AdminProduct['stockStatus']) {
+  return productStockStatusLabels[value] || value
 }
 
 export function labelProductStatus(value: AdminProduct['status']) {

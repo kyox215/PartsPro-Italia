@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { Modal, message } from 'ant-design-vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   getNextOrderStatus,
   orderStatusFlow,
@@ -19,8 +19,10 @@ import {
   labelStockStatus,
   orderStatusLabels,
 } from '@/utils/adminLabels'
+import { matchesSearchTokens, readRouteQuery, withSearchQuery } from '@/utils/adminSearch'
 
 const route = useRoute()
+const router = useRouter()
 const orders = ref<AdminOrder[]>([])
 const isLoading = ref(false)
 const selectedStatus = ref<'all' | AdminOrderStatus>('all')
@@ -50,36 +52,48 @@ const statusOptions = computed(() => [
 ])
 
 const filteredOrders = computed(() => {
-  const normalizedQuery = query.value.trim().toLowerCase()
   const statusFilteredOrders =
     selectedStatus.value === 'all'
       ? orders.value
       : orders.value.filter((order) => order.status === selectedStatus.value)
 
-  if (!normalizedQuery) {
+  if (!query.value.trim()) {
     return statusFilteredOrders
   }
 
   return statusFilteredOrders.filter((order) =>
-    [
-      order.orderNo,
-      order.customerName,
-      order.customerTier,
-      order.paymentStatus,
-      order.stockRisk,
-      order.shippingMethod,
-      order.deliveryAddress,
-      ...order.lines.flatMap((line) => [
-        line.skuCode,
-        line.productName,
-        line.qualityGrade,
-        line.batchCode,
-        line.location,
-      ]),
-    ]
-      .join(' ')
-      .toLowerCase()
-      .includes(normalizedQuery),
+    matchesSearchTokens(
+      [
+        order.orderNo,
+        order.customerName,
+        order.customerTier,
+        labelCustomerTier(order.customerTier),
+        order.status,
+        labelOrderStatus(order.status),
+        order.paymentStatus,
+        labelPaymentStatus(order.paymentStatus),
+        order.stockRisk,
+        labelStockRisk(order.stockRisk),
+        order.shippingMethod,
+        order.deliveryAddress,
+        order.customerNote,
+        order.staffNote,
+        order.fiscal.vatNumber,
+        order.fiscal.fiscalCode,
+        order.fiscal.sdi,
+        order.fiscal.pec,
+        ...order.lines.flatMap((line) => [
+          line.skuCode,
+          line.productName,
+          line.qualityGrade,
+          line.stockStatus,
+          labelStockStatus(line.stockStatus),
+          line.batchCode,
+          line.location,
+        ]),
+      ],
+      query.value,
+    ),
   )
 })
 
@@ -331,12 +345,25 @@ function stockRiskColor(risk: StockRisk) {
   return colors[risk]
 }
 
-function readRouteQuery(value: unknown) {
-  return Array.isArray(value) ? value[0] || '' : typeof value === 'string' ? value : ''
-}
-
 function orderStatusIndex(status: AdminOrderStatus) {
   return orderStatusFlow.indexOf(status)
+}
+
+function syncOrderSearch(value: string) {
+  router.replace({ query: withSearchQuery(route.query, 'q', value) })
+}
+
+function handleOrderSearch(value: string) {
+  query.value = value
+  syncOrderSearch(value)
+}
+
+function handleOrderSearchChange(event: Event) {
+  const value = event.target instanceof HTMLInputElement ? event.target.value : query.value
+
+  if (!value.trim()) {
+    syncOrderSearch('')
+  }
 }
 
 function orderProgressPercent(status: AdminOrderStatus) {
@@ -531,6 +558,12 @@ watch(
   },
   { immediate: true },
 )
+
+watch(query, (value, previousValue) => {
+  if (!value.trim() && previousValue.trim() && readRouteQuery(route.query.q)) {
+    syncOrderSearch('')
+  }
+})
 </script>
 
 <template>
@@ -568,8 +601,10 @@ watch(
         <a-input-search
           v-model:value="query"
           class="admin-toolbar-search"
-          placeholder="搜索订单号、客户、SKU、批次..."
+          placeholder="搜索订单号、客户、SKU、商品、批次、库位、配送方式..."
           allow-clear
+          @search="handleOrderSearch"
+          @change="handleOrderSearchChange"
         />
         <div class="admin-status-filter-row" role="tablist" aria-label="订单状态筛选">
           <button

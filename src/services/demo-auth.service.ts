@@ -1,4 +1,5 @@
 import type { AuthProfile } from '@/types/auth'
+import { defaultPermissionsForRole, normalizeStaffPermissions, staffRoles } from '@/types/auth'
 
 const demoProfileStorageKey = 'partspro.demoProfile'
 
@@ -9,7 +10,23 @@ export function readDemoAuthProfile() {
 
   try {
     const rawProfile = window.localStorage.getItem(demoProfileStorageKey)
-    return rawProfile ? (JSON.parse(rawProfile) as AuthProfile) : null
+    if (!rawProfile) {
+      return null
+    }
+
+    const profile = JSON.parse(rawProfile) as AuthProfile
+    if (profile.role === 'guest') {
+      return null
+    }
+
+    return {
+      ...profile,
+      permissions:
+        profile.permissions && profile.permissions.length > 0
+          ? normalizeStaffPermissions(profile.permissions, profile.role)
+          : defaultPermissionsForRole(profile.role),
+      staffEnabled: profile.staffEnabled ?? staffRoles.includes(profile.role),
+    }
   } catch {
     return null
   }

@@ -2785,8 +2785,8 @@ a {
 }
 
 .admin-header.ant-layout-header {
-  display: grid;
-  grid-template-columns: minmax(240px, 360px) minmax(0, 1fr);
+  display: flex;
+  justify-content: flex-end;
   gap: 8px;
   align-items: center;
   height: 48px;
@@ -2800,15 +2800,6 @@ a {
 .admin-content {
   padding: 10px;
   min-width: 0;
-}
-
-.admin-search {
-  max-width: 340px;
-}
-
-.admin-search .ant-input,
-.admin-search .ant-btn {
-  height: 34px;
 }
 
 .admin-mobile-topline {
@@ -2884,7 +2875,8 @@ a {
 
 .admin-toolbar {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  justify-content: flex-start;
   gap: 8px;
   align-items: center;
   margin-bottom: 8px;
@@ -3220,6 +3212,9 @@ a {
 }
 
 .admin-toolbar-search {
+  flex: 1 1 320px;
+  width: 100%;
+  min-width: 240px;
   max-width: 360px;
 }
 
@@ -3246,6 +3241,35 @@ a {
   justify-content: flex-end;
   width: 100%;
   margin-top: 12px;
+}
+
+.admin-staff-access-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-staff-access-form {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-permission-checks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+  width: 100%;
+}
+
+.admin-permission-checks .ant-checkbox-wrapper {
+  min-width: 0;
+  margin-inline-start: 0;
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.admin-permission-tags {
+  width: 100%;
 }
 
 .admin-detail-card {
@@ -4458,6 +4482,31 @@ a {
   font-size: 13px;
 }
 
+.admin-upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 4px 12px;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.admin-upload-button:hover {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+.admin-upload-button input {
+  display: none;
+}
+
 .admin-product-form .ant-input,
 .admin-product-form .ant-select-single .ant-select-selector,
 .admin-product-form .ant-input-number {
@@ -5413,10 +5462,9 @@ a {
 
   .admin-header.ant-layout-header {
     height: auto !important;
-    min-height: 92px;
-    grid-template-columns: 1fr;
+    min-height: 50px;
+    justify-content: stretch;
     gap: 6px;
-    align-content: start;
     padding: 8px 10px !important;
   }
 
@@ -5429,6 +5477,7 @@ a {
     justify-content: space-between;
     gap: 8px;
     align-items: center;
+    width: 100%;
     min-width: 0;
     min-height: 34px;
   }
@@ -5445,16 +5494,6 @@ a {
   .admin-mobile-menu-button {
     width: 32px;
     height: 32px;
-  }
-
-  .admin-search {
-    width: 100%;
-    max-width: none;
-  }
-
-  .admin-search .ant-input,
-  .admin-search .ant-btn {
-    height: 36px;
   }
 
   .admin-content {
@@ -5729,7 +5768,14 @@ a {
   }
 
   .admin-toolbar-search {
+    width: 100%;
+    min-width: 0;
     max-width: none;
+  }
+
+  .admin-permission-checks {
+    grid-template-columns: 1fr;
+    gap: 5px;
   }
 
   .admin-toolbar .ant-segmented {
@@ -6255,7 +6301,7 @@ a {
 
 @media (min-width: 768px) and (max-width: 1180px) {
   .admin-header.ant-layout-header {
-    grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+    justify-content: flex-end;
     gap: 6px;
     padding-inline: 10px !important;
   }
