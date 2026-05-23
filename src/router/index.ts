@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import StorefrontLayout from '@/layouts/StorefrontLayout.vue'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { useAuthStore } from '@/stores/auth.store'
+import { useCustomerStore } from '@/stores/customer.store'
 import type { RouteAccess } from '@/types/auth'
 
 const HomePage = () => import('@/pages/storefront/HomePage.vue')
@@ -11,6 +12,7 @@ const LoginPage = () => import('@/pages/storefront/LoginPage.vue')
 const B2BRegisterPage = () => import('@/pages/storefront/B2BRegisterPage.vue')
 const AccountPage = () => import('@/pages/storefront/AccountPage.vue')
 const AccountOrdersPage = () => import('@/pages/storefront/AccountOrdersPage.vue')
+const AccountCompanyPage = () => import('@/pages/storefront/AccountCompanyPage.vue')
 const FrequentProductsPage = () => import('@/pages/storefront/FrequentProductsPage.vue')
 const CartPage = () => import('@/pages/storefront/CartPage.vue')
 const CheckoutPage = () => import('@/pages/storefront/CheckoutPage.vue')
@@ -208,7 +210,7 @@ export const router = createRouter({
         {
           path: 'account/addresses',
           name: 'account-addresses',
-          component: PlaceholderPage,
+          component: AccountCompanyPage,
           meta: {
             title: 'Indirizzi',
             description: 'Sedi operative, indirizzi di fatturazione e consegna.',
@@ -218,7 +220,7 @@ export const router = createRouter({
         {
           path: 'account/company',
           name: 'account-company',
-          component: PlaceholderPage,
+          component: AccountCompanyPage,
           meta: {
             title: 'Dati aziendali',
             description: 'P.IVA, SDI, PEC, referente e profilo B2B.',
@@ -413,6 +415,30 @@ router.beforeEach(async (to) => {
     }
 
     return authStore.isStaff ? { name: 'admin-dashboard' } : { name: 'products' }
+  }
+
+  if (authStore.canAccess(access) && to.name === 'checkout') {
+    const customerStore = useCustomerStore()
+
+    try {
+      await customerStore.ensureLoaded(authStore.profile?.email || '')
+    } catch {
+      return {
+        name: 'account-company',
+        query: {
+          returnUrl: to.fullPath,
+        },
+      }
+    }
+
+    if (!customerStore.isComplete) {
+      return {
+        name: 'account-company',
+        query: {
+          returnUrl: to.fullPath,
+        },
+      }
+    }
   }
 
   if (authStore.canAccess(access)) {

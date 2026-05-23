@@ -11,6 +11,7 @@ import type {
   StockMovement,
 } from '@/types/admin'
 import { shouldUseSupabaseData, supabase } from '@/lib/supabase'
+import { hasDemoAuthProfile } from '@/services/demo-auth.service'
 
 type AdminProductRow = {
   id: string
@@ -46,21 +47,21 @@ type AdminProductRow = {
 
 type CustomerRow = {
   id: string
-  company_name: string
-  contact_name: string
+  company_name: string | null
+  contact_name: string | null
   email: string
-  vat_number: string
-  sdi: string
-  pec: string
+  vat_number: string | null
+  sdi: string | null
+  pec: string | null
   tier: CustomerAccount['tier']
-  price_group_id: string
+  price_group_id: string | null
   status: CustomerAccount['status']
-  monthly_purchase: string
+  monthly_purchase: string | null
   orders_count: number
   revenue: number
   last_order_at: string | null
   credit_limit: number
-  payment_terms: string
+  payment_terms: string | null
 }
 
 type B2BApprovalRow = {
@@ -934,6 +935,14 @@ function warnAdminFallback(scope: string, error: unknown) {
   console.warn(`[PartsPro] Supabase ${scope} fallback to mock data`, error)
 }
 
+async function hasRealSupabaseSession() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  return Boolean(session)
+}
+
 function mapAdminProduct(row: AdminProductRow): AdminProduct {
   return {
     id: row.id,
@@ -971,21 +980,21 @@ function mapAdminProduct(row: AdminProductRow): AdminProduct {
 function mapCustomer(row: CustomerRow): CustomerAccount {
   return {
     id: row.id,
-    companyName: row.company_name,
-    contactName: row.contact_name,
-    email: row.email,
-    vatNumber: row.vat_number,
-    sdi: row.sdi,
-    pec: row.pec,
+    companyName: row.company_name || '',
+    contactName: row.contact_name || '',
+    email: row.email || '',
+    vatNumber: row.vat_number || '',
+    sdi: row.sdi || '',
+    pec: row.pec || '',
     tier: row.tier,
-    priceGroupId: row.price_group_id,
+    priceGroupId: row.price_group_id || '',
     status: row.status,
-    monthlyPurchase: row.monthly_purchase,
+    monthlyPurchase: row.monthly_purchase || '',
     ordersCount: row.orders_count,
     revenue: Number(row.revenue),
-    lastOrderAt: row.last_order_at || '',
+    lastOrderAt: row.last_order_at,
     creditLimit: Number(row.credit_limit),
-    paymentTerms: row.payment_terms,
+    paymentTerms: row.payment_terms || '',
   }
 }
 
@@ -1044,7 +1053,7 @@ function mapBatch(row: BatchRow): AdminBatch {
 }
 
 export async function fetchAdminProducts() {
-  if (!shouldUseSupabaseData) {
+  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
     return getAdminProducts()
   }
 
@@ -1067,7 +1076,7 @@ export async function fetchAdminProducts() {
 }
 
 export async function saveAdminProduct(productId: string, patch: Partial<AdminProduct>) {
-  if (!shouldUseSupabaseData) {
+  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
     return updateAdminProduct(productId, patch)
   }
 
@@ -1118,7 +1127,7 @@ export async function saveAdminProduct(productId: string, patch: Partial<AdminPr
 }
 
 export async function fetchCustomerAccounts() {
-  if (!shouldUseSupabaseData) {
+  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
     return getCustomerAccounts()
   }
 
@@ -1137,7 +1146,7 @@ export async function fetchCustomerAccounts() {
 }
 
 export async function fetchB2BApprovals() {
-  if (!shouldUseSupabaseData) {
+  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
     return getB2BApprovals()
   }
 
@@ -1163,7 +1172,7 @@ export async function approveB2BApplication(
   status: Extract<B2BApprovalStatus, 'approved' | 'rejected'>,
   priceGroupId: string,
 ) {
-  if (!shouldUseSupabaseData) {
+  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
     return reviewB2BApproval(approvalId, status, priceGroupId)
   }
 
@@ -1195,7 +1204,7 @@ export async function approveB2BApplication(
 }
 
 export async function fetchPriceGroups() {
-  if (!shouldUseSupabaseData) {
+  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
     return getPriceGroups()
   }
 
@@ -1214,7 +1223,7 @@ export async function fetchPriceGroups() {
 }
 
 export async function fetchAdminBatches() {
-  if (!shouldUseSupabaseData) {
+  if (!shouldUseSupabaseData || hasDemoAuthProfile() || !(await hasRealSupabaseSession())) {
     return getAdminBatches()
   }
 

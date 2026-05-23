@@ -24,20 +24,7 @@ export type CartSummary = {
 
 export type CheckoutPayload = {
   items: CartItem[]
-  billing: {
-    companyName: string
-    vatNumber: string
-    fiscalCode: string
-    sdi: string
-    pec: string
-    address: string
-  }
-  shipping: {
-    contactName: string
-    phone: string
-    address: string
-    method: string
-  }
+  shippingMethod: string
   paymentMethod: 'stripe' | 'paypal' | 'bank_transfer'
   customerNote: string
 }

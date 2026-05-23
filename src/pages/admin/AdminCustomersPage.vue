@@ -40,7 +40,7 @@ const filteredCustomers = computed(() => {
       customer.sdi,
       customer.pec,
       customer.priceGroupId,
-    ].some((value) => value.toLowerCase().includes(normalizedQuery)),
+    ].some((value) => String(value || '').toLowerCase().includes(normalizedQuery)),
   )
 })
 
@@ -58,7 +58,11 @@ function formatCurrency(value: number) {
   }).format(value)
 }
 
-function formatDate(value: string) {
+function formatDate(value: string | null) {
+  if (!value) {
+    return '暂无订单'
+  }
+
   return new Intl.DateTimeFormat('zh-CN', {
     dateStyle: 'medium',
   }).format(new Date(value))
@@ -85,7 +89,7 @@ function statusColor(status: CustomerStatus) {
 }
 
 function priceGroupName(priceGroupId: string) {
-  return priceGroups.value.find((group) => group.id === priceGroupId)?.name || priceGroupId
+  return priceGroupId ? priceGroups.value.find((group) => group.id === priceGroupId)?.name || priceGroupId : '未分配'
 }
 
 function readRouteQuery(value: unknown) {
@@ -161,6 +165,7 @@ watch(
       </div>
 
       <a-table
+        class="admin-desktop-data-table"
         :columns="columns"
         :data-source="filteredCustomers"
         :loading="isLoading"
@@ -169,14 +174,14 @@ watch(
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'customer'">
-            <strong>{{ record.companyName }}</strong>
-            <span class="admin-muted-line">{{ record.contactName }} / {{ record.email }}</span>
+            <strong>{{ record.companyName || '未完善公司资料' }}</strong>
+            <span class="admin-muted-line">{{ record.contactName || '未填写联系人' }} / {{ record.email }}</span>
           </template>
 
           <template v-else-if="column.key === 'fiscal'">
-            <span>P.IVA {{ record.vatNumber }}</span>
-            <span class="admin-muted-line">SDI {{ record.sdi }}</span>
-            <span class="admin-muted-line">PEC {{ record.pec }}</span>
+            <span>P.IVA {{ record.vatNumber || '未填写' }}</span>
+            <span class="admin-muted-line">SDI {{ record.sdi || '未填写' }}</span>
+            <span class="admin-muted-line">PEC {{ record.pec || '未填写' }}</span>
           </template>
 
           <template v-else-if="column.key === 'tier'">
@@ -207,22 +212,77 @@ watch(
           </template>
         </template>
       </a-table>
+
+      <div class="admin-mobile-data-list admin-mobile-customer-list">
+        <a-empty v-if="filteredCustomers.length === 0" class="admin-mobile-empty" description="暂无客户" />
+        <article
+          v-for="customer in filteredCustomers"
+          :key="customer.id"
+          class="admin-mobile-data-card admin-mobile-customer-card"
+        >
+          <header>
+            <div>
+              <strong>{{ customer.companyName || '未完善公司资料' }}</strong>
+              <span>{{ customer.contactName || '未填写联系人' }} / {{ customer.email }}</span>
+            </div>
+            <a-tag :color="statusColor(customer.status)">
+              {{ labelCustomerStatus(customer.status) }}
+            </a-tag>
+          </header>
+
+          <div class="admin-mobile-data-tags">
+            <a-tag :color="tierColor(customer.tier)">{{ labelCustomerTier(customer.tier) }}</a-tag>
+            <a-tag color="blue">{{ priceGroupName(customer.priceGroupId) }}</a-tag>
+          </div>
+
+          <dl class="admin-mobile-data-grid">
+            <div>
+              <dt>P.IVA</dt>
+              <dd>{{ customer.vatNumber || '未填写' }}</dd>
+            </div>
+            <div>
+              <dt>发票</dt>
+              <dd>SDI {{ customer.sdi || '-' }} / PEC {{ customer.pec || '-' }}</dd>
+            </div>
+            <div>
+              <dt>采购</dt>
+              <dd>{{ formatCurrency(customer.revenue) }} · {{ customer.ordersCount }} 单</dd>
+            </div>
+            <div>
+              <dt>最近订单</dt>
+              <dd>{{ formatDate(customer.lastOrderAt) }}</dd>
+            </div>
+            <div>
+              <dt>付款条款</dt>
+              <dd>{{ customer.paymentTerms }}</dd>
+            </div>
+            <div>
+              <dt>信用额度</dt>
+              <dd>{{ formatCurrency(customer.creditLimit) }}</dd>
+            </div>
+          </dl>
+
+          <div class="admin-mobile-data-actions">
+            <a-button size="small" block @click="openCustomer(customer)">详情</a-button>
+          </div>
+        </article>
+      </div>
     </a-card>
 
     <a-drawer
       v-model:open="isDrawerOpen"
       class="admin-data-drawer"
       width="640"
-      :title="selectedCustomer?.companyName || '客户详情'"
+      :title="selectedCustomer?.companyName || selectedCustomer?.email || '客户详情'"
     >
       <template v-if="selectedCustomer">
         <a-descriptions bordered size="small" :column="1">
           <a-descriptions-item label="联系人">
-            {{ selectedCustomer.contactName }} / {{ selectedCustomer.email }}
+            {{ selectedCustomer.contactName || '未填写联系人' }} / {{ selectedCustomer.email }}
           </a-descriptions-item>
           <a-descriptions-item label="电子发票">
-            P.IVA {{ selectedCustomer.vatNumber }} - SDI {{ selectedCustomer.sdi }} - PEC
-            {{ selectedCustomer.pec }}
+            P.IVA {{ selectedCustomer.vatNumber || '未填写' }} - SDI
+            {{ selectedCustomer.sdi || '未填写' }} - PEC {{ selectedCustomer.pec || '未填写' }}
           </a-descriptions-item>
           <a-descriptions-item label="客户等级">
             {{ labelCustomerTier(selectedCustomer.tier) }} / {{ priceGroupName(selectedCustomer.priceGroupId) }}

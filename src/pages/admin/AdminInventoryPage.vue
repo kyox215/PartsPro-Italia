@@ -131,6 +131,7 @@ watch(
       </div>
 
       <a-table
+        class="admin-desktop-data-table"
         :columns="columns"
         :data-source="filteredInventory"
         row-key="id"
@@ -174,6 +175,65 @@ watch(
           </template>
         </template>
       </a-table>
+
+      <div class="admin-mobile-data-list admin-mobile-inventory-list">
+        <a-empty v-if="filteredInventory.length === 0" class="admin-mobile-empty" description="暂无库存" />
+        <article
+          v-for="item in filteredInventory"
+          :key="item.id"
+          class="admin-mobile-data-card admin-mobile-inventory-card"
+        >
+          <header>
+            <div>
+              <strong>{{ item.skuCode }}</strong>
+              <span>{{ item.productName }}</span>
+            </div>
+            <a-tag :color="stockColor(item)">可用 {{ item.availableQty }}</a-tag>
+          </header>
+
+          <div class="admin-mobile-data-tags">
+            <a-tag color="blue">{{ item.brand }}</a-tag>
+            <a-tag>{{ item.model }}</a-tag>
+            <a-tag>{{ item.qualityGrade }}</a-tag>
+          </div>
+
+          <dl class="admin-mobile-data-grid admin-mobile-inventory-grid">
+            <div>
+              <dt>批次</dt>
+              <dd>{{ item.batchCode }}</dd>
+            </div>
+            <div>
+              <dt>库位</dt>
+              <dd>{{ item.location }}</dd>
+            </div>
+            <div>
+              <dt>实际</dt>
+              <dd>{{ item.actualQty }}</dd>
+            </div>
+            <div>
+              <dt>锁定</dt>
+              <dd>{{ item.lockedQty }}</dd>
+            </div>
+            <div>
+              <dt>在途</dt>
+              <dd>{{ item.incomingQty }}</dd>
+            </div>
+            <div>
+              <dt>最后流水</dt>
+              <dd>{{ formatDate(item.lastMovementAt) }}</dd>
+            </div>
+          </dl>
+
+          <div class="admin-mobile-data-tags">
+            <a-tag :color="item.qcQty > 0 ? 'gold' : 'default'">QC {{ item.qcQty }}</a-tag>
+            <a-tag :color="item.rmaQty > 0 ? 'blue' : 'default'">RMA {{ item.rmaQty }}</a-tag>
+            <a-tag :color="item.defectiveQty > 0 ? 'red' : 'default'">
+              瑕疵 {{ item.defectiveQty }}
+            </a-tag>
+            <a-tag>{{ item.supplier }}</a-tag>
+          </div>
+        </article>
+      </div>
     </a-card>
   </main>
 </template>

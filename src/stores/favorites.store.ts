@@ -4,7 +4,7 @@ import { getProducts } from '@/services/products.service'
 const favoritesStorageKey = 'partspro.favorites'
 
 function readStoredFavorites() {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || !window.localStorage) {
     return []
   }
 
@@ -20,11 +20,15 @@ function readStoredFavorites() {
 }
 
 function writeStoredFavorites(skuCodes: string[]) {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || !window.localStorage) {
     return
   }
 
-  window.localStorage.setItem(favoritesStorageKey, JSON.stringify(skuCodes))
+  try {
+    window.localStorage.setItem(favoritesStorageKey, JSON.stringify(skuCodes))
+  } catch {
+    // Storage can be unavailable in embedded/private contexts.
+  }
 }
 
 export const useFavoritesStore = defineStore('favorites', {

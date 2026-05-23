@@ -10,20 +10,28 @@ function isLanguage(value: string | null): value is Language {
 }
 
 function readStoredLanguage(key: string, fallback: Language) {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || !window.localStorage) {
     return fallback
   }
 
-  const storedLanguage = window.localStorage.getItem(key)
-  return isLanguage(storedLanguage) ? storedLanguage : fallback
+  try {
+    const storedLanguage = window.localStorage.getItem(key)
+    return isLanguage(storedLanguage) ? storedLanguage : fallback
+  } catch {
+    return fallback
+  }
 }
 
 function writeStoredLanguage(key: string, language: Language) {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || !window.localStorage) {
     return
   }
 
-  window.localStorage.setItem(key, language)
+  try {
+    window.localStorage.setItem(key, language)
+  } catch {
+    // Storage can be blocked in embedded/private browser contexts.
+  }
 }
 
 export const useUiStore = defineStore('ui', {

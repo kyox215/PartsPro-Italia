@@ -6,7 +6,7 @@ import { message } from 'ant-design-vue'
 import { fetchSupabaseAuthSettings, hasSupabaseConfig } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth.store'
 import { useUiStore } from '@/stores/ui.store'
-import type { UserRole } from '@/types/auth'
+import { staffRoles, type UserRole } from '@/types/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -84,6 +84,18 @@ async function finishLogin() {
   await router.replace(returnUrl.value)
 }
 
+function getDemoReturnUrl(role: Exclude<UserRole, 'guest'>) {
+  const rawReturnUrl = Array.isArray(route.query.returnUrl)
+    ? route.query.returnUrl[0]
+    : route.query.returnUrl
+
+  if (rawReturnUrl) {
+    return returnUrl.value
+  }
+
+  return staffRoles.includes(role) ? '/admin' : returnUrl.value
+}
+
 function buildGoogleRedirectUrl() {
   const redirectUrl = new URL('/login', window.location.origin)
   redirectUrl.searchParams.set('returnUrl', returnUrl.value)
@@ -111,7 +123,7 @@ async function handleGoogleLogin() {
 async function handleDemoLogin(role: Exclude<UserRole, 'guest'>) {
   authStore.loginAsDemo(role)
   message.success(`${copy.value.demoActive}: ${role}`)
-  await finishLogin()
+  await router.replace(getDemoReturnUrl(role))
 }
 
 onMounted(async () => {

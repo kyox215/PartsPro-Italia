@@ -1,5 +1,6 @@
 import type { Product } from '@/types/product'
 import { hasSupabaseConfig, shouldUseSupabaseData, supabase } from '@/lib/supabase'
+import { hasDemoAuthProfile } from '@/services/demo-auth.service'
 
 type ProductRow = {
   sku_code: string
@@ -21,6 +22,10 @@ type ProductRow = {
   warranty_days: number
   compatibility: Product['compatibility'] | null
   highlights: string[] | null
+}
+
+type FetchProductOptions = {
+  includePrices?: boolean
 }
 
 const publicProductColumns =
@@ -266,25 +271,35 @@ function mapProductRow(row: ProductRow): Product {
   }
 }
 
-async function getProductColumns() {
+async function hasRealSupabaseSession() {
   const {
     data: { session },
   } = await supabase.auth.getSession()
 
-  return session ? authenticatedProductColumns : publicProductColumns
+  return Boolean(session)
+}
+
+async function getProductColumns(includePrices = false) {
+  const hasSession = await hasRealSupabaseSession()
+
+  return hasSession && includePrices ? authenticatedProductColumns : publicProductColumns
 }
 
 function warnSupabaseFallback(scope: string, error: unknown) {
   console.warn(`[PartsPro] Supabase ${scope} fallback to mock data`, error)
 }
 
-export async function fetchProducts() {
+export async function fetchProducts(options: FetchProductOptions = {}) {
   if (!shouldUseSupabaseData) {
     return getProducts()
   }
 
   try {
-    const columns = await getProductColumns()
+    if (options.includePrices && (hasDemoAuthProfile() || !(await hasRealSupabaseSession()))) {
+      return getProducts()
+    }
+
+    const columns = await getProductColumns(options.includePrices)
     const { data, error } = await supabase
       .from('products')
       .select(columns as string)
@@ -303,13 +318,17 @@ export async function fetchProducts() {
   }
 }
 
-export async function fetchProductBySku(skuCode: string) {
+export async function fetchProductBySku(skuCode: string, options: FetchProductOptions = {}) {
   if (!shouldUseSupabaseData) {
     return getProductBySku(skuCode)
   }
 
   try {
-    const columns = await getProductColumns()
+    if (options.includePrices && (hasDemoAuthProfile() || !(await hasRealSupabaseSession()))) {
+      return getProductBySku(skuCode)
+    }
+
+    const columns = await getProductColumns(options.includePrices)
     const { data, error } = await supabase
       .from('products')
       .select(columns as string)
@@ -327,7 +346,7 @@ export async function fetchProductBySku(skuCode: string) {
   }
 }
 
-export async function fetchProductByRef(productRef: string) {
+export async function fetchProductByRef(productRef: string, options: FetchProductOptions = {}) {
   const normalizedRef = productRef.trim()
 
   if (!normalizedRef) {
@@ -341,13 +360,13 @@ export async function fetchProductByRef(productRef: string) {
   }
 
   if (/^[A-Z0-9-]+$/i.test(normalizedRef)) {
-    const productBySku = await fetchProductBySku(normalizedRef)
+    const productBySku = await fetchProductBySku(normalizedRef, options)
 
     if (productBySku) {
       return productBySku
     }
   }
 
-  const allProducts = await fetchProducts()
+  const allProducts = await fetchProducts(options)
   return allProducts.find((product) => getProductSlug(product) === normalizedRef.toLowerCase())
 }

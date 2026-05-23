@@ -149,7 +149,7 @@ function syncRouteFilters() {
 async function loadProducts() {
   isLoading.value = true
   try {
-    products.value = await fetchProducts()
+    products.value = await fetchProducts({ includePrices: canViewPrice.value })
   } finally {
     isLoading.value = false
   }

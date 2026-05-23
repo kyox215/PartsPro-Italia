@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { createOrderFromCheckout } from '@/services/order.service'
 import { useCartStore } from '@/stores/cart.store'
+import { useAuthStore } from '@/stores/auth.store'
+import { useCustomerStore } from '@/stores/customer.store'
 import { useUiStore } from '@/stores/ui.store'
 import type { CheckoutPayload } from '@/types/cart'
 
+const router = useRouter()
 const cartStore = useCartStore()
+const authStore = useAuthStore()
+const customerStore = useCustomerStore()
 const uiStore = useUiStore()
 const currentStep = ref(0)
 const isSubmitting = ref(false)
@@ -20,20 +26,7 @@ const currency = new Intl.NumberFormat('it-IT', {
 
 const checkout = reactive<CheckoutPayload>({
   items: [],
-  billing: {
-    companyName: 'PartsPro Demo Customer',
-    vatNumber: 'IT00000000000',
-    fiscalCode: '',
-    sdi: '0000000',
-    pec: 'cliente@examplepec.it',
-    address: 'Via Roma 1, Milano, Italia',
-  },
-  shipping: {
-    contactName: 'Demo Customer',
-    phone: '+39 000 000 0000',
-    address: 'Via Roma 1, Milano, Italia',
-    method: 'GLS/BRT 24-48h',
-  },
+  shippingMethod: 'GLS/BRT 24-48h',
   paymentMethod: 'bank_transfer',
   customerNote: '',
 })
@@ -42,7 +35,12 @@ const acceptsTerms = ref(false)
 const acceptsPrivacy = ref(false)
 
 const canSubmit = computed(
-  () => cartStore.lines.length > 0 && !cartStore.hasBlockingIssues && acceptsTerms.value && acceptsPrivacy.value,
+  () =>
+    cartStore.lines.length > 0 &&
+    !cartStore.hasBlockingIssues &&
+    customerStore.isComplete &&
+    acceptsTerms.value &&
+    acceptsPrivacy.value,
 )
 const copy = computed(() => {
   if (uiStore.language === 'zh') {
@@ -55,8 +53,10 @@ const copy = computed(() => {
       checkout: '结账',
       steps: ['客户', '发票', '配送', '支付'],
       customer: '客户',
-      customerMessage: '已审核 B2B 客户',
-      customerDescription: '当前为演示资料。正式环境将从 Supabase 客户资料读取。',
+      customerMessage: '客户资料已锁定用于本次订单',
+      customerDescription: '公司、P.IVA、发票地址和送货地址会从客户中心读取，结账页不再临时修改。',
+      profileIncomplete: '客户资料不完整',
+      completeProfile: '完善资料',
       billing: '发票资料',
       company: '公司名称',
       fiscalCode: '税号',
@@ -74,7 +74,7 @@ const copy = computed(() => {
       terms: '我接受条款与条件',
       privacy: '我接受隐私政策',
       backendPrice: '价格由后端重新计算',
-      backendPriceDescription: '提交订单时会调用后端订单接口，前端价格仅作为展示。',
+      backendPriceDescription: '提交订单时后端会读取已保存客户资料并重新计算价格、MOQ、VAT 和运费。',
       back: '上一步',
       next: '下一步',
       confirm: '确认订单',
@@ -94,8 +94,10 @@ const copy = computed(() => {
     checkout: 'Checkout',
     steps: ['Cliente', 'Fatturazione', 'Spedizione', 'Pagamento'],
     customer: 'Cliente',
-    customerMessage: 'Cliente B2B approvato',
-    customerDescription: 'I dati sono precaricati dal profilo demo. In produzione arrivano dal profilo Supabase.',
+    customerMessage: 'Dati cliente bloccati per questo ordine',
+    customerDescription: 'Azienda, P.IVA, fattura e consegna arrivano dall’area cliente e non si modificano nel checkout.',
+    profileIncomplete: 'Profilo cliente incompleto',
+    completeProfile: 'Completa dati',
     billing: 'Fatturazione',
     company: 'Ragione sociale',
     fiscalCode: 'Codice Fiscale',
@@ -113,7 +115,8 @@ const copy = computed(() => {
     terms: 'Accetto Termini e Condizioni',
     privacy: 'Accetto Privacy Policy',
     backendPrice: 'Prezzo ricalcolato dal backend',
-    backendPriceDescription: 'La conferma ordine deve chiamare create_order_from_cart RPC e non fidarsi del prezzo frontend.',
+    backendPriceDescription:
+      'Alla conferma il backend legge il profilo salvato e ricalcola prezzi, MOQ, IVA e spedizione.',
     back: 'Indietro',
     next: 'Avanti',
     confirm: 'Conferma ordine',
@@ -124,6 +127,7 @@ const copy = computed(() => {
   }
 })
 const stepItems = computed(() => copy.value.steps.map((title, index) => ({ title, index })))
+const profile = computed(() => customerStore.profile)
 
 function nextStep() {
   currentStep.value = Math.min(currentStep.value + 1, 3)
@@ -134,10 +138,22 @@ function previousStep() {
 }
 
 async function submitOrder() {
-  checkout.items = cartStore.items
   isSubmitting.value = true
 
   try {
+    await customerStore.ensureLoaded(authStore.profile?.email || '')
+
+    if (!customerStore.isComplete) {
+      await router.push({
+        name: 'account-company',
+        query: {
+          returnUrl: '/checkout',
+        },
+      })
+      return
+    }
+
+    checkout.items = cartStore.items
     const order = await createOrderFromCheckout(checkout)
     createdOrderId.value = order.orderId
     createdOrderNo.value = order.orderNo
@@ -149,6 +165,23 @@ async function submitOrder() {
     isSubmitting.value = false
   }
 }
+
+onMounted(async () => {
+  try {
+    await customerStore.ensureLoaded(authStore.profile?.email || '')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : copy.value.profileIncomplete)
+  }
+
+  if (!customerStore.isComplete && !createdOrderId.value) {
+    await router.replace({
+      name: 'account-company',
+      query: {
+        returnUrl: '/checkout',
+      },
+    })
+  }
+})
 </script>
 
 <template>
@@ -198,60 +231,76 @@ async function submitOrder() {
           <template v-if="currentStep === 0">
             <h2>{{ copy.customer }}</h2>
             <a-alert
-              type="info"
+              :type="customerStore.isComplete ? 'info' : 'warning'"
               show-icon
-              :message="copy.customerMessage"
+              :message="customerStore.isComplete ? copy.customerMessage : copy.profileIncomplete"
               :description="copy.customerDescription"
             />
+            <div class="checkout-readonly-grid">
+              <div class="checkout-readonly-item">
+                <span>{{ copy.company }}</span>
+                <strong>{{ profile.companyName || '-' }}</strong>
+              </div>
+              <div class="checkout-readonly-item">
+                <span>{{ copy.contact }}</span>
+                <strong>{{ profile.contactName || '-' }}</strong>
+              </div>
+              <div class="checkout-readonly-item">
+                <span>Email</span>
+                <strong>{{ profile.email || authStore.profile?.email || '-' }}</strong>
+              </div>
+              <div class="checkout-readonly-item">
+                <span>{{ copy.phone }}</span>
+                <strong>{{ profile.phone || '-' }}</strong>
+              </div>
+            </div>
+            <RouterLink
+              v-if="!customerStore.isComplete"
+              :to="{ name: 'account-company', query: { returnUrl: '/checkout' } }"
+            >
+              <a-button type="primary">{{ copy.completeProfile }}</a-button>
+            </RouterLink>
           </template>
 
-          <a-form v-if="currentStep === 1" layout="vertical">
+          <template v-if="currentStep === 1">
             <h2>{{ copy.billing }}</h2>
-            <a-form-item :label="copy.company">
-              <a-input v-model:value="checkout.billing.companyName" />
-            </a-form-item>
-            <a-row :gutter="12">
-              <a-col :xs="24" :md="12">
-                <a-form-item label="P.IVA">
-                  <a-input v-model:value="checkout.billing.vatNumber" />
-                </a-form-item>
-              </a-col>
-              <a-col :xs="24" :md="12">
-                <a-form-item :label="copy.fiscalCode">
-                  <a-input v-model:value="checkout.billing.fiscalCode" />
-                </a-form-item>
-              </a-col>
-            </a-row>
-            <a-row :gutter="12">
-              <a-col :xs="24" :md="12">
-                <a-form-item label="SDI">
-                  <a-input v-model:value="checkout.billing.sdi" />
-                </a-form-item>
-              </a-col>
-              <a-col :xs="24" :md="12">
-                <a-form-item label="PEC">
-                  <a-input v-model:value="checkout.billing.pec" />
-                </a-form-item>
-              </a-col>
-            </a-row>
-            <a-form-item :label="copy.billingAddress">
-              <a-textarea v-model:value="checkout.billing.address" :rows="3" />
-            </a-form-item>
-          </a-form>
+            <div class="checkout-readonly-grid fiscal-grid">
+              <div class="checkout-readonly-item">
+                <span>P.IVA</span>
+                <strong>{{ profile.vatNumber || '-' }}</strong>
+              </div>
+              <div class="checkout-readonly-item">
+                <span>{{ copy.fiscalCode }}</span>
+                <strong>{{ profile.fiscalCode || '-' }}</strong>
+              </div>
+              <div class="checkout-readonly-item">
+                <span>SDI</span>
+                <strong>{{ profile.sdi || '-' }}</strong>
+              </div>
+              <div class="checkout-readonly-item">
+                <span>PEC</span>
+                <strong>{{ profile.pec || '-' }}</strong>
+              </div>
+              <div class="checkout-readonly-item is-wide">
+                <span>{{ copy.billingAddress }}</span>
+                <strong>{{ profile.billingAddress || '-' }}</strong>
+              </div>
+            </div>
+            <RouterLink :to="{ name: 'account-company', query: { returnUrl: '/checkout' } }">
+              <a-button>{{ copy.completeProfile }}</a-button>
+            </RouterLink>
+          </template>
 
           <a-form v-if="currentStep === 2" layout="vertical">
             <h2>{{ copy.shipping }}</h2>
-            <a-form-item :label="copy.contact">
-              <a-input v-model:value="checkout.shipping.contactName" />
-            </a-form-item>
-            <a-form-item :label="copy.phone">
-              <a-input v-model:value="checkout.shipping.phone" />
-            </a-form-item>
-            <a-form-item :label="copy.shippingAddress">
-              <a-textarea v-model:value="checkout.shipping.address" :rows="3" />
-            </a-form-item>
+            <div class="checkout-readonly-grid">
+              <div class="checkout-readonly-item is-wide">
+                <span>{{ copy.shippingAddress }}</span>
+                <strong>{{ profile.shippingAddress || '-' }}</strong>
+              </div>
+            </div>
             <a-form-item :label="copy.shippingMethod">
-              <a-radio-group v-model:value="checkout.shipping.method">
+              <a-radio-group v-model:value="checkout.shippingMethod">
                 <a-radio value="GLS/BRT 24-48h">GLS/BRT 24-48h</a-radio>
                 <a-radio value="DHL/UPS EU">DHL/UPS EU</a-radio>
                 <a-radio value="Ritiro in sede">Ritiro in sede</a-radio>

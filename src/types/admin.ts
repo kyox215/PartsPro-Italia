@@ -142,7 +142,7 @@ export type CustomerAccount = {
   monthlyPurchase: string
   ordersCount: number
   revenue: number
-  lastOrderAt: string
+  lastOrderAt: string | null
   creditLimit: number
   paymentTerms: string
 }

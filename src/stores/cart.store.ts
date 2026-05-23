@@ -18,11 +18,15 @@ function readStoredCart() {
 }
 
 function writeStoredCart(items: CartItem[]) {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || !window.localStorage) {
     return
   }
 
-  window.localStorage.setItem(cartStorageKey, JSON.stringify(items))
+  try {
+    window.localStorage.setItem(cartStorageKey, JSON.stringify(items))
+  } catch {
+    // Browser storage can be unavailable in embedded/private contexts.
+  }
 }
 
 export const useCartStore = defineStore('cart', {

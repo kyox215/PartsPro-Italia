@@ -131,7 +131,7 @@ const copy = computed(() => {
 async function loadProduct() {
   isLoading.value = true
   try {
-    product.value = await fetchProductByRef(productRef.value)
+    product.value = await fetchProductByRef(productRef.value, { includePrices: canViewPrice.value })
     purchaseQuantity.value = product.value?.moq || 1
     failedImage.value = false
   } finally {

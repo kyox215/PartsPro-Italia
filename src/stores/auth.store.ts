@@ -5,28 +5,9 @@ import {
   signInWithGoogle,
   signOutFromSupabase,
 } from '@/services/auth.service'
+import { readDemoAuthProfile, writeDemoAuthProfile } from '@/services/demo-auth.service'
 import type { AuthProfile, RouteAccess, UserRole } from '@/types/auth'
 import { staffRoles } from '@/types/auth'
-
-const demoProfileStorageKey = 'partspro.demoProfile'
-
-function readDemoProfile() {
-  try {
-    const rawProfile = window.localStorage.getItem(demoProfileStorageKey)
-    return rawProfile ? (JSON.parse(rawProfile) as AuthProfile) : null
-  } catch {
-    return null
-  }
-}
-
-function writeDemoProfile(profile: AuthProfile | null) {
-  if (!profile || profile.source !== 'demo') {
-    window.localStorage.removeItem(demoProfileStorageKey)
-    return
-  }
-
-  window.localStorage.setItem(demoProfileStorageKey, JSON.stringify(profile))
-}
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -74,7 +55,7 @@ export const useAuthStore = defineStore('auth', {
       this.authError = ''
 
       try {
-        const profile = (await getCurrentAuthProfile()) || readDemoProfile()
+        const profile = (await getCurrentAuthProfile()) || readDemoAuthProfile()
         this.applyProfile(profile)
       } catch (error) {
         this.authError = error instanceof Error ? error.message : 'Errore autenticazione.'
@@ -119,7 +100,7 @@ export const useAuthStore = defineStore('auth', {
         role,
         source: 'demo',
       }
-      writeDemoProfile(profile)
+      writeDemoAuthProfile(profile)
       this.applyProfile(profile)
       this.isInitialized = true
     },
@@ -132,7 +113,7 @@ export const useAuthStore = defineStore('auth', {
       } catch (error) {
         this.authError = error instanceof Error ? error.message : 'Logout non riuscito.'
       } finally {
-        writeDemoProfile(null)
+        writeDemoAuthProfile(null)
         this.applyProfile(null)
         this.isLoading = false
       }

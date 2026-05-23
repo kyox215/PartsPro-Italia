@@ -24,6 +24,13 @@ type NavNode = {
   children?: NavNode[]
 }
 
+type NavigationSection = {
+  key: string
+  label: string
+  to: string
+  children: NavNode[]
+}
+
 const uiStore = useUiStore()
 const authStore = useAuthStore()
 const cartStore = useCartStore()
@@ -77,10 +84,11 @@ const brandTreeLinks = computed<NavNode[]>(() =>
   })),
 )
 
-const navigationSections = computed<Array<{ key: string; label: string; children: NavNode[] }>>(() => [
+const navigationSections = computed<NavigationSection[]>(() => [
   {
     key: 'catalog',
     label: uiStore.language === 'zh' ? '商品目录' : 'Catalogo',
+    to: '/products',
     children: [
       { key: 'all-products', label: uiStore.language === 'zh' ? '全部商品' : 'Tutti i prodotti', to: '/products' },
       ...categoryLinks.value,
@@ -89,11 +97,13 @@ const navigationSections = computed<Array<{ key: string; label: string; children
   {
     key: 'brands',
     label: uiStore.language === 'zh' ? '品牌' : 'Brand',
+    to: '/products',
     children: brandTreeLinks.value,
   },
   {
     key: 'b2b',
     label: 'B2B',
+    to: '/b2b/register',
     children: [
       { key: 'wholesale', label: t(uiStore.language, 'footerWholesale'), to: '/b2b/register' },
       { key: 'request-b2b', label: t(uiStore.language, 'requestB2B'), to: '/b2b/register' },
@@ -104,6 +114,7 @@ const navigationSections = computed<Array<{ key: string; label: string; children
   {
     key: 'support',
     label: uiStore.language === 'zh' ? '规则与支持' : 'Regole e supporto',
+    to: '/legal/terms',
     children: [
       { key: 'quality', label: t(uiStore.language, 'footerQuality'), to: '/products' },
       { key: 'terms', label: t(uiStore.language, 'footerTerms'), to: '/legal/terms' },
@@ -189,6 +200,14 @@ function handleDrawerSearch(value: string) {
   isMobileMenuOpen.value = false
 }
 
+function navigateToMenu(to?: string) {
+  if (!to) {
+    return
+  }
+
+  router.push(to)
+}
+
 function toggleMobileSection(sectionKey: string) {
   openMobileSectionKey.value = openMobileSectionKey.value === sectionKey ? '' : sectionKey
   openMobileChildKey.value = ''
@@ -237,6 +256,15 @@ async function handleLogout() {
           </template>
         </a-input-search>
         <a-space class="header-actions">
+          <a-segmented
+            class="desktop-language-switch"
+            :value="uiStore.language"
+            :options="[
+              { label: 'IT', value: 'it' },
+              { label: '中文', value: 'zh' },
+            ]"
+            @change="handleLanguageChange"
+          />
           <a-tag v-if="authStore.isAuthenticated" color="blue" class="auth-role-tag">
             {{ authStore.role }}
           </a-tag>
@@ -279,23 +307,39 @@ async function handleLogout() {
         <a-menu-item key="home">
           <RouterLink to="/">{{ uiStore.language === 'zh' ? '首页' : 'Home' }}</RouterLink>
         </a-menu-item>
-        <a-sub-menu v-for="section in navigationSections" :key="section.key">
+        <a-sub-menu
+          v-for="section in navigationSections"
+          :key="section.key"
+          @titleClick="navigateToMenu(section.to)"
+        >
           <template #title>
-            <span class="menu-section-title">
+            <span class="menu-section-title menu-section-title-action">
               <AppstoreOutlined />
               {{ section.label }}
             </span>
           </template>
           <template v-for="link in section.children" :key="`${section.key}-${link.key}`">
-            <a-sub-menu v-if="link.children?.length" :key="`${section.key}-${link.key}-sub`">
+            <a-sub-menu
+              v-if="link.children?.length"
+              :key="`${section.key}-${link.key}-sub`"
+              @titleClick="navigateToMenu(link.to)"
+            >
               <template #title>
-                <RouterLink v-if="link.to" :to="link.to">{{ link.label }}</RouterLink>
+                <span v-if="link.to" class="desktop-menu-title-action">
+                  {{ link.label }}
+                </span>
                 <span v-else>{{ link.label }}</span>
               </template>
               <template v-for="child in link.children" :key="`${link.key}-${child.key}`">
-                <a-sub-menu v-if="child.children?.length" :key="`${link.key}-${child.key}-sub`">
+                <a-sub-menu
+                  v-if="child.children?.length"
+                  :key="`${link.key}-${child.key}-sub`"
+                  @titleClick="navigateToMenu(child.to)"
+                >
                   <template #title>
-                    <RouterLink v-if="child.to" :to="child.to">{{ child.label }}</RouterLink>
+                    <span v-if="child.to" class="desktop-menu-title-action">
+                      {{ child.label }}
+                    </span>
                     <span v-else>{{ child.label }}</span>
                   </template>
                   <a-menu-item
@@ -395,46 +439,71 @@ async function handleLogout() {
             :key="section.key"
             class="mobile-nav-group"
           >
-            <button
-              class="mobile-nav-parent"
-              type="button"
-              :aria-expanded="openMobileSectionKey === section.key"
-              @click="toggleMobileSection(section.key)"
-            >
-              <span>
+            <div class="mobile-nav-parent">
+              <RouterLink
+                class="mobile-nav-parent-link"
+                :to="section.to"
+                @click="isMobileMenuOpen = false"
+              >
                 <AppstoreOutlined />
                 {{ section.label }}
-              </span>
-              <DownOutlined v-if="openMobileSectionKey === section.key" />
-              <RightOutlined v-else />
-            </button>
+              </RouterLink>
+              <button
+                class="mobile-nav-toggle"
+                type="button"
+                :aria-label="`${section.label} ${openMobileSectionKey === section.key ? 'collapse' : 'expand'}`"
+                :aria-expanded="openMobileSectionKey === section.key"
+                @click="toggleMobileSection(section.key)"
+              >
+                <DownOutlined v-if="openMobileSectionKey === section.key" />
+                <RightOutlined v-else />
+              </button>
+            </div>
 
             <div v-if="openMobileSectionKey === section.key" class="mobile-nav-children mobile-nav-tree">
               <template v-for="link in section.children" :key="`${section.key}-${link.key}`">
                 <div v-if="link.children?.length" class="mobile-nav-branch">
-                  <button
-                    class="mobile-nav-child-parent"
-                    type="button"
-                    :aria-expanded="openMobileChildKey === link.key"
-                    @click="toggleMobileChild(link.key)"
-                  >
-                    <span>{{ link.label }}</span>
-                    <DownOutlined v-if="openMobileChildKey === link.key" />
-                    <RightOutlined v-else />
-                  </button>
+                  <div class="mobile-nav-child-parent">
+                    <RouterLink
+                      class="mobile-nav-row-link"
+                      :to="link.to || '/products'"
+                      @click="isMobileMenuOpen = false"
+                    >
+                      {{ link.label }}
+                    </RouterLink>
+                    <button
+                      class="mobile-nav-toggle"
+                      type="button"
+                      :aria-label="`${link.label} ${openMobileChildKey === link.key ? 'collapse' : 'expand'}`"
+                      :aria-expanded="openMobileChildKey === link.key"
+                      @click="toggleMobileChild(link.key)"
+                    >
+                      <DownOutlined v-if="openMobileChildKey === link.key" />
+                      <RightOutlined v-else />
+                    </button>
+                  </div>
                   <div v-if="openMobileChildKey === link.key" class="mobile-nav-branch-children">
                     <template v-for="child in link.children" :key="`${link.key}-${child.key}`">
                       <div v-if="child.children?.length" class="mobile-nav-subbranch">
-                        <button
-                          class="mobile-nav-grand-parent"
-                          type="button"
-                          :aria-expanded="openMobileGrandKey === child.key"
-                          @click="toggleMobileGrand(child.key)"
-                        >
-                          <span>{{ child.label }}</span>
-                          <DownOutlined v-if="openMobileGrandKey === child.key" />
-                          <RightOutlined v-else />
-                        </button>
+                        <div class="mobile-nav-grand-parent">
+                          <RouterLink
+                            class="mobile-nav-row-link"
+                            :to="child.to || '/products'"
+                            @click="isMobileMenuOpen = false"
+                          >
+                            {{ child.label }}
+                          </RouterLink>
+                          <button
+                            class="mobile-nav-toggle"
+                            type="button"
+                            :aria-label="`${child.label} ${openMobileGrandKey === child.key ? 'collapse' : 'expand'}`"
+                            :aria-expanded="openMobileGrandKey === child.key"
+                            @click="toggleMobileGrand(child.key)"
+                          >
+                            <DownOutlined v-if="openMobileGrandKey === child.key" />
+                            <RightOutlined v-else />
+                          </button>
+                        </div>
                         <div v-if="openMobileGrandKey === child.key" class="mobile-nav-leaves">
                           <RouterLink
                             v-for="leaf in child.children"
@@ -493,7 +562,13 @@ async function handleLogout() {
               :to="authStore.isAuthenticated ? '/account' : '/login'"
               @click="isMobileMenuOpen = false"
             >
-              {{ authStore.isAuthenticated ? t(uiStore.language, 'footerCustomerArea') : 'Login' }}
+              {{
+                authStore.isAuthenticated
+                  ? t(uiStore.language, 'footerCustomerArea')
+                  : uiStore.language === 'zh'
+                    ? '登录'
+                    : 'Login'
+              }}
             </RouterLink>
             <RouterLink
               v-if="authStore.isStaff"
@@ -503,7 +578,7 @@ async function handleLogout() {
               Admin
             </RouterLink>
             <button v-if="authStore.isAuthenticated" type="button" @click="handleLogout">
-              Logout
+              {{ uiStore.language === 'zh' ? '退出登录' : 'Logout' }}
             </button>
           </div>
         </div>

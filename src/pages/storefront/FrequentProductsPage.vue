@@ -50,7 +50,7 @@ const favoriteProducts = computed(() => {
 async function loadProducts() {
   isLoading.value = true
   try {
-    products.value = await fetchProducts()
+    products.value = await fetchProducts({ includePrices: authStore.canViewCustomerPrices })
   } finally {
     isLoading.value = false
   }

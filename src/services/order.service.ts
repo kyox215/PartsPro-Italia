@@ -7,6 +7,7 @@ import {
   updateOrderStatus as updateDemoOrderStatus,
 } from '@/services/admin.service'
 import { buildCartLines, calculateCartSummary } from '@/services/cart.service'
+import { fetchCurrentCustomerProfile, validateCustomerProfile } from '@/services/customer.service'
 import { shouldUseSupabaseData, supabase } from '@/lib/supabase'
 import type {
   AdminOrder,
@@ -108,7 +109,11 @@ function writeStoredDemoOrders(orders: AdminOrder[]) {
     return
   }
 
-  window.localStorage.setItem(demoOrdersStorageKey, JSON.stringify(orders))
+  try {
+    window.localStorage.setItem(demoOrdersStorageKey, JSON.stringify(orders))
+  } catch {
+    // Storage can be unavailable in embedded/private contexts.
+  }
 }
 
 function getDemoOrders() {
@@ -245,7 +250,14 @@ function createDemoOrderNo() {
   return `SO-${datePart}-${suffix}`
 }
 
-function createDemoOrder(payload: CheckoutPayload): CreatedOrder {
+async function createDemoOrder(payload: CheckoutPayload): Promise<CreatedOrder> {
+  const customerProfile = await fetchCurrentCustomerProfile()
+  const profileValidation = validateCustomerProfile(customerProfile)
+
+  if (!profileValidation.isComplete) {
+    throw new Error('Completa i dati aziendali prima del checkout.')
+  }
+
   const lines = buildCartLines(payload.items)
   const hasInvalidLine = lines.some((line) => line.isBelowMoq || line.isOutOfStock)
 
@@ -258,7 +270,7 @@ function createDemoOrder(payload: CheckoutPayload): CreatedOrder {
   const createdOrder: AdminOrder = {
     id: `demo-${orderNo}`,
     orderNo,
-    customerName: payload.billing.companyName || 'PartsPro Demo Customer',
+    customerName: customerProfile.companyName,
     customerTier: 'standard',
     status: 'submitted',
     paymentStatus: payload.paymentMethod === 'bank_transfer' ? 'bank_waiting' : 'pending',
@@ -267,14 +279,14 @@ function createDemoOrder(payload: CheckoutPayload): CreatedOrder {
     vat: summary.vat,
     shipping: summary.shipping,
     createdAt: new Date().toISOString(),
-    shippingMethod: payload.shipping.method,
+    shippingMethod: payload.shippingMethod,
     fiscal: {
-      vatNumber: payload.billing.vatNumber,
-      fiscalCode: payload.billing.fiscalCode,
-      sdi: payload.billing.sdi,
-      pec: payload.billing.pec,
+      vatNumber: customerProfile.vatNumber,
+      fiscalCode: customerProfile.fiscalCode,
+      sdi: customerProfile.sdi,
+      pec: customerProfile.pec,
     },
-    deliveryAddress: payload.shipping.address,
+    deliveryAddress: customerProfile.shippingAddress,
     customerNote: payload.customerNote,
     staffNote: 'Demo order created from local checkout.',
     lines: lines.map((line) => ({
@@ -324,8 +336,7 @@ export async function createOrderFromCheckout(payload: CheckoutPayload): Promise
     const { data, error } = await supabase.rpc('create_order_from_cart', {
       payload: {
         items: payload.items,
-        billing: payload.billing,
-        shipping: payload.shipping,
+        shippingMethod: payload.shippingMethod,
         paymentMethod: payload.paymentMethod,
         customerNote: payload.customerNote,
       },

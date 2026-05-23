@@ -179,7 +179,7 @@ function createId(prefix: string) {
 }
 
 function readTaxonomy() {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || !window.localStorage) {
     return cloneDefaultTaxonomy()
   }
 
@@ -214,11 +214,15 @@ function normalizeTaxonomyGroups(value: unknown) {
 }
 
 function writeLocalTaxonomy(groups: TaxonomyBrandNode[]) {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || !window.localStorage) {
     return
   }
 
-  window.localStorage.setItem(taxonomyStorageKey, JSON.stringify(groups))
+  try {
+    window.localStorage.setItem(taxonomyStorageKey, JSON.stringify(groups))
+  } catch {
+    // Storage can be unavailable in embedded/private contexts.
+  }
 }
 
 export function getTaxonomyLabel(
