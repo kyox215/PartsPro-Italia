@@ -144,6 +144,8 @@ async function handleSubmit() {
     const result = await submitB2BApplication(application)
     submittedId.value = result.id
     message.success(copy.value.success)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : copy.value.acceptError)
   } finally {
     isSubmitting.value = false
   }

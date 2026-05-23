@@ -135,6 +135,8 @@ async function handleSubmit() {
     const result = await submitRmaRequest(rmaRequest)
     submittedCaseId.value = result.id
     message.success(copy.value.success)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : copy.value.statusDescription)
   } finally {
     isSubmitting.value = false
   }

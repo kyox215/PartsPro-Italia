@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { shouldUseSupabaseData, supabase } from '@/lib/supabase'
 
 export type TaxonomyCategoryNode = {
   id: string
@@ -26,6 +27,7 @@ export type TaxonomyBrandNode = {
 type TaxonomyLanguage = 'zh' | 'it'
 
 const taxonomyStorageKey = 'partspro.catalogTaxonomy'
+const taxonomyRecordId = 'default'
 
 const defaultTaxonomy: TaxonomyBrandNode[] = [
   {
@@ -190,6 +192,35 @@ function readTaxonomy() {
   }
 }
 
+function isTaxonomyGroup(value: unknown): value is TaxonomyBrandNode {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const candidate = value as TaxonomyBrandNode
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.labelZh === 'string' &&
+    typeof candidate.labelIt === 'string' &&
+    typeof candidate.value === 'string' &&
+    Array.isArray(candidate.children)
+  )
+}
+
+function normalizeTaxonomyGroups(value: unknown) {
+  return Array.isArray(value) && value.every(isTaxonomyGroup)
+    ? (value as TaxonomyBrandNode[])
+    : cloneDefaultTaxonomy()
+}
+
+function writeLocalTaxonomy(groups: TaxonomyBrandNode[]) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.localStorage.setItem(taxonomyStorageKey, JSON.stringify(groups))
+}
+
 export function getTaxonomyLabel(
   node: Pick<TaxonomyBrandNode, 'labelZh' | 'labelIt' | 'value'>,
   language: TaxonomyLanguage,
@@ -204,6 +235,9 @@ function nodeMatches(value: string, candidate: string) {
 export const useTaxonomyStore = defineStore('taxonomy', {
   state: () => ({
     groups: readTaxonomy(),
+    isLoaded: false,
+    isSaving: false,
+    syncError: '',
   }),
   getters: {
     cascaderOptions: (state) =>
@@ -221,12 +255,77 @@ export const useTaxonomyStore = defineStore('taxonomy', {
       })),
   },
   actions: {
-    persist() {
-      if (typeof window === 'undefined') {
+    async load() {
+      if (this.isLoaded) {
         return
       }
 
-      window.localStorage.setItem(taxonomyStorageKey, JSON.stringify(this.groups))
+      this.syncError = ''
+
+      if (!shouldUseSupabaseData) {
+        this.isLoaded = true
+        return
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('catalog_taxonomy')
+          .select('groups')
+          .eq('id', taxonomyRecordId)
+          .maybeSingle()
+
+        if (error) {
+          throw error
+        }
+
+        if (data?.groups) {
+          this.groups = normalizeTaxonomyGroups(data.groups)
+          writeLocalTaxonomy(this.groups)
+        }
+      } catch (error) {
+        this.syncError = error instanceof Error ? error.message : 'Catalog taxonomy sync failed.'
+        console.warn('[PartsPro] Catalog taxonomy fallback to local data', error)
+      } finally {
+        this.isLoaded = true
+      }
+    },
+    persist() {
+      writeLocalTaxonomy(this.groups)
+
+      if (shouldUseSupabaseData) {
+        void this.persistRemote()
+      }
+    },
+    async persistRemote() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session?.user) {
+        return
+      }
+
+      this.isSaving = true
+      this.syncError = ''
+
+      try {
+        const { error } = await supabase
+          .from('catalog_taxonomy')
+          .upsert({
+            id: taxonomyRecordId,
+            groups: this.groups,
+            updated_by: session.user.id,
+          })
+
+        if (error) {
+          throw error
+        }
+      } catch (error) {
+        this.syncError = error instanceof Error ? error.message : 'Catalog taxonomy save failed.'
+        console.warn('[PartsPro] Catalog taxonomy save failed', error)
+      } finally {
+        this.isSaving = false
+      }
     },
     resetDefaults() {
       this.groups = cloneDefaultTaxonomy()

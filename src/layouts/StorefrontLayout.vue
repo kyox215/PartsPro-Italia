@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   AppstoreOutlined,
@@ -112,6 +112,10 @@ const navigationSections = computed<Array<{ key: string; label: string; children
     ],
   },
 ])
+
+onMounted(() => {
+  void taxonomyStore.load()
+})
 
 const footerColumns = computed(() => [
   {

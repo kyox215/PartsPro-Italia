@@ -2,6 +2,10 @@ import type { User } from '@supabase/supabase-js'
 import { hasSupabaseConfig, supabase } from '@/lib/supabase'
 import type { AuthProfile, UserRole } from '@/types/auth'
 
+type ProfileRow = {
+  role: UserRole
+}
+
 function normalizeRole(role: unknown): UserRole {
   if (
     role === 'customer' ||
@@ -16,11 +20,25 @@ function normalizeRole(role: unknown): UserRole {
   return 'customer'
 }
 
-function profileFromUser(user: User): AuthProfile {
+async function fetchProfileRole(user: User) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (error) {
+    console.warn('[PartsPro] Supabase profile role fallback to app_metadata', error)
+  }
+
+  return normalizeRole((data as ProfileRow | null)?.role || user.app_metadata?.role)
+}
+
+async function profileFromUser(user: User): Promise<AuthProfile> {
   return {
     id: user.id,
     email: user.email || 'unknown@partspro.local',
-    role: normalizeRole(user.app_metadata?.role),
+    role: await fetchProfileRole(user),
     source: 'supabase',
   }
 }

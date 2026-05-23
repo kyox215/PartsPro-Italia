@@ -268,7 +268,10 @@ async function saveProduct() {
   message.success('商品 PIM 已更新。')
 }
 
-onMounted(refreshProducts)
+onMounted(async () => {
+  await taxonomyStore.load()
+  await refreshProducts()
+})
 
 watch(
   () => taxonomyStore.groups.length,
