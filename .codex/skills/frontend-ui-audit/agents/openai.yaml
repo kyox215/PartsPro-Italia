@@ -1,8 +1,0 @@
-interface:
-  display_name: "Frontend UI Audit"
-  short_description: "Checks responsive UI alignment and visual defects"
-  brand_color: "#2563EB"
-  default_prompt: "Use $frontend-ui-audit to inspect this page for layout misalignment, hidden controls, and responsive UI defects."
-
-policy:
-  allow_implicit_invocation: true

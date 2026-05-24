@@ -1,0 +1,352 @@
+{
+  "app": {
+    "name": "PartsPro",
+    "tagline": "Project foundation ready.",
+    "description": "A clean App Router shell for the PartsPro product, admin, and data layers.",
+    "status": "Framework only"
+  },
+  "auth": {
+    "login": {
+      "title": "Secure sign in",
+      "description": "Sign in to your PartsPro account to manage your profile and protected areas.",
+      "submit": "Sign in",
+      "submitting": "Signing in...",
+      "switchText": "No account yet?",
+      "switchAction": "Create one"
+    },
+    "register": {
+      "title": "Create account",
+      "description": "Create a customer account. B2B permissions will be handled after review.",
+      "submit": "Create account",
+      "submitting": "Creating...",
+      "switchText": "Already have an account?",
+      "switchAction": "Sign in"
+    },
+    "fields": {
+      "fullName": "Full name",
+      "fullNamePlaceholder": "Mario Rossi",
+      "email": "Email",
+      "emailPlaceholder": "name@company.it",
+      "password": "Password",
+      "passwordPlaceholder": "Minimum 6 characters",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password"
+    },
+    "validation": {
+      "email": "Enter a valid email address.",
+      "password": "Password must be at least 6 characters.",
+      "fullName": "Name must be 80 characters or fewer."
+    },
+    "toast": {
+      "signedIn": {
+        "title": "Signed in",
+        "description": "Your session is ready."
+      },
+      "registered": {
+        "title": "Account created",
+        "description": "Your customer profile is ready."
+      },
+      "checkEmail": {
+        "title": "Check your email",
+        "description": "Confirm your account from the link we sent."
+      },
+      "invalidFields": {
+        "title": "Invalid fields",
+        "description": "Check the email and password."
+      },
+      "invalidCredentials": {
+        "title": "Sign in failed",
+        "description": "Email or password is incorrect."
+      },
+      "authFailed": {
+        "title": "Action failed",
+        "description": "Try again in a moment."
+      },
+      "profileFailed": {
+        "title": "Profile not updated",
+        "description": "The session exists, but the profile needs review."
+      }
+    },
+    "account": {
+      "title": "Account center",
+      "description": "Active session and Supabase profile role.",
+      "email": "Email",
+      "role": "Role",
+      "signOut": "Sign out"
+    },
+    "admin": {
+      "title": "Protected admin area",
+      "description": "Technical placeholder for role, session, and redirect checks.",
+      "roleLabel": "Active role"
+    },
+    "forbidden": {
+      "title": "Access denied",
+      "description": "Your role cannot open this area.",
+      "action": "Back to account"
+    }
+  },
+  "home": {
+    "header": {
+      "categories": "Categories",
+      "search": "Products",
+      "cart": "Cart",
+      "account": "Account"
+    },
+    "cart": {
+      "cart": "Cart",
+      "empty": "Your cart is empty.",
+      "subtotal": "Subtotal",
+      "checkout": "Go to checkout",
+      "clear": "Clear",
+      "increase": "Increase quantity",
+      "decrease": "Decrease quantity",
+      "remove": "Remove SKU"
+    },
+    "hero": {
+      "eyebrow": "B2B smartphone parts",
+      "title": "Professional repair parts, ready for fast purchasing",
+      "description": "Search by SKU, model, or brand and prepare compact orders for repair shops.",
+      "primary": "View products",
+      "secondary": "B2B access"
+    },
+    "search": {
+      "placeholder": "Search SKU, product, brand, or model...",
+      "button": "Search",
+      "camera": "Search by photo",
+      "clear": "Clear search",
+      "toastTitle": "Search ready",
+      "toastDescription": "Opening results"
+    },
+    "categories": {
+      "title": "Quick categories",
+      "viewAll": "All"
+    },
+    "products": {
+      "title": "Requested products",
+      "description": "Seed-aligned demo SKU with stock and quality visible.",
+      "viewAll": "View all",
+      "stock": "Stock",
+      "add": "Add",
+      "toastTitle": "Added to cart",
+      "toastDescription": "added as a local preview"
+    },
+    "b2b": {
+      "title": "Pricing and workflows for repair shops and resellers",
+      "description": "Create an account and prepare your B2B profile. Commercial review belongs to the dedicated module.",
+      "primary": "Register",
+      "secondary": "Sign in",
+      "benefits": ["B2B price lists", "Fast ordering", "Secure payments"]
+    },
+    "brands": {
+      "title": "Main brands",
+      "description": "Quick access to the brands repair shops request most.",
+      "viewAll": "All brands"
+    },
+    "mobileNav": {
+      "home": "Home",
+      "categories": "Categories",
+      "cart": "Cart",
+      "favorites": "Saved",
+      "account": "Account"
+    }
+  },
+  "catalog": {
+    "header": {
+      "categories": "Categories",
+      "search": "Products",
+      "cart": "Cart",
+      "account": "Account"
+    },
+    "cart": {
+      "cart": "Cart",
+      "empty": "Your cart is empty.",
+      "subtotal": "Subtotal",
+      "checkout": "Go to checkout",
+      "clear": "Clear",
+      "increase": "Increase quantity",
+      "decrease": "Decrease quantity",
+      "remove": "Remove SKU"
+    },
+    "mobileNav": {
+      "home": "Home",
+      "categories": "Categories",
+      "cart": "Cart",
+      "favorites": "Saved",
+      "account": "Account"
+    },
+    "search": {
+      "placeholder": "Search SKU, product, brand, or model...",
+      "submit": "Search"
+    },
+    "products": {
+      "title": "Parts catalog",
+      "description": "Demo SKU organized by brand, category, quality, and availability."
+    },
+    "searchPage": {
+      "title": "Search results",
+      "description": "Search by SKU, model, brand, or product name."
+    },
+    "brand": {
+      "description": "Demo SKU filtered for {brand}."
+    },
+    "filters": {
+      "filters": "Filters",
+      "categories": "Categories",
+      "brands": "Brands",
+      "quality": "Quality",
+      "all": "All"
+    },
+    "results": {
+      "count": "{count} SKU found"
+    },
+    "productCard": {
+      "empty": "No SKU matched these filters.",
+      "stock": "Stock",
+      "model": "Model",
+      "add": "Add",
+      "addedTitle": "Added to cart",
+      "addedDescription": "added to the local cart",
+      "inStock": "In Stock",
+      "lowStock": "Low Stock",
+      "outOfStock": "Out of Stock"
+    },
+    "detail": {
+      "back": "Back to catalog",
+      "skuList": "SKU variants",
+      "models": "Models",
+      "category": "Category",
+      "brand": "Brand",
+      "stock": "Stock",
+      "quality": "Quality",
+      "price": "Price",
+      "moq": "MOQ",
+      "add": "Add",
+      "addedTitle": "Added to cart",
+      "addedDescription": "added to the local cart",
+      "related": "More SKU in this category",
+      "inStock": "In Stock",
+      "lowStock": "Low Stock",
+      "outOfStock": "Out of Stock"
+    }
+  },
+  "admin": {
+    "sidebar": {
+      "dashboard": "Dashboard",
+      "products": "Products",
+      "orders": "Orders",
+      "customers": "Customers",
+      "inventory": "Inventory",
+      "storefront": "Storefront",
+      "role": "Role"
+    },
+    "topbar": {
+      "search": "Search admin...",
+      "export": "Export",
+      "create": "New",
+      "sync": "Sync"
+    },
+    "dashboard": {
+      "title": "Operations dashboard",
+      "description": "Compact view for orders, revenue, SKU, and critical stock.",
+      "salesTrend": "Sales trend",
+      "orderStatus": "Order status",
+      "inventoryStatus": "Stock distribution",
+      "recentOrders": "Recent orders",
+      "metrics": {
+        "orders": "Today's orders",
+        "revenue": "Sales",
+        "customers": "Customers",
+        "sku": "Total SKU"
+      }
+    },
+    "pages": {
+      "products": {
+        "title": "Product management",
+        "description": "Dense table for SKU, quality, price, stock, and status."
+      },
+      "orders": {
+        "title": "Order management",
+        "description": "Review order status, payment, total, and fulfillment."
+      },
+      "customers": {
+        "title": "Customer management",
+        "description": "Monitor retail, B2B, and review status."
+      },
+      "inventory": {
+        "title": "Inventory management",
+        "description": "Available stock, reserved units, location, and thresholds."
+      }
+    },
+    "table": {
+      "search": "Search rows...",
+      "empty": "No results.",
+      "rows": "rows",
+      "selected": "selected",
+      "previousPage": "Previous page",
+      "nextPage": "Next page",
+      "bulkExport": "Export selection",
+      "bulkStatus": "Update status",
+      "view": "View",
+      "edit": "Edit",
+      "confirm": "Confirm",
+      "cancel": "Cancel",
+      "confirmTitle": "Confirm this action?",
+      "confirmDescription": "This is a local demo: no data will be persisted.",
+      "toastTitle": "Action completed",
+      "toastDescription": "Local feedback, without database writes.",
+      "columns": {
+        "sku": "SKU",
+        "name": "Name",
+        "brand": "Brand",
+        "quality": "Quality",
+        "stock": "Stock",
+        "price": "Price",
+        "status": "Status",
+        "updatedAt": "Updated",
+        "order": "Order",
+        "customer": "Customer",
+        "total": "Total",
+        "items": "Items",
+        "payment": "Payment",
+        "createdAt": "Created",
+        "email": "Email",
+        "type": "Type",
+        "orders": "Orders",
+        "revenue": "Revenue",
+        "location": "Location",
+        "available": "Available",
+        "reserved": "Reserved",
+        "actions": "Actions"
+      }
+    },
+    "status": {
+      "active": "Active",
+      "draft": "Draft",
+      "low_stock": "Low stock",
+      "new": "New",
+      "paid": "Paid",
+      "pending": "Pending",
+      "processing": "Processing",
+      "shipped": "Shipped",
+      "retail": "Retail",
+      "b2b": "B2B",
+      "approved": "Approved",
+      "suspended": "Suspended",
+      "in_stock": "In stock",
+      "out_of_stock": "Out of stock"
+    }
+  },
+  "stack": {
+    "items": [
+      "Next.js 16 App Router",
+      "TypeScript",
+      "Tailwind CSS",
+      "shadcn/ui with Radix UI",
+      "Supabase",
+      "TanStack Table",
+      "React Hook Form",
+      "Zod",
+      "Framer Motion"
+    ]
+  }
+}
