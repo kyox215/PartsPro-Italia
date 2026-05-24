@@ -1,0 +1,352 @@
+{
+  "app": {
+    "name": "PartsPro",
+    "tagline": "Base del progetto pronta.",
+    "description": "Una shell pulita con App Router per i livelli prodotto, admin e dati di PartsPro.",
+    "status": "Solo framework"
+  },
+  "auth": {
+    "login": {
+      "title": "Accesso sicuro",
+      "description": "Accedi al tuo account PartsPro per gestire profilo e area riservata.",
+      "submit": "Accedi",
+      "submitting": "Accesso...",
+      "switchText": "Non hai un account?",
+      "switchAction": "Registrati"
+    },
+    "register": {
+      "title": "Crea account",
+      "description": "Apri un account cliente. I permessi B2B saranno gestiti dopo la verifica.",
+      "submit": "Crea account",
+      "submitting": "Creazione...",
+      "switchText": "Hai gia un account?",
+      "switchAction": "Accedi"
+    },
+    "fields": {
+      "fullName": "Nome completo",
+      "fullNamePlaceholder": "Mario Rossi",
+      "email": "Email",
+      "emailPlaceholder": "nome@azienda.it",
+      "password": "Password",
+      "passwordPlaceholder": "Minimo 6 caratteri",
+      "showPassword": "Mostra password",
+      "hidePassword": "Nascondi password"
+    },
+    "validation": {
+      "email": "Inserisci una email valida.",
+      "password": "La password deve avere almeno 6 caratteri.",
+      "fullName": "Il nome deve restare entro 80 caratteri."
+    },
+    "toast": {
+      "signedIn": {
+        "title": "Accesso riuscito",
+        "description": "Sessione aggiornata correttamente."
+      },
+      "registered": {
+        "title": "Account creato",
+        "description": "Il profilo cliente e pronto."
+      },
+      "checkEmail": {
+        "title": "Controlla la email",
+        "description": "Conferma l'account dal link ricevuto."
+      },
+      "invalidFields": {
+        "title": "Dati non validi",
+        "description": "Controlla email e password."
+      },
+      "invalidCredentials": {
+        "title": "Accesso non riuscito",
+        "description": "Email o password non corretti."
+      },
+      "authFailed": {
+        "title": "Operazione non riuscita",
+        "description": "Riprova tra poco."
+      },
+      "profileFailed": {
+        "title": "Profilo non aggiornato",
+        "description": "La sessione esiste, ma il profilo va verificato."
+      }
+    },
+    "account": {
+      "title": "Centro account",
+      "description": "Sessione attiva e ruolo collegato al profilo Supabase.",
+      "email": "Email",
+      "role": "Ruolo",
+      "signOut": "Esci"
+    },
+    "admin": {
+      "title": "Area admin protetta",
+      "description": "Placeholder tecnico per verificare ruolo, sessione e redirect.",
+      "roleLabel": "Ruolo attivo"
+    },
+    "forbidden": {
+      "title": "Accesso negato",
+      "description": "Il tuo ruolo non permette di aprire questa area.",
+      "action": "Torna all'account"
+    }
+  },
+  "home": {
+    "header": {
+      "categories": "Categorie",
+      "search": "Prodotti",
+      "cart": "Carrello",
+      "account": "Account"
+    },
+    "cart": {
+      "cart": "Carrello",
+      "empty": "Il carrello e vuoto.",
+      "subtotal": "Subtotale",
+      "checkout": "Vai al checkout",
+      "clear": "Svuota",
+      "increase": "Aumenta quantita",
+      "decrease": "Diminuisci quantita",
+      "remove": "Rimuovi SKU"
+    },
+    "hero": {
+      "eyebrow": "B2B ricambi smartphone",
+      "title": "Ricambi professionali per riparatori, pronti da acquistare",
+      "description": "Cerca per SKU, modello o marca e prepara ordini compatti per laboratorio e negozio.",
+      "primary": "Vedi prodotti",
+      "secondary": "Accesso B2B"
+    },
+    "search": {
+      "placeholder": "Cerca SKU, prodotto, marca o modello...",
+      "button": "Cerca",
+      "camera": "Cerca con foto",
+      "clear": "Svuota ricerca",
+      "toastTitle": "Ricerca pronta",
+      "toastDescription": "Apro i risultati"
+    },
+    "categories": {
+      "title": "Categorie rapide",
+      "viewAll": "Tutte"
+    },
+    "products": {
+      "title": "Prodotti richiesti",
+      "description": "SKU demo allineati ai dati seed, con stock e qualita visibili.",
+      "viewAll": "Vedi tutto",
+      "stock": "Stock",
+      "add": "Aggiungi",
+      "toastTitle": "Aggiunto al carrello",
+      "toastDescription": "aggiunto come anteprima locale"
+    },
+    "b2b": {
+      "title": "Prezzi e flussi pensati per officine e rivenditori",
+      "description": "Crea un account e prepara il profilo B2B. La revisione commerciale sara gestita nel modulo dedicato.",
+      "primary": "Registrati",
+      "secondary": "Accedi",
+      "benefits": ["Listini B2B", "Ordini rapidi", "Pagamenti sicuri"]
+    },
+    "brands": {
+      "title": "Brand principali",
+      "description": "Accesso rapido ai marchi piu richiesti dai laboratori.",
+      "viewAll": "Tutti i brand"
+    },
+    "mobileNav": {
+      "home": "Home",
+      "categories": "Categorie",
+      "cart": "Carrello",
+      "favorites": "Preferiti",
+      "account": "Account"
+    }
+  },
+  "catalog": {
+    "header": {
+      "categories": "Categorie",
+      "search": "Prodotti",
+      "cart": "Carrello",
+      "account": "Account"
+    },
+    "cart": {
+      "cart": "Carrello",
+      "empty": "Il carrello e vuoto.",
+      "subtotal": "Subtotale",
+      "checkout": "Vai al checkout",
+      "clear": "Svuota",
+      "increase": "Aumenta quantita",
+      "decrease": "Diminuisci quantita",
+      "remove": "Rimuovi SKU"
+    },
+    "mobileNav": {
+      "home": "Home",
+      "categories": "Categorie",
+      "cart": "Carrello",
+      "favorites": "Preferiti",
+      "account": "Account"
+    },
+    "search": {
+      "placeholder": "Cerca SKU, prodotto, marca o modello...",
+      "submit": "Cerca"
+    },
+    "products": {
+      "title": "Catalogo ricambi",
+      "description": "SKU demo organizzati per marca, categoria, qualita e disponibilita."
+    },
+    "searchPage": {
+      "title": "Risultati ricerca",
+      "description": "Cerca per SKU, modello, marca o nome prodotto."
+    },
+    "brand": {
+      "description": "SKU demo filtrati per {brand}."
+    },
+    "filters": {
+      "filters": "Filtri",
+      "categories": "Categorie",
+      "brands": "Brand",
+      "quality": "Qualita",
+      "all": "Tutti"
+    },
+    "results": {
+      "count": "{count} SKU trovati"
+    },
+    "productCard": {
+      "empty": "Nessuno SKU trovato con questi filtri.",
+      "stock": "Stock",
+      "model": "Modello",
+      "add": "Aggiungi",
+      "addedTitle": "Aggiunto al carrello",
+      "addedDescription": "aggiunto al carrello locale",
+      "inStock": "Disponibile",
+      "lowStock": "Scorta bassa",
+      "outOfStock": "Esaurito"
+    },
+    "detail": {
+      "back": "Torna al catalogo",
+      "skuList": "Varianti SKU",
+      "models": "Modelli",
+      "category": "Categoria",
+      "brand": "Brand",
+      "stock": "Stock",
+      "quality": "Qualita",
+      "price": "Prezzo",
+      "moq": "MOQ",
+      "add": "Aggiungi",
+      "addedTitle": "Aggiunto al carrello",
+      "addedDescription": "aggiunto al carrello locale",
+      "related": "Altri SKU della categoria",
+      "inStock": "Disponibile",
+      "lowStock": "Scorta bassa",
+      "outOfStock": "Esaurito"
+    }
+  },
+  "admin": {
+    "sidebar": {
+      "dashboard": "Dashboard",
+      "products": "Prodotti",
+      "orders": "Ordini",
+      "customers": "Clienti",
+      "inventory": "Inventario",
+      "storefront": "Storefront",
+      "role": "Ruolo"
+    },
+    "topbar": {
+      "search": "Cerca in admin...",
+      "export": "Esporta",
+      "create": "Nuovo",
+      "sync": "Sincronizza"
+    },
+    "dashboard": {
+      "title": "Dashboard operativa",
+      "description": "Vista compatta per ordini, ricavi, SKU e stock critico.",
+      "salesTrend": "Trend vendite",
+      "orderStatus": "Stato ordini",
+      "inventoryStatus": "Distribuzione stock",
+      "recentOrders": "Ordini recenti",
+      "metrics": {
+        "orders": "Ordini oggi",
+        "revenue": "Vendite",
+        "customers": "Clienti",
+        "sku": "SKU totali"
+      }
+    },
+    "pages": {
+      "products": {
+        "title": "Gestione prodotti",
+        "description": "Tabella densa per SKU, qualita, prezzo, stock e stato."
+      },
+      "orders": {
+        "title": "Gestione ordini",
+        "description": "Controlla stato ordine, pagamento, totale e preparazione."
+      },
+      "customers": {
+        "title": "Gestione clienti",
+        "description": "Monitora clienti retail, B2B e stato revisione."
+      },
+      "inventory": {
+        "title": "Gestione inventario",
+        "description": "Stock disponibile, riservato, ubicazione e soglie."
+      }
+    },
+    "table": {
+      "search": "Cerca righe...",
+      "empty": "Nessun risultato.",
+      "rows": "righe",
+      "selected": "selezionate",
+      "previousPage": "Pagina precedente",
+      "nextPage": "Pagina successiva",
+      "bulkExport": "Esporta selezione",
+      "bulkStatus": "Aggiorna stato",
+      "view": "Vedi",
+      "edit": "Modifica",
+      "confirm": "Conferma",
+      "cancel": "Annulla",
+      "confirmTitle": "Confermare l'azione?",
+      "confirmDescription": "Questa e una demo locale: nessun dato verra salvato.",
+      "toastTitle": "Azione completata",
+      "toastDescription": "Feedback locale, senza scrittura database.",
+      "columns": {
+        "sku": "SKU",
+        "name": "Nome",
+        "brand": "Brand",
+        "quality": "Qualita",
+        "stock": "Stock",
+        "price": "Prezzo",
+        "status": "Stato",
+        "updatedAt": "Aggiornato",
+        "order": "Ordine",
+        "customer": "Cliente",
+        "total": "Totale",
+        "items": "Articoli",
+        "payment": "Pagamento",
+        "createdAt": "Creato",
+        "email": "Email",
+        "type": "Tipo",
+        "orders": "Ordini",
+        "revenue": "Ricavi",
+        "location": "Posizione",
+        "available": "Disponibile",
+        "reserved": "Riservato",
+        "actions": "Azioni"
+      }
+    },
+    "status": {
+      "active": "Attivo",
+      "draft": "Bozza",
+      "low_stock": "Scorta bassa",
+      "new": "Nuovo",
+      "paid": "Pagato",
+      "pending": "In attesa",
+      "processing": "In lavorazione",
+      "shipped": "Spedito",
+      "retail": "Retail",
+      "b2b": "B2B",
+      "approved": "Approvato",
+      "suspended": "Sospeso",
+      "in_stock": "Disponibile",
+      "out_of_stock": "Esaurito"
+    }
+  },
+  "stack": {
+    "items": [
+      "Next.js 16 App Router",
+      "TypeScript",
+      "Tailwind CSS",
+      "shadcn/ui con Radix UI",
+      "Supabase",
+      "TanStack Table",
+      "React Hook Form",
+      "Zod",
+      "Framer Motion"
+    ]
+  }
+}
