@@ -1,8 +1,0 @@
-interface:
-  display_name: "Mobile UI Safe Audit"
-  short_description: "Mobile UI polish without desktop changes"
-  brand_color: "#0F766E"
-  default_prompt: "Use $mobile-ui-safe-audit to inspect and improve the mobile frontend while preserving desktop behavior."
-
-policy:
-  allow_implicit_invocation: true
